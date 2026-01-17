@@ -649,6 +649,195 @@
             height: 14px;
         }
 
+        /* Expression indicator */
+        .expr-input-wrapper {
+            position: relative;
+        }
+        .expr-indicator {
+            position: absolute;
+            right: 4px;
+            bottom: 4px;
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-bottom: 10px solid #28a745;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+            z-index: 10;
+        }
+        .expr-indicator:hover {
+            opacity: 1;
+        }
+        .expr-indicator.has-error {
+            border-bottom-color: #e74c3c;
+        }
+        /* Contenteditable styling */
+        .expr-input-wrapper [contenteditable] {
+            outline: none;
+        }
+        .expr-input-wrapper [contenteditable]:empty:before {
+            content: attr(data-placeholder);
+            color: #555;
+        }
+
+        /* Expression Editor Modal */
+        .expr-editor-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1100;
+        }
+        .expr-editor-dialog {
+            background: #1a1a2e;
+            border: 1px solid #3a3a5e;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 1200px;
+            height: 80%;
+            max-height: 700px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .expr-editor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid #3a3a5e;
+            background: #252542;
+        }
+        .expr-editor-header h3 {
+            margin: 0;
+            font-size: 14px;
+            color: #eee;
+        }
+        .expr-editor-close {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+        .expr-editor-close:hover {
+            color: #eee;
+        }
+        .expr-editor-body {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        .expr-editor-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-width: 0;
+        }
+        .expr-editor-pane.input-pane {
+            background: #12121f;
+        }
+        .expr-editor-pane.expr-pane {
+            border-left: 1px solid #3a3a5e;
+            border-right: 1px solid #3a3a5e;
+        }
+        .expr-editor-pane.result-pane {
+            background: #12121f;
+        }
+        .expr-pane-header {
+            padding: 10px 14px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #888;
+            border-bottom: 1px solid #3a3a5e;
+        }
+        .expr-pane-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+        .expr-input-textarea {
+            width: 100%;
+            height: 100%;
+            min-height: 200px;
+            background: #1a1a2e;
+            border: 1px solid #3a3a5e;
+            border-radius: 6px;
+            color: #eee;
+            font-size: 13px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            padding: 12px;
+            resize: none;
+            outline: none;
+        }
+        .expr-input-textarea:focus {
+            border-color: #667eea;
+        }
+        .expr-result-display {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+        }
+        .expr-result-error {
+            color: #e74c3c;
+            background: rgba(231, 76, 60, 0.1);
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        .expr-result-value {
+            color: #9cdcfe;
+        }
+        .expr-editor-footer {
+            padding: 12px 16px;
+            border-top: 1px solid #3a3a5e;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+        .expr-editor-btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            border: none;
+        }
+        .expr-editor-btn-primary {
+            background: #667eea;
+            color: #fff;
+        }
+        .expr-editor-btn-primary:hover {
+            background: #5a6fd6;
+        }
+        .expr-editor-btn-cancel {
+            background: #3a3a5e;
+            color: #ccc;
+        }
+        .expr-editor-btn-cancel:hover {
+            background: #4a4a6e;
+        }
+        /* Draggable JSON paths */
+        .json-draggable {
+            cursor: grab;
+        }
+        .json-draggable:hover {
+            background: rgba(102, 126, 234, 0.2);
+            border-radius: 2px;
+        }
+        .json-draggable:active {
+            cursor: grabbing;
+        }
+
         /* JSON Viewer styles */
         .json-viewer {
             font-family: 'Monaco', 'Menlo', monospace;
@@ -763,6 +952,122 @@
             }
             return null;
         }
+
+        // Expression evaluation utilities
+        // Evaluates a single JavaScript expression with $ as the input data
+        function evaluateExpression(expr, $) {
+            try {
+                // Create a function that has $ in scope and evaluates the expression
+                const fn = new Function('$', `return (${expr})`);
+                return { value: fn($), error: null };
+            } catch (e) {
+                return { value: null, error: e.message };
+            }
+        }
+
+        // Parse a template string and find all {{...}} expression blocks
+        function parseTemplate(template) {
+            const parts = [];
+            const regex = /\{\{([\s\S]*?)\}\}/g;
+            let lastIndex = 0;
+            let match;
+
+            while ((match = regex.exec(template)) !== null) {
+                // Add text before this expression
+                if (match.index > lastIndex) {
+                    parts.push({ type: 'text', value: template.slice(lastIndex, match.index) });
+                }
+                // Add the expression
+                parts.push({ type: 'expr', value: match[1], raw: match[0] });
+                lastIndex = regex.lastIndex;
+            }
+
+            // Add remaining text
+            if (lastIndex < template.length) {
+                parts.push({ type: 'text', value: template.slice(lastIndex) });
+            }
+
+            return parts;
+        }
+
+        // Evaluate a template string, returning both the result and details for UI
+        // Returns: { result: string, parts: [{ type, value, evaluated, error }] }
+        function evaluateTemplate(template, $) {
+            if (!template || typeof template !== 'string') {
+                return { result: template, parts: [], hasExpressions: false };
+            }
+
+            const parts = parseTemplate(template);
+            if (parts.length === 0) {
+                return { result: '', parts: [], hasExpressions: false };
+            }
+
+            const hasExpressions = parts.some(p => p.type === 'expr');
+            const evaluatedParts = parts.map(part => {
+                if (part.type === 'text') {
+                    return { ...part, evaluated: part.value, error: null };
+                } else {
+                    const { value, error } = evaluateExpression(part.value, $);
+                    const evaluated = error ? '' : (typeof value === 'object' ? JSON.stringify(value) : String(value));
+                    return { ...part, evaluated, error };
+                }
+            });
+
+            const hasErrors = evaluatedParts.some(p => p.error);
+            const result = hasErrors ? null : evaluatedParts.map(p => p.evaluated).join('');
+
+            return { result, parts: evaluatedParts, hasExpressions, hasErrors };
+        }
+
+        // Get the JSON path for a value in an object (for drag-and-drop)
+        function getJsonPath(obj, targetPath = []) {
+            return '$' + targetPath.map(key => {
+                // Use bracket notation for keys with special characters or numbers
+                if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)) {
+                    return '.' + key;
+                } else {
+                    return `[${JSON.stringify(key)}]`;
+                }
+            }).join('');
+        }
+
+        // Recursively evaluate all expressions in a data structure
+        // This is used at execution time to resolve {{...}} in node data
+        function evaluateDataExpressions(data, $) {
+            if (data === null || data === undefined) {
+                return data;
+            }
+            if (typeof data === 'string') {
+                const result = evaluateTemplate(data, $);
+                // If template has expressions and evaluates successfully, return result
+                // If it's pure expression returning non-string, try to preserve type
+                if (result.hasExpressions && !result.hasErrors) {
+                    // If entire template is one expression, return the actual value (preserve type)
+                    if (result.parts.length === 1 && result.parts[0].type === 'expr') {
+                        const { value } = evaluateExpression(result.parts[0].value, $);
+                        return value;
+                    }
+                    return result.result;
+                }
+                return data; // Return original if no expressions or has errors
+            }
+            if (Array.isArray(data)) {
+                return data.map(item => evaluateDataExpressions(item, $));
+            }
+            if (typeof data === 'object') {
+                const result = {};
+                for (const [key, value] of Object.entries(data)) {
+                    // Evaluate both keys and values
+                    const evaluatedKey = evaluateDataExpressions(key, $);
+                    result[evaluatedKey] = evaluateDataExpressions(value, $);
+                }
+                return result;
+            }
+            return data;
+        }
+
+        // Expose for use by node modules
+        window.evaluateDataExpressions = evaluateDataExpressions;
 
         // Save state to localStorage
         function saveToStorage(state) {
@@ -1277,32 +1582,415 @@
             return React.createElement('span', null, String(data));
         }
 
-        // Property Editor Components
-        function TextPropertyEditor({ property, onChange }) {
-            const [value, setValue] = useState(property.value);
+        // Draggable JSON Viewer for Expression Editor
+        // Allows dragging JSON paths to insert into expressions
+        function DraggableJsonViewer({ data, path = [], defaultExpanded = false, isFirstItem = true, onDragPath }) {
+            const [expanded, setExpanded] = useState(defaultExpanded || isFirstItem);
 
-            const handleBlur = () => {
-                if (value !== property.value) {
-                    onChange(property.id, value);
+            const handleToggle = (e) => {
+                e.stopPropagation();
+                setExpanded(!expanded);
+            };
+
+            const handleDragStart = (e, currentPath) => {
+                const pathStr = getJsonPath(data, currentPath);
+                e.dataTransfer.setData('text/plain', `{{${pathStr}}}`);
+                e.dataTransfer.effectAllowed = 'copy';
+            };
+
+            if (data === null) {
+                return React.createElement('span', {
+                    className: 'json-null json-draggable',
+                    draggable: true,
+                    onDragStart: (e) => handleDragStart(e, path),
+                }, 'null');
+            }
+            if (data === undefined) return React.createElement('span', { className: 'json-undefined' }, 'undefined');
+
+            const type = typeof data;
+
+            if (type === 'string') {
+                return React.createElement('span', {
+                    className: 'json-string json-draggable',
+                    draggable: true,
+                    onDragStart: (e) => handleDragStart(e, path),
+                }, `"${data}"`);
+            }
+            if (type === 'number') {
+                return React.createElement('span', {
+                    className: 'json-number json-draggable',
+                    draggable: true,
+                    onDragStart: (e) => handleDragStart(e, path),
+                }, String(data));
+            }
+            if (type === 'boolean') {
+                return React.createElement('span', {
+                    className: 'json-boolean json-draggable',
+                    draggable: true,
+                    onDragStart: (e) => handleDragStart(e, path),
+                }, String(data));
+            }
+
+            if (Array.isArray(data)) {
+                if (data.length === 0) {
+                    return React.createElement('span', { className: 'json-bracket' }, '[]');
+                }
+                return React.createElement('div', { className: 'json-array' }, [
+                    React.createElement('span', {
+                        key: 'bracket-open',
+                        className: 'json-bracket json-toggle json-draggable',
+                        onClick: handleToggle,
+                        draggable: true,
+                        onDragStart: (e) => handleDragStart(e, path),
+                        title: expanded ? 'Collapse (drag to insert path)' : 'Expand (drag to insert path)',
+                    }, expanded ? '[' : `[${data.length} items...]`),
+                    expanded && React.createElement('div', { key: 'items', className: 'json-indent' },
+                        data.map((item, index) =>
+                            React.createElement('div', { key: index, className: 'json-array-item' }, [
+                                React.createElement(DraggableJsonViewer, {
+                                    key: 'value',
+                                    data: item,
+                                    path: [...path, index],
+                                    isFirstItem: index === 0,
+                                    onDragPath,
+                                }),
+                                index < data.length - 1 && React.createElement('span', { key: 'comma', className: 'json-comma' }, ','),
+                            ])
+                        )
+                    ),
+                    expanded && React.createElement('span', { key: 'bracket-close', className: 'json-bracket' }, ']'),
+                ]);
+            }
+
+            if (type === 'object') {
+                const keys = Object.keys(data);
+                if (keys.length === 0) {
+                    return React.createElement('span', { className: 'json-bracket' }, '{}');
+                }
+                return React.createElement('div', { className: 'json-object' }, [
+                    React.createElement('span', {
+                        key: 'bracket-open',
+                        className: 'json-bracket json-toggle json-draggable',
+                        onClick: handleToggle,
+                        draggable: true,
+                        onDragStart: (e) => handleDragStart(e, path),
+                        title: expanded ? 'Collapse (drag to insert path)' : 'Expand (drag to insert path)',
+                    }, expanded ? '{' : `{${keys.length} keys...}`),
+                    expanded && React.createElement('div', { key: 'props', className: 'json-indent' },
+                        keys.map((key, index) =>
+                            React.createElement('div', { key, className: 'json-property' }, [
+                                React.createElement('span', {
+                                    key: 'key',
+                                    className: 'json-key json-draggable',
+                                    draggable: true,
+                                    onDragStart: (e) => handleDragStart(e, [...path, key]),
+                                    title: 'Drag to insert path',
+                                }, `"${key}"`),
+                                React.createElement('span', { key: 'colon', className: 'json-colon' }, ': '),
+                                React.createElement(DraggableJsonViewer, {
+                                    key: 'value',
+                                    data: data[key],
+                                    path: [...path, key],
+                                    isFirstItem: false,
+                                    onDragPath,
+                                }),
+                                index < keys.length - 1 && React.createElement('span', { key: 'comma', className: 'json-comma' }, ','),
+                            ])
+                        )
+                    ),
+                    expanded && React.createElement('span', { key: 'bracket-close', className: 'json-bracket' }, '}'),
+                ]);
+            }
+
+            return React.createElement('span', null, String(data));
+        }
+
+        // Expression Editor Modal
+        // Three panes: Input data (draggable), Expression editor, Live result
+        function ExpressionEditorModal({ value, inputData, onSave, onClose }) {
+            const [localValue, setLocalValue] = useState(value || '');
+            const textareaRef = useRef(null);
+
+            // Evaluate the template with input data
+            const evaluation = useMemo(() => {
+                // Use first item if array, otherwise use whole input
+                const $ = Array.isArray(inputData) ? (inputData[0] || {}) : (inputData || {});
+                return evaluateTemplate(localValue, $);
+            }, [localValue, inputData]);
+
+            const handleSave = () => {
+                onSave(localValue);
+                onClose();
+            };
+
+            const handleKeyDown = (e) => {
+                if (e.key === 'Escape') {
+                    onClose();
+                } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    handleSave();
                 }
             };
 
-            return React.createElement('div', { className: 'property-group' }, [
-                React.createElement('label', { key: 'label', className: 'property-label' }, property.label),
-                React.createElement('input', {
-                    key: 'input',
-                    type: 'text',
-                    className: 'property-input',
+            // Handle drop from draggable JSON viewer
+            const handleDrop = (e) => {
+                e.preventDefault();
+                const text = e.dataTransfer.getData('text/plain');
+                if (text && textareaRef.current) {
+                    const textarea = textareaRef.current;
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+                    const newValue = localValue.substring(0, start) + text + localValue.substring(end);
+                    setLocalValue(newValue);
+                    // Set cursor after inserted text
+                    setTimeout(() => {
+                        textarea.focus();
+                        textarea.selectionStart = textarea.selectionEnd = start + text.length;
+                    }, 0);
+                }
+            };
+
+            const handleDragOver = (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+            };
+
+            // Render highlighted parts for the result pane
+            const renderResultParts = () => {
+                if (!evaluation.hasExpressions) {
+                    return React.createElement('div', { className: 'expr-result-value' }, localValue || '(empty)');
+                }
+
+                return React.createElement('div', null, [
+                    evaluation.parts.map((part, i) => {
+                        if (part.type === 'text') {
+                            return React.createElement('span', { key: i }, part.value);
+                        } else {
+                            if (part.error) {
+                                return React.createElement('span', {
+                                    key: i,
+                                    className: 'expr-result-error',
+                                    title: part.error,
+                                }, `{{${part.value}}}`);
+                            } else {
+                                return React.createElement('span', {
+                                    key: i,
+                                    className: 'expr-result-value',
+                                    style: { background: 'rgba(40, 167, 69, 0.2)', padding: '0 2px', borderRadius: '2px' },
+                                }, part.evaluated);
+                            }
+                        }
+                    }),
+                    evaluation.result !== null && React.createElement('div', {
+                        key: 'final',
+                        style: { marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #3a3a5e' },
+                    }, [
+                        React.createElement('div', { key: 'label', style: { fontSize: '10px', color: '#888', marginBottom: '4px' } }, 'FINAL RESULT'),
+                        React.createElement('div', { key: 'value', className: 'expr-result-value' }, evaluation.result),
+                    ]),
+                ]);
+            };
+
+            return React.createElement('div', {
+                className: 'expr-editor-overlay',
+                onClick: onClose,
+                onKeyDown: handleKeyDown,
+            },
+                React.createElement('div', {
+                    className: 'expr-editor-dialog',
+                    onClick: (e) => e.stopPropagation(),
+                }, [
+                    // Header
+                    React.createElement('div', { key: 'header', className: 'expr-editor-header' }, [
+                        React.createElement('h3', { key: 'title' }, 'Expression Editor'),
+                        React.createElement('button', {
+                            key: 'close',
+                            className: 'expr-editor-close',
+                            onClick: onClose,
+                        }, '×'),
+                    ]),
+                    // Body with three panes
+                    React.createElement('div', { key: 'body', className: 'expr-editor-body' }, [
+                        // Input pane - shows available data (draggable)
+                        // For arrays (map node input), show first item since $ represents each item
+                        React.createElement('div', { key: 'input', className: 'expr-editor-pane input-pane' }, [
+                            React.createElement('div', { key: 'header', className: 'expr-pane-header' },
+                                Array.isArray(inputData) && inputData.length > 1
+                                    ? `Input Data - $ is each item (${inputData.length} items)`
+                                    : 'Input Data (drag to insert)'
+                            ),
+                            React.createElement('div', { key: 'content', className: 'expr-pane-content' },
+                                inputData
+                                    ? React.createElement('div', { className: 'json-viewer' },
+                                        React.createElement(DraggableJsonViewer, {
+                                            // Show first item for arrays, since $ represents each item in map nodes
+                                            data: Array.isArray(inputData) ? (inputData[0] || {}) : inputData,
+                                            defaultExpanded: true,
+                                        }))
+                                    : React.createElement('div', { style: { color: '#555', fontStyle: 'italic' } }, 'No input data available')
+                            ),
+                        ]),
+                        // Expression pane - editable textarea
+                        React.createElement('div', { key: 'expr', className: 'expr-editor-pane expr-pane' }, [
+                            React.createElement('div', { key: 'header', className: 'expr-pane-header' }, 'Expression'),
+                            React.createElement('div', { key: 'content', className: 'expr-pane-content' },
+                                React.createElement('textarea', {
+                                    ref: textareaRef,
+                                    className: 'expr-input-textarea',
+                                    value: localValue,
+                                    onChange: (e) => setLocalValue(e.target.value),
+                                    onDrop: handleDrop,
+                                    onDragOver: handleDragOver,
+                                    placeholder: 'Enter value or expression like {{$.fieldName}}',
+                                    autoFocus: true,
+                                })
+                            ),
+                        ]),
+                        // Result pane - live preview
+                        React.createElement('div', { key: 'result', className: 'expr-editor-pane result-pane' }, [
+                            React.createElement('div', { key: 'header', className: 'expr-pane-header' }, 'Live Result'),
+                            React.createElement('div', { key: 'content', className: 'expr-pane-content expr-result-display' },
+                                renderResultParts()
+                            ),
+                        ]),
+                    ]),
+                    // Footer
+                    React.createElement('div', { key: 'footer', className: 'expr-editor-footer' }, [
+                        React.createElement('button', {
+                            key: 'cancel',
+                            className: 'expr-editor-btn expr-editor-btn-cancel',
+                            onClick: onClose,
+                        }, 'Cancel'),
+                        React.createElement('button', {
+                            key: 'save',
+                            className: 'expr-editor-btn expr-editor-btn-primary',
+                            onClick: handleSave,
+                        }, 'Save'),
+                    ]),
+                ])
+            );
+        }
+
+        // Expression-enabled Input component
+        // Shows colored {{...}} when not focused, plain input when focused
+        function ExpressionInput({ value, onChange, onBlur, inputData, isTextarea, placeholder, className, rows }) {
+            const [showEditor, setShowEditor] = useState(false);
+            const [isFocused, setIsFocused] = useState(false);
+            const inputRef = useRef(null);
+
+            // Evaluate for highlighting
+            const evaluation = useMemo(() => {
+                const $ = Array.isArray(inputData) ? (inputData[0] || {}) : (inputData || {});
+                return evaluateTemplate(value || '', $);
+            }, [value, inputData]);
+
+            const handleIndicatorClick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowEditor(true);
+            };
+
+            const handleSave = (newValue) => {
+                onChange(newValue);
+                if (onBlur) onBlur();
+            };
+
+            const handleBlur = () => {
+                setIsFocused(false);
+                if (onBlur) onBlur();
+            };
+
+            const handleDisplayClick = () => {
+                setIsFocused(true);
+                // Focus the input after render
+                setTimeout(() => inputRef.current?.focus(), 0);
+            };
+
+            // Render colored content for display (when not focused)
+            const renderColoredContent = () => {
+                if (!value) {
+                    return React.createElement('span', { style: { color: '#555' } }, placeholder || '');
+                }
+                if (!evaluation.hasExpressions) {
+                    return value;
+                }
+                return evaluation.parts.map((part, i) => {
+                    if (part.type === 'text') {
+                        return React.createElement('span', { key: i }, part.value);
+                    } else {
+                        const color = part.error ? '#e74c3c' : '#28a745';
+                        return React.createElement('span', { key: i, style: { color } }, part.raw);
+                    }
+                });
+            };
+
+            const baseClass = isTextarea ? 'property-textarea' : 'property-input';
+
+            return React.createElement('div', {
+                className: 'expr-input-wrapper',
+                style: { position: 'relative' },
+            }, [
+                // When not focused: show colored display
+                !isFocused && React.createElement('div', {
+                    key: 'display',
+                    className: baseClass,
+                    style: {
+                        cursor: 'text',
+                        minHeight: isTextarea ? '120px' : 'auto',
+                        whiteSpace: isTextarea ? 'pre-wrap' : 'nowrap',
+                        overflow: 'hidden',
+                    },
+                    onClick: handleDisplayClick,
+                }, renderColoredContent()),
+                // When focused: show actual input/textarea
+                isFocused && (isTextarea
+                    ? React.createElement('textarea', {
+                        key: 'input',
+                        ref: inputRef,
+                        className: baseClass,
+                        value: value || '',
+                        placeholder: placeholder,
+                        rows: rows || 8,
+                        onChange: (e) => onChange(e.target.value),
+                        onBlur: handleBlur,
+                        autoFocus: true,
+                    })
+                    : React.createElement('input', {
+                        key: 'input',
+                        ref: inputRef,
+                        type: 'text',
+                        className: baseClass,
+                        value: value || '',
+                        placeholder: placeholder,
+                        onChange: (e) => onChange(e.target.value),
+                        onBlur: handleBlur,
+                        autoFocus: true,
+                    })
+                ),
+                // Green triangle indicator
+                React.createElement('div', {
+                    key: 'indicator',
+                    className: `expr-indicator${evaluation.hasErrors ? ' has-error' : ''}`,
+                    onClick: handleIndicatorClick,
+                    title: 'Open expression editor',
+                }),
+                // Expression editor modal
+                showEditor && React.createElement(ExpressionEditorModal, {
+                    key: 'modal',
                     value: value,
-                    placeholder: property.placeholder || '',
-                    onChange: (e) => setValue(e.target.value),
-                    onBlur: handleBlur,
+                    inputData: inputData,
+                    onSave: handleSave,
+                    onClose: () => setShowEditor(false),
                 }),
             ]);
         }
 
-        function TextareaPropertyEditor({ property, onChange }) {
+        // Property Editor Components
+        function TextPropertyEditor({ property, onChange, inputData }) {
             const [value, setValue] = useState(property.value);
+
+            const handleChange = (newValue) => {
+                setValue(newValue);
+            };
 
             const handleBlur = () => {
                 if (value !== property.value) {
@@ -1312,14 +2000,41 @@
 
             return React.createElement('div', { className: 'property-group' }, [
                 React.createElement('label', { key: 'label', className: 'property-label' }, property.label),
-                React.createElement('textarea', {
-                    key: 'textarea',
-                    className: 'property-textarea',
+                React.createElement(ExpressionInput, {
+                    key: 'input',
                     value: value,
+                    onChange: handleChange,
+                    onBlur: handleBlur,
+                    inputData: inputData,
+                    placeholder: property.placeholder || '',
+                }),
+            ]);
+        }
+
+        function TextareaPropertyEditor({ property, onChange, inputData }) {
+            const [value, setValue] = useState(property.value);
+
+            const handleChange = (newValue) => {
+                setValue(newValue);
+            };
+
+            const handleBlur = () => {
+                if (value !== property.value) {
+                    onChange(property.id, value);
+                }
+            };
+
+            return React.createElement('div', { className: 'property-group' }, [
+                React.createElement('label', { key: 'label', className: 'property-label' }, property.label),
+                React.createElement(ExpressionInput, {
+                    key: 'textarea',
+                    value: value,
+                    onChange: handleChange,
+                    onBlur: handleBlur,
+                    inputData: inputData,
+                    isTextarea: true,
                     placeholder: property.placeholder || '',
                     rows: 8,
-                    onChange: (e) => setValue(e.target.value),
-                    onBlur: handleBlur,
                 }),
             ]);
         }
@@ -1365,7 +2080,7 @@
             ]);
         }
 
-        function FieldListPropertyEditor({ property, onChange }) {
+        function FieldListPropertyEditor({ property, onChange, inputData }) {
             const fields = property.value || [];
 
             const handleFieldChange = (index, key, value) => {
@@ -1393,23 +2108,25 @@
                             React.createElement('div', { key: 'inputs', className: 'field-item-inputs' }, [
                                 React.createElement('div', { key: 'name-row', className: 'field-item-row' }, [
                                     React.createElement('label', { key: 'label' }, 'Name'),
-                                    React.createElement('input', {
-                                        key: 'input',
-                                        type: 'text',
-                                        value: field.name || '',
-                                        placeholder: 'field name',
-                                        onChange: (e) => handleFieldChange(index, 'name', e.target.value),
-                                    }),
+                                    React.createElement('div', { key: 'input', style: { flex: 1 } },
+                                        React.createElement(ExpressionInput, {
+                                            value: field.name || '',
+                                            onChange: (val) => handleFieldChange(index, 'name', val),
+                                            inputData: inputData,
+                                            placeholder: 'field name',
+                                        })
+                                    ),
                                 ]),
                                 React.createElement('div', { key: 'value-row', className: 'field-item-row' }, [
                                     React.createElement('label', { key: 'label' }, 'Value'),
-                                    React.createElement('input', {
-                                        key: 'input',
-                                        type: 'text',
-                                        value: field.value || '',
-                                        placeholder: 'value (JSON or string)',
-                                        onChange: (e) => handleFieldChange(index, 'value', e.target.value),
-                                    }),
+                                    React.createElement('div', { key: 'input', style: { flex: 1 } },
+                                        React.createElement(ExpressionInput, {
+                                            value: field.value || '',
+                                            onChange: (val) => handleFieldChange(index, 'value', val),
+                                            inputData: inputData,
+                                            placeholder: 'value (JSON or expression)',
+                                        })
+                                    ),
                                 ]),
                             ]),
                             React.createElement('button', {
@@ -1436,18 +2153,18 @@
             ]);
         }
 
-        function PropertyEditor({ property, onChange }) {
+        function PropertyEditor({ property, onChange, inputData }) {
             switch (property.type) {
                 case 'text':
-                    return React.createElement(TextPropertyEditor, { property, onChange });
+                    return React.createElement(TextPropertyEditor, { property, onChange, inputData });
                 case 'textarea':
-                    return React.createElement(TextareaPropertyEditor, { property, onChange });
+                    return React.createElement(TextareaPropertyEditor, { property, onChange, inputData });
                 case 'number':
                     return React.createElement(NumberPropertyEditor, { property, onChange });
                 case 'select':
                     return React.createElement(SelectPropertyEditor, { property, onChange });
                 case 'fieldlist':
-                    return React.createElement(FieldListPropertyEditor, { property, onChange });
+                    return React.createElement(FieldListPropertyEditor, { property, onChange, inputData });
                 default:
                     return null;
             }
@@ -1511,25 +2228,52 @@
                 }
             };
 
-            const handleExecute = () => {
-                if (!nodeType.execute) return;
-                const inputData = upstreamData || [];
+            // Execute a node - if input not available, execute upstream nodes first
+            const executeNode = (targetNodeId) => {
+                const store = useWorkflowStore.getState();
+                const targetNode = store.nodes.find(n => n.id === targetNodeId);
+                if (!targetNode) return;
 
-                // Execute node to get its output
-                const nodeOutputResult = nodeType.execute(node.data, inputData);
+                const targetNodeType = nodeTypeDefinitions[targetNode.typeId];
+                if (!targetNodeType?.execute) return;
+
+                // Find upstream connections
+                const incomingConns = store.connections.filter(c => c.targetNodeId === targetNodeId);
+
+                // Get input from upstream - execute upstream if needed
+                let inputData = null;
+                for (const conn of incomingConns) {
+                    const sourceExecution = store.ambientExecution[conn.sourceNodeId];
+                    if (!sourceExecution?.output) {
+                        // Upstream hasn't been executed yet - execute it first
+                        executeNode(conn.sourceNodeId);
+                    }
+                    // Now get the (hopefully available) output
+                    const updatedExecution = useWorkflowStore.getState().ambientExecution[conn.sourceNodeId];
+                    if (updatedExecution?.output) {
+                        inputData = updatedExecution.output;
+                        break;
+                    }
+                }
+
+                // Execute this node
+                const nodeInput = inputData || [];
+                const nodeOutputResult = targetNodeType.execute(targetNode.data, nodeInput);
 
                 // Merge input with node output, namespaced by node name
-                // If input is [{scheduled1: {time}}] and this node "set1" outputs [{status}]
-                // Combined is [{scheduled1: {time}, set1: {status}}]
-                const inputArray = Array.isArray(inputData) ? inputData : [inputData || {}];
+                const inputArray = Array.isArray(nodeInput) ? nodeInput : [nodeInput || {}];
                 const outputArray = Array.isArray(nodeOutputResult) ? nodeOutputResult : [nodeOutputResult];
 
                 const combinedOutput = outputArray.map((out, i) => {
                     const inp = inputArray[i] || {};
-                    return { ...inp, [node.name]: out };
+                    return { ...inp, [targetNode.name]: out };
                 });
 
-                setNodeExecution(nodeId, inputData, nodeOutputResult, combinedOutput);
+                store.setNodeExecution(targetNodeId, nodeInput, nodeOutputResult, combinedOutput);
+            };
+
+            const handleExecute = () => {
+                executeNode(nodeId);
             };
 
             const handleKeyDown = (e) => {
@@ -1622,6 +2366,7 @@
                                         key: prop.id,
                                         property: prop,
                                         onChange: handlePropertyChange,
+                                        inputData: upstreamData,
                                     })
                                 ),
                             ]),

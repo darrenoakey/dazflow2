@@ -13,6 +13,7 @@ import set from './set.js';
 // Wrap map nodes to be array nodes
 // Map nodes define execute(nodeData, item) -> item
 // This wraps them to execute(nodeData, inputs) -> outputs (array in, array out)
+// Also evaluates {{expressions}} in nodeData per-item using window.evaluateDataExpressions if available
 function normalizeNodeType(nodeType) {
     if (nodeType.kind !== 'map' || !nodeType.execute) return nodeType;
 
@@ -25,7 +26,13 @@ function normalizeNodeType(nodeType) {
             if (inputArray.length === 0) {
                 inputArray = [{}];
             }
-            return inputArray.map(item => itemExecute(nodeData, item));
+            return inputArray.map(item => {
+                // Evaluate expressions in nodeData for this item
+                // The $ in expressions refers to the current item
+                const evaluator = window.evaluateDataExpressions;
+                const evaluatedData = evaluator ? evaluator(nodeData, item) : nodeData;
+                return itemExecute(evaluatedData, item);
+            });
         }
     };
 }

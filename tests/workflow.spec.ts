@@ -400,10 +400,13 @@ test.describe('Workflow Editor', () => {
     await expect(fieldItem).toHaveCount(1);
 
     // Fill in the field name and value
-    const nameInput = fieldItem.locator('input').first();
-    const valueInput = fieldItem.locator('input').nth(1);
-    await nameInput.fill('greeting');
-    await valueInput.fill('"hello world"');
+    // Click display div to focus, then fill the input that appears
+    const nameWrapper = fieldItem.locator('.expr-input-wrapper').first();
+    const valueWrapper = fieldItem.locator('.expr-input-wrapper').nth(1);
+    await nameWrapper.click();
+    await nameWrapper.locator('input').fill('greeting');
+    await valueWrapper.click();
+    await valueWrapper.locator('input').fill('"hello world"');
 
     // Add another field
     await addFieldBtn.click();
@@ -411,8 +414,12 @@ test.describe('Workflow Editor', () => {
 
     // Fill second field with a number
     const secondFieldItem = dialog.locator('.field-item').nth(1);
-    await secondFieldItem.locator('input').first().fill('count');
-    await secondFieldItem.locator('input').nth(1).fill('42');
+    const secondNameWrapper = secondFieldItem.locator('.expr-input-wrapper').first();
+    const secondValueWrapper = secondFieldItem.locator('.expr-input-wrapper').nth(1);
+    await secondNameWrapper.click();
+    await secondNameWrapper.locator('input').fill('count');
+    await secondValueWrapper.click();
+    await secondValueWrapper.locator('input').fill('42');
 
     // Execute
     await page.getByTestId('execute-btn').click();
@@ -468,8 +475,12 @@ test.describe('Workflow Editor', () => {
 
     await page.getByTestId('add-field-btn').click();
     const fieldItem = dialog.locator('.field-item');
-    await fieldItem.locator('input').first().fill('status');
-    await fieldItem.locator('input').nth(1).fill('"processed"');
+    const nameWrapper = fieldItem.locator('.expr-input-wrapper').first();
+    const valueWrapper = fieldItem.locator('.expr-input-wrapper').nth(1);
+    await nameWrapper.click();
+    await nameWrapper.locator('input').fill('status');
+    await valueWrapper.click();
+    await valueWrapper.locator('input').fill('"processed"');
     await page.locator('.node-editor-close').click();
 
     // Set up: create a fake upstream node and inject connection + execution data
