@@ -7,13 +7,27 @@ from pathlib import Path
 from typing import Any
 
 import setproctitle
-from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
+from .credentials import (
+    delete_credential,
+    get_credential,
+    list_credentials,
+    save_credential,
+    test_credential_data,
+    verify_credential,
+)
 from .executor import execute_node
+from .module_loader import (
+    get_credential_types_for_api,
+    get_modules_ui_paths,
+    get_node_types_for_api,
+    load_all_modules,
+)
 from .triggers import (
     get_enabled_workflows,
     init_trigger_system,
@@ -70,6 +84,9 @@ def init_work_directories():
 
     # Initialize trigger system
     init_trigger_system(WORK_DIR, WORKFLOWS_DIR)
+
+    # Load all modules
+    load_all_modules()
 
 
 def _load_executions_from_disk(limit: int = 100) -> dict:
@@ -156,6 +173,91 @@ api_router = APIRouter(prefix="/api")
 
 # Mount static files for nodes directory (must be before routes)
 app.mount("/nodes", StaticFiles(directory=STATIC_DIR / "nodes"), name="nodes")
+
+# Mount modules directory for JS files
+MODULES_DIR = PROJECT_ROOT / "modules"
+if MODULES_DIR.exists():
+    app.mount("/modules", StaticFiles(directory=MODULES_DIR), name="modules")
+
+
+# ##################################################################
+# get modules endpoint
+# returns all node types and credential types from loaded modules
+@api_router.get("/modules")
+async def get_modules():
+    """Get all node types and credential types from loaded modules."""
+    return {
+        "nodeTypes": get_node_types_for_api(),
+        "credentialTypes": get_credential_types_for_api(),
+        "moduleUIPaths": [f"/modules/{p.parent.name}/{p.name}" for p in get_modules_ui_paths()],
+    }
+
+
+# ##################################################################
+# credentials endpoints
+# manage secure credential storage
+
+
+@api_router.get("/credentials")
+async def list_credentials_endpoint():
+    """List all stored credentials."""
+    return {"credentials": list_credentials()}
+
+
+@api_router.get("/credential/{name}")
+async def get_credential_endpoint(name: str):
+    """Get a credential by name (private fields masked)."""
+    cred = get_credential(name)
+    if cred is None:
+        raise HTTPException(status_code=404, detail="Credential not found")
+    return {"name": name, **cred}
+
+
+class SaveCredentialRequest(BaseModel):
+    type: str
+    data: dict
+
+
+@api_router.put("/credential/{name}")
+async def save_credential_endpoint(name: str, request: SaveCredentialRequest):
+    """Save or update a credential."""
+    success = save_credential(name, request.type, request.data)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to save credential")
+    return {"saved": True, "name": name}
+
+
+@api_router.delete("/credential/{name}")
+async def delete_credential_endpoint(name: str):
+    """Delete a credential."""
+    success = delete_credential(name)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to delete credential")
+    return {"deleted": True, "name": name}
+
+
+@api_router.post("/credential/{name}/test")
+async def test_credential_endpoint(name: str):
+    """Test a credential connection."""
+    result = verify_credential(name)
+    return result
+
+
+@api_router.post("/credential-test")
+async def test_credential_data_endpoint(request: Request):
+    """Test credential data without saving.
+
+    Request body: { type: string, data: object }
+    """
+    body = await request.json()
+    cred_type = body.get("type")
+    cred_data = body.get("data", {})
+
+    if not cred_type:
+        return {"status": False, "message": "Missing credential type"}
+
+    result = test_credential_data(cred_type, cred_data)
+    return result
 
 
 # ##################################################################

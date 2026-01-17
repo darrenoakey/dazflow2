@@ -940,6 +940,190 @@
             overflow-y: auto;
             padding: 24px 32px;
         }
+        /* Credentials Tab Styles */
+        .credentials-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .credential-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: #2a2a4e;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .credential-item:hover {
+            background: #3a3a5e;
+        }
+        .credential-icon {
+            width: 20px;
+            height: 20px;
+            color: #667eea;
+        }
+        .credential-info {
+            flex: 1;
+        }
+        .credential-name {
+            font-size: 14px;
+            color: #eee;
+        }
+        .credential-type {
+            font-size: 12px;
+            color: #888;
+        }
+        .credential-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .credential-action-btn {
+            padding: 4px 8px;
+            background: transparent;
+            border: 1px solid #4a4a6e;
+            border-radius: 4px;
+            color: #888;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .credential-action-btn:hover {
+            background: #3a3a5e;
+            color: #eee;
+        }
+        .credential-action-btn.delete:hover {
+            background: #8b2942;
+            border-color: #8b2942;
+        }
+        .credential-action-btn.test:hover {
+            background: #2a5e4e;
+            border-color: #2a5e4e;
+        }
+        .credential-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .credential-modal-content {
+            background: #1a1a2e;
+            border: 1px solid #3a3a5e;
+            border-radius: 12px;
+            padding: 24px;
+            width: 450px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .credential-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .credential-modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #eee;
+        }
+        .credential-modal-close {
+            background: transparent;
+            border: none;
+            color: #888;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+        .credential-modal-close:hover {
+            color: #eee;
+        }
+        .credential-form-group {
+            margin-bottom: 16px;
+        }
+        .credential-form-label {
+            display: block;
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 6px;
+        }
+        .credential-form-input {
+            width: 100%;
+            padding: 10px 12px;
+            background: #2a2a4e;
+            border: 1px solid #4a4a6e;
+            border-radius: 6px;
+            color: #eee;
+            font-size: 14px;
+        }
+        .credential-form-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .credential-form-input.hidden-value {
+            color: #888;
+            font-style: italic;
+        }
+        .credential-modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        .credential-modal-btn {
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            border: none;
+        }
+        .credential-modal-btn.cancel {
+            background: #3a3a5e;
+            color: #eee;
+        }
+        .credential-modal-btn.cancel:hover {
+            background: #4a4a6e;
+        }
+        .credential-modal-btn.save {
+            background: #667eea;
+            color: #fff;
+        }
+        .credential-modal-btn.save:hover {
+            background: #5a6fd6;
+        }
+        .credential-modal-btn.save:disabled {
+            background: #4a4a6e;
+            color: #888;
+            cursor: not-allowed;
+        }
+        .credential-modal-btn.test-passed {
+            background: #2a4e2a;
+            color: #8c8;
+        }
+        .credential-modal-btn.test-passed:hover {
+            background: #3a5e3a;
+        }
+        .credential-test-result {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+        .credential-test-result.success {
+            background: #1a4a3e;
+            color: #4ade80;
+        }
+        .credential-test-result.failure {
+            background: #4a1a2e;
+            color: #f87171;
+        }
         .workflows-toolbar {
             display: flex;
             gap: 12px;
@@ -1173,6 +1357,11 @@
         .readonly-banner-close:hover {
             background: #6a5a3e;
         }
+        .sidebar-actions {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
         .back-btn {
             display: flex;
             align-items: center;
@@ -1185,11 +1374,40 @@
             font-size: 12px;
             cursor: pointer;
             transition: all 0.15s;
-            margin-bottom: 12px;
         }
         .back-btn:hover {
             background: #3a3a5e;
             color: #eee;
+        }
+        .save-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: #2a4e2a;
+            border: 1px solid #3a5e3a;
+            border-radius: 6px;
+            color: #8c8;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .save-btn:hover {
+            background: #3a5e3a;
+            color: #afa;
+        }
+        .save-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .save-btn.saved {
+            background: #1a4a1a;
+            color: #6c6;
+        }
+        .save-btn.error {
+            background: #4a1a1a;
+            border-color: #5a2a2a;
+            color: #c66;
         }
         .empty-state {
             text-align: center;
@@ -1238,7 +1456,7 @@
         } from '@xyflow/react';
         import { create } from 'zustand';
         import { v4 as uuid } from 'uuid';
-        import { nodeTypeDefinitions, getNodeTypesByCategory } from 'nodes';
+        import { nodeTypeDefinitions, getNodeTypesByCategory, loadModules } from 'nodes';
 
         // LocalStorage key for persistence
         const STORAGE_KEY = 'dazflow2-workflow';
@@ -1415,6 +1633,7 @@
                 // Initialize from URL pathname
                 const path = window.location.pathname;
                 if (path === '/executions') return 'executions';
+                if (path === '/credentials') return 'credentials';
                 return 'workflows';
             })(),
             dashboardItems: [],
@@ -1622,7 +1841,7 @@
                 }));
             },
 
-            addNode: (typeId, position) => {
+            addNode: (typeId, position, credentialName = null) => {
                 const nodeType = nodeTypeDefinitions[typeId];
                 if (!nodeType) return '';
 
@@ -1631,12 +1850,18 @@
                 const count = (state.nameCounts[typeId] || 0) + 1;
                 const name = `${typeId}${count}`;
 
+                // Build node data, including credentialName if provided
+                const nodeData = { ...nodeType.defaultData };
+                if (credentialName) {
+                    nodeData.credentialName = credentialName;
+                }
+
                 const newNode = {
                     id,
                     typeId,
                     name,
                     position,
-                    data: { ...nodeType.defaultData },
+                    data: nodeData,
                 };
 
                 set({
@@ -1711,6 +1936,95 @@
                     selectedEdgeIds: [],
                 });
             },
+
+            // Credentials state
+            credentials: [],
+            credentialsLoading: false,
+            editingCredential: null, // { name, type, data, isNew }
+
+            // Load credentials from server
+            loadCredentials: async () => {
+                set({ credentialsLoading: true });
+                try {
+                    const response = await fetch('/api/credentials');
+                    if (response.ok) {
+                        const data = await response.json();
+                        set({ credentials: data.credentials || [] });
+                    }
+                } catch (e) {
+                    console.error('Failed to load credentials:', e);
+                } finally {
+                    set({ credentialsLoading: false });
+                }
+            },
+
+            // Save a credential
+            saveCredentialToServer: async (name, type, data) => {
+                try {
+                    const response = await fetch(`/api/credential/${encodeURIComponent(name)}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ type, data }),
+                    });
+                    if (response.ok) {
+                        await get().loadCredentials();
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Failed to save credential:', e);
+                }
+                return false;
+            },
+
+            // Delete a credential
+            deleteCredentialFromServer: async (name) => {
+                try {
+                    const response = await fetch(`/api/credential/${encodeURIComponent(name)}`, {
+                        method: 'DELETE',
+                    });
+                    if (response.ok) {
+                        await get().loadCredentials();
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Failed to delete credential:', e);
+                }
+                return false;
+            },
+
+            // Test a credential by name (for existing credentials)
+            testCredentialOnServer: async (name) => {
+                try {
+                    const response = await fetch(`/api/credential/${encodeURIComponent(name)}/test`, {
+                        method: 'POST',
+                    });
+                    if (response.ok) {
+                        return await response.json();
+                    }
+                } catch (e) {
+                    console.error('Failed to test credential:', e);
+                }
+                return { status: false, message: 'Request failed' };
+            },
+
+            // Test credential data directly (for new credentials)
+            testCredentialData: async (credType, data) => {
+                try {
+                    const response = await fetch('/api/credential-test', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ type: credType, data }),
+                    });
+                    if (response.ok) {
+                        return await response.json();
+                    }
+                } catch (e) {
+                    console.error('Failed to test credential data:', e);
+                }
+                return { status: false, message: 'Request failed' };
+            },
+
+            setEditingCredential: (cred) => set({ editingCredential: cred }),
         }));
 
         // Subscribe to store changes and save to localStorage
@@ -2684,7 +2998,6 @@
                 : null;
 
             const properties = nodeType.getProperties(node.data);
-            const canExecute = nodeType.canExecute ? nodeType.canExecute(upstreamData || {}) : false;
 
             const handlePropertyChange = (propertyId, value) => {
                 updateNodeData(nodeId, { [propertyId]: value });
@@ -2777,7 +3090,7 @@
                             `Edit ${nodeType.name} Node`,
                         ]),
                         React.createElement('div', { key: 'actions', style: { display: 'flex', alignItems: 'center', gap: '12px' } }, [
-                            canExecute && !isReadOnly && React.createElement('button', {
+                            !isReadOnly && React.createElement('button', {
                                 key: 'execute',
                                 className: 'execute-btn',
                                 onClick: handleExecute,
@@ -3321,6 +3634,277 @@
             ]);
         }
 
+        // Credential Editor Modal Component
+        function CredentialEditorModal({ credential, onClose, onSave }) {
+            const credentialTypes = window.credentialTypes || [];
+            const initialType = credential.type || (credentialTypes[0]?.id || '');
+
+            // Initialize formData with defaults for new credentials
+            const getInitialFormData = (typeId) => {
+                if (!credential.isNew) return credential.data || {};
+                const credType = credentialTypes.find(ct => ct.id === typeId);
+                const defaults = {};
+                for (const prop of (credType?.properties || [])) {
+                    if (prop.default !== undefined) {
+                        defaults[prop.id] = prop.default;
+                    }
+                }
+                return defaults;
+            };
+
+            const [formData, setFormData] = useState(() => getInitialFormData(initialType));
+            const [name, setName] = useState(credential.name || '');
+            const [type, setType] = useState(initialType);
+            const [testResult, setTestResult] = useState(null);
+            const [testing, setTesting] = useState(false);
+            const [testPassed, setTestPassed] = useState(!credential.isNew); // Existing credentials don't need re-test
+            const testCredentialOnServer = useWorkflowStore((state) => state.testCredentialOnServer);
+            const testCredentialData = useWorkflowStore((state) => state.testCredentialData);
+
+            const credType = credentialTypes.find(ct => ct.id === type);
+            const properties = credType?.properties || [];
+            const HIDE_SENTINEL = 'HIDE_PASSWORD_FOR_SECURITY';
+
+            // Update formData defaults when type changes for new credentials
+            useEffect(() => {
+                if (credential.isNew) {
+                    setFormData(getInitialFormData(type));
+                    setTestPassed(false);
+                    setTestResult(null);
+                }
+            }, [type]);
+
+            // Reset test status when form data changes for new credentials
+            const handleFieldChange = (fieldId, value) => {
+                setFormData(prev => ({ ...prev, [fieldId]: value }));
+                if (credential.isNew) {
+                    setTestPassed(false);
+                    setTestResult(null);
+                }
+            };
+
+            const handleTest = async () => {
+                setTesting(true);
+                setTestResult(null);
+
+                let result;
+                if (credential.isNew) {
+                    // Test data directly for new credentials
+                    result = await testCredentialData(type, formData);
+                } else {
+                    // Test by name for existing credentials
+                    result = await testCredentialOnServer(credential.name);
+                }
+
+                setTestResult(result);
+                setTestPassed(result.status === true);
+                setTesting(false);
+            };
+
+            const handleSave = () => {
+                onSave(name, type, formData);
+            };
+
+            // Save is enabled when name and type are set, and test has passed for new credentials
+            const canSave = name && type && (testPassed || !credential.isNew);
+
+            return React.createElement('div', { className: 'credential-modal', onClick: (e) => e.target === e.currentTarget && onClose() },
+                React.createElement('div', { className: 'credential-modal-content' }, [
+                    React.createElement('div', { key: 'header', className: 'credential-modal-header' }, [
+                        React.createElement('h2', { key: 'title', className: 'credential-modal-title' },
+                            credential.isNew ? 'New Credential' : 'Edit Credential'),
+                        React.createElement('button', { key: 'close', className: 'credential-modal-close', onClick: onClose }, '\u00D7'),
+                    ]),
+
+                    // Name field
+                    React.createElement('div', { key: 'name-group', className: 'credential-form-group' }, [
+                        React.createElement('label', { key: 'label', className: 'credential-form-label' }, 'Name'),
+                        React.createElement('input', {
+                            key: 'input',
+                            type: 'text',
+                            className: 'credential-form-input',
+                            value: name,
+                            onChange: (e) => setName(e.target.value),
+                            disabled: !credential.isNew,
+                            placeholder: 'my-database',
+                        }),
+                    ]),
+
+                    // Type field (only for new credentials)
+                    credential.isNew && React.createElement('div', { key: 'type-group', className: 'credential-form-group' }, [
+                        React.createElement('label', { key: 'label', className: 'credential-form-label' }, 'Type'),
+                        React.createElement('select', {
+                            key: 'select',
+                            className: 'credential-form-input',
+                            value: type,
+                            onChange: (e) => { setType(e.target.value); setFormData({}); },
+                        }, credentialTypes.map(ct =>
+                            React.createElement('option', { key: ct.id, value: ct.id }, ct.name)
+                        )),
+                    ]),
+
+                    // Dynamic property fields
+                    ...properties.map(prop =>
+                        React.createElement('div', { key: prop.id, className: 'credential-form-group' }, [
+                            React.createElement('label', { key: 'label', className: 'credential-form-label' }, prop.label),
+                            React.createElement('input', {
+                                key: 'input',
+                                type: prop.private ? 'password' : 'text',
+                                className: `credential-form-input ${formData[prop.id] === HIDE_SENTINEL ? 'hidden-value' : ''}`,
+                                value: formData[prop.id] === HIDE_SENTINEL ? '(hidden)' : (formData[prop.id] || ''),
+                                onChange: (e) => handleFieldChange(prop.id, e.target.value),
+                                placeholder: prop.private ? 'Enter to change' : '',
+                                onFocus: (e) => {
+                                    if (formData[prop.id] === HIDE_SENTINEL) {
+                                        handleFieldChange(prop.id, '');
+                                        e.target.value = '';
+                                    }
+                                },
+                            }),
+                        ])
+                    ),
+
+                    // Test result
+                    testResult && React.createElement('div', {
+                        key: 'test-result',
+                        className: `credential-test-result ${testResult.status ? 'success' : 'failure'}`,
+                    }, testResult.message || (testResult.status ? 'Connection successful' : 'Connection failed')),
+
+                    // Actions
+                    React.createElement('div', { key: 'actions', className: 'credential-modal-actions' }, [
+                        React.createElement('button', {
+                            key: 'test',
+                            className: `credential-modal-btn ${testPassed ? 'test-passed' : 'cancel'}`,
+                            onClick: handleTest,
+                            disabled: testing,
+                        }, testing ? 'Testing...' : testPassed ? 'Test \u2713' : 'Test'),
+                        React.createElement('button', {
+                            key: 'cancel',
+                            className: 'credential-modal-btn cancel',
+                            onClick: onClose,
+                        }, 'Cancel'),
+                        React.createElement('button', {
+                            key: 'save',
+                            className: 'credential-modal-btn save',
+                            onClick: handleSave,
+                            disabled: !canSave,
+                        }, 'Save'),
+                    ]),
+                ])
+            );
+        }
+
+        // Credentials Tab Component
+        function CredentialsTab() {
+            const credentials = useWorkflowStore((state) => state.credentials);
+            const credentialsLoading = useWorkflowStore((state) => state.credentialsLoading);
+            const editingCredential = useWorkflowStore((state) => state.editingCredential);
+            const loadCredentials = useWorkflowStore((state) => state.loadCredentials);
+            const saveCredentialToServer = useWorkflowStore((state) => state.saveCredentialToServer);
+            const deleteCredentialFromServer = useWorkflowStore((state) => state.deleteCredentialFromServer);
+            const setEditingCredential = useWorkflowStore((state) => state.setEditingCredential);
+            const credentialTypes = window.credentialTypes || [];
+
+            // Load credentials on mount
+            useEffect(() => {
+                loadCredentials();
+            }, []);
+
+            const handleNewCredential = () => {
+                setEditingCredential({ name: '', type: credentialTypes[0]?.id || '', data: {}, isNew: true });
+            };
+
+            const handleEditCredential = async (cred) => {
+                // Fetch full credential data
+                try {
+                    const response = await fetch(`/api/credential/${encodeURIComponent(cred.name)}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        setEditingCredential({ name: data.name, type: data.type, data: data.data, isNew: false });
+                    }
+                } catch (e) {
+                    console.error('Failed to load credential:', e);
+                }
+            };
+
+            const handleDeleteCredential = async (name, e) => {
+                e.stopPropagation();
+                if (confirm(`Delete credential "${name}"?`)) {
+                    await deleteCredentialFromServer(name);
+                }
+            };
+
+            const handleSaveCredential = async (name, type, data) => {
+                const success = await saveCredentialToServer(name, type, data);
+                if (success) {
+                    setEditingCredential(null);
+                }
+            };
+
+            const getCredTypeName = (typeId) => {
+                const ct = credentialTypes.find(c => c.id === typeId);
+                return ct?.name || typeId;
+            };
+
+            return React.createElement('div', { className: 'credentials-tab' }, [
+                // Toolbar
+                React.createElement('div', { key: 'toolbar', className: 'workflows-toolbar' }, [
+                    React.createElement('button', {
+                        key: 'new',
+                        className: 'toolbar-btn',
+                        onClick: handleNewCredential,
+                        disabled: credentialTypes.length === 0,
+                    }, [
+                        React.createElement('span', { key: 'icon', className: 'toolbar-btn-icon', dangerouslySetInnerHTML: { __html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>' }}),
+                        'New Credential',
+                    ]),
+                ]),
+
+                // Empty state or list
+                credentialsLoading
+                    ? React.createElement('div', { key: 'loading' }, 'Loading...')
+                    : credentials.length === 0
+                    ? React.createElement('div', { key: 'empty', style: { color: '#888', padding: '20px 0' } },
+                        credentialTypes.length === 0
+                            ? 'No credential types available. Add a module with credential types first.'
+                            : 'No credentials configured. Click "New Credential" to add one.')
+                    : React.createElement('div', { key: 'list', className: 'credentials-list' },
+                        credentials.map(cred =>
+                            React.createElement('div', {
+                                key: cred.name,
+                                className: 'credential-item',
+                                onClick: () => handleEditCredential(cred),
+                            }, [
+                                React.createElement('div', {
+                                    key: 'icon',
+                                    className: 'credential-icon',
+                                    dangerouslySetInnerHTML: { __html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' },
+                                }),
+                                React.createElement('div', { key: 'info', className: 'credential-info' }, [
+                                    React.createElement('div', { key: 'name', className: 'credential-name' }, cred.name),
+                                    React.createElement('div', { key: 'type', className: 'credential-type' }, getCredTypeName(cred.type)),
+                                ]),
+                                React.createElement('div', { key: 'actions', className: 'credential-actions' }, [
+                                    React.createElement('button', {
+                                        key: 'delete',
+                                        className: 'credential-action-btn delete',
+                                        onClick: (e) => handleDeleteCredential(cred.name, e),
+                                    }, 'Delete'),
+                                ]),
+                            ])
+                        )
+                    ),
+
+                // Modal
+                editingCredential && React.createElement(CredentialEditorModal, {
+                    key: 'modal',
+                    credential: editingCredential,
+                    onClose: () => setEditingCredential(null),
+                    onSave: handleSaveCredential,
+                }),
+            ]);
+        }
+
         // Dashboard Component
         function Dashboard() {
             const dashboardTab = useWorkflowStore((state) => state.dashboardTab);
@@ -3342,37 +3926,102 @@
                             onClick: () => setDashboardTab('executions'),
                             'data-testid': 'tab-executions',
                         }, 'Executions'),
+                        React.createElement('button', {
+                            key: 'credentials',
+                            className: `dashboard-tab ${dashboardTab === 'credentials' ? 'active' : ''}`,
+                            onClick: () => setDashboardTab('credentials'),
+                            'data-testid': 'tab-credentials',
+                        }, 'Credentials'),
                     ]),
                 ]),
                 React.createElement('div', { key: 'content', className: 'dashboard-content' },
                     dashboardTab === 'workflows'
                         ? React.createElement(WorkflowsTab)
-                        : React.createElement(ExecutionsTab)
+                        : dashboardTab === 'executions'
+                        ? React.createElement(ExecutionsTab)
+                        : React.createElement(CredentialsTab)
                 ),
             ]);
         }
 
         // Sidebar Component
         function Sidebar({ onAddNode }) {
-            const categorized = getNodeTypesByCategory();
+            const baseCategorized = getNodeTypesByCategory();
             const nodes = useWorkflowStore((state) => state.nodes);
             const connections = useWorkflowStore((state) => state.connections);
             const ambientExecution = useWorkflowStore((state) => state.ambientExecution);
             const goToDashboard = useWorkflowStore((state) => state.goToDashboard);
             const isReadOnly = useWorkflowStore((state) => state.isReadOnly);
+            const credentials = useWorkflowStore((state) => state.credentials);
+            const loadCredentials = useWorkflowStore((state) => state.loadCredentials);
+            const saveWorkflow = useWorkflowStore((state) => state.saveWorkflow);
+            const currentWorkflowPath = useWorkflowStore((state) => state.currentWorkflowPath);
             const [showJson, setShowJson] = useState(false);
+            const [saveStatus, setSaveStatus] = useState(null); // null, 'saving', 'saved', 'error'
 
-            function handleDragStart(event, typeId) {
+            const handleSave = async () => {
+                if (!currentWorkflowPath || isReadOnly) return;
+                setSaveStatus('saving');
+                const success = await saveWorkflow(currentWorkflowPath);
+                setSaveStatus(success ? 'saved' : 'error');
+                // Clear status after 2 seconds
+                setTimeout(() => setSaveStatus(null), 2000);
+            };
+
+            // Load credentials on mount
+            useEffect(() => {
+                loadCredentials();
+            }, []);
+
+            // Expand node types that require credentials
+            // For each node with requiredCredential, create one entry per matching credential
+            const categorized = useMemo(() => {
+                // Group credentials by type
+                const credentialsByType = {};
+                for (const cred of credentials) {
+                    if (!credentialsByType[cred.type]) {
+                        credentialsByType[cred.type] = [];
+                    }
+                    credentialsByType[cred.type].push(cred);
+                }
+
+                // Expand categorized node types
+                const expanded = {};
+                for (const [category, types] of Object.entries(baseCategorized)) {
+                    expanded[category] = [];
+                    for (const nt of types) {
+                        if (nt.requiredCredential) {
+                            // Create one entry per credential of the required type
+                            const creds = credentialsByType[nt.requiredCredential] || [];
+                            for (const cred of creds) {
+                                expanded[category].push({
+                                    ...nt,
+                                    sidebarId: `${nt.id}:${cred.name}`,
+                                    displayName: `${cred.name} ${nt.name}`,
+                                    credentialName: cred.name,
+                                });
+                            }
+                        } else {
+                            expanded[category].push({ ...nt, sidebarId: nt.id, displayName: nt.name });
+                        }
+                    }
+                }
+                return expanded;
+            }, [baseCategorized, credentials]);
+
+            function handleDragStart(event, item) {
                 if (isReadOnly) return;
-                event.dataTransfer.setData('application/reactflow', typeId);
+                // Encode both typeId and credentialName
+                const dragData = JSON.stringify({ typeId: item.id, credentialName: item.credentialName });
+                event.dataTransfer.setData('application/reactflow', dragData);
                 event.dataTransfer.effectAllowed = 'move';
             }
 
-            function handleClick(typeId) {
+            function handleClick(item) {
                 if (isReadOnly) return;
                 // Stagger position based on current node count to avoid overlap
                 const offset = nodes.length * 40;
-                onAddNode(typeId, { x: 300 + offset, y: 200 + offset });
+                onAddNode(item.id, { x: 300 + offset, y: 200 + offset }, item.credentialName);
             }
 
             // Instance = workflow definition + execution state
@@ -3382,31 +4031,40 @@
             }, null, 2);
 
             return React.createElement('div', { className: 'sidebar', 'data-testid': 'sidebar' }, [
-                !isReadOnly && React.createElement('button', {
-                    key: 'back',
-                    className: 'back-btn',
-                    onClick: goToDashboard,
-                    'data-testid': 'back-to-dashboard',
-                }, '\u2190 Dashboard'),
+                !isReadOnly && React.createElement('div', { key: 'sidebar-actions', className: 'sidebar-actions' }, [
+                    React.createElement('button', {
+                        key: 'back',
+                        className: 'back-btn',
+                        onClick: goToDashboard,
+                        'data-testid': 'back-to-dashboard',
+                    }, '\u2190 Dashboard'),
+                    React.createElement('button', {
+                        key: 'save',
+                        className: `save-btn${saveStatus === 'saved' ? ' saved' : ''}${saveStatus === 'error' ? ' error' : ''}`,
+                        onClick: handleSave,
+                        disabled: saveStatus === 'saving',
+                        'data-testid': 'save-workflow',
+                    }, saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved!' : saveStatus === 'error' ? 'Error' : 'Save'),
+                ]),
                 React.createElement('div', { key: 'title', className: 'sidebar-title', 'data-testid': 'sidebar-title' }, 'Nodes'),
-                ...Object.entries(categorized).map(([category, types]) =>
+                ...Object.entries(categorized).filter(([_, items]) => items.length > 0).map(([category, items]) =>
                     React.createElement('div', { key: category, className: 'category-group', style: isReadOnly ? { opacity: 0.5, pointerEvents: 'none' } : {} }, [
                         React.createElement('div', { key: 'label', className: 'category-label' }, category),
                         React.createElement('div', { key: 'items', className: 'category-items' },
-                            types.map((nt) =>
+                            items.map((item) =>
                                 React.createElement('div', {
-                                    key: nt.id,
+                                    key: item.sidebarId,
                                     className: `node-type-item${isReadOnly ? ' disabled' : ''}`,
-                                    'data-testid': `node-type-${nt.id}`,
-                                    onClick: () => handleClick(nt.id),
+                                    'data-testid': `node-type-${item.id}`,
+                                    onClick: () => handleClick(item),
                                     draggable: !isReadOnly,
-                                    onDragStart: (e) => handleDragStart(e, nt.id),
+                                    onDragStart: (e) => handleDragStart(e, item),
                                 }, [
                                     React.createElement('div', {
                                         key: 'icon',
-                                        dangerouslySetInnerHTML: { __html: nt.icon },
+                                        dangerouslySetInnerHTML: { __html: item.icon },
                                     }),
-                                    React.createElement('span', { key: 'name' }, nt.name),
+                                    React.createElement('span', { key: 'name' }, item.displayName),
                                 ])
                             )
                         ),
@@ -3539,13 +4197,25 @@
 
             const onDrop = useCallback((event) => {
                 event.preventDefault();
-                const typeId = event.dataTransfer.getData('application/reactflow');
-                if (!typeId || !reactFlowInstance.current) return;
+                const rawData = event.dataTransfer.getData('application/reactflow');
+                if (!rawData || !reactFlowInstance.current) return;
+
+                // Parse drag data - can be JSON with typeId and credentialName, or just typeId string
+                let typeId, credentialName;
+                try {
+                    const parsed = JSON.parse(rawData);
+                    typeId = parsed.typeId;
+                    credentialName = parsed.credentialName;
+                } catch {
+                    typeId = rawData;
+                    credentialName = null;
+                }
+
                 const position = reactFlowInstance.current.screenToFlowPosition({
                     x: event.clientX,
                     y: event.clientY,
                 });
-                onAddNode(typeId, position);
+                onAddNode(typeId, position, credentialName);
             }, [onAddNode]);
 
             const onMoveEnd = useCallback((event, viewport) => {
@@ -3688,9 +4358,9 @@
                 return () => window.removeEventListener('keydown', handleKeyDown);
             }, [deleteSelected, selectNodes, clearSelection, nodes, selectedNodeIds, editingNodeId, setEditingNodeId, openEditorNodeId, isReadOnly]);
 
-            const handleAddNode = useCallback((typeId, position) => {
+            const handleAddNode = useCallback((typeId, position, credentialName = null) => {
                 if (isReadOnly) return;
-                addNode(typeId, position);
+                addNode(typeId, position, credentialName);
             }, [addNode, isReadOnly]);
 
             const formatTimestamp = (ts) => {
@@ -3786,9 +4456,19 @@
             return React.createElement(Editor);
         }
 
-        // Mount
-        const root = createRoot(document.getElementById('root'));
-        root.render(React.createElement(App));
+        // Load modules and mount app
+        async function initApp() {
+            // Load modules before rendering
+            const moduleData = await loadModules();
+
+            // Store credential types in window for now (will move to Zustand in Phase 6)
+            window.credentialTypes = moduleData.credentialTypes || [];
+
+            const root = createRoot(document.getElementById('root'));
+            root.render(React.createElement(App));
+        }
+
+        initApp();
     </script>
 </body>
 </html>

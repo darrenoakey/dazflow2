@@ -1,15 +1,9 @@
-// Node type registry - dynamically loads all node types from this directory
-// To add a new node type, create a new file in this directory and import it here
+// Node type registry - dynamically loads all node types from modules
+// To add a new node type, create a module in the modules/ directory
 
-import start from './start.js';
-import scheduled from './scheduled.js';
-import hardwired from './hardwired.js';
-import rss from './rss.js';
-import ifNode from './if.js';
-import http from './http.js';
-import transform from './transform.js';
-import set from './set.js';
-import appendToFile from './append_to_file.js';
+// Cached node type definitions
+let nodeTypeDefinitions = {};
+let loadPromise = null;
 
 // Wrap map nodes to be array nodes
 // Map nodes define execute(nodeData, item) -> item
@@ -38,18 +32,47 @@ function normalizeNodeType(nodeType) {
     };
 }
 
-// Build the node type definitions object from all imported nodes
-const nodeTypes = [start, scheduled, hardwired, rss, ifNode, http, transform, set, appendToFile];
+// Load all modules from the server
+async function loadModules() {
+    if (loadPromise) return loadPromise;
 
-const nodeTypeDefinitions = {};
-for (const nodeType of nodeTypes) {
-    nodeTypeDefinitions[nodeType.id] = normalizeNodeType(nodeType);
+    loadPromise = (async () => {
+        try {
+            // Fetch module info from the API
+            const response = await fetch('/api/modules');
+            const data = await response.json();
+
+            // Dynamically import each module's UI file
+            for (const path of data.moduleUIPaths) {
+                try {
+                    const module = await import(path);
+                    if (module.nodeTypes) {
+                        for (const nodeType of module.nodeTypes) {
+                            nodeTypeDefinitions[nodeType.id] = normalizeNodeType(nodeType);
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`Failed to load module from ${path}:`, e);
+                }
+            }
+
+            return { nodeTypes: data.nodeTypes, credentialTypes: data.credentialTypes };
+        } catch (e) {
+            console.error('Failed to load modules:', e);
+            return { nodeTypes: [], credentialTypes: [] };
+        }
+    })();
+
+    return loadPromise;
 }
 
-export { nodeTypeDefinitions };
+// Get node type definitions (must call loadModules first)
+function getNodeTypeDefinitions() {
+    return nodeTypeDefinitions;
+}
 
 // Group node types by category
-export function getNodeTypesByCategory() {
+function getNodeTypesByCategory() {
     const grouped = {};
     for (const nt of Object.values(nodeTypeDefinitions)) {
         if (!grouped[nt.category]) {
@@ -59,3 +82,5 @@ export function getNodeTypesByCategory() {
     }
     return grouped;
 }
+
+export { nodeTypeDefinitions, getNodeTypesByCategory, loadModules, getNodeTypeDefinitions };

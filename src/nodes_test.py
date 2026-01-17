@@ -1,7 +1,6 @@
 """Tests for node type definitions."""
 
-from src.nodes import (
-    NODE_TYPES,
+from modules.core.nodes import (
     execute_append_to_file,
     execute_hardwired,
     execute_http,
@@ -11,8 +10,9 @@ from src.nodes import (
     execute_set,
     execute_start,
     execute_transform,
-    get_node_type,
 )
+
+from src.nodes import NODE_TYPES, get_node_type
 
 
 # ##################################################################

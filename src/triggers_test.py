@@ -5,7 +5,7 @@ import time
 
 import pytest
 
-from src.nodes import register_scheduled
+from modules.core.nodes import register_scheduled
 from src.triggers import (
     find_trigger_nodes,
     get_enabled_workflows,

@@ -551,6 +551,24 @@ test.describe('Workflow Editor', () => {
     await page.locator('.node-editor-close').click();
   });
 
+  test('execute button shows for all node types', async ({ page }) => {
+    // Test that execute button is visible for ALL node types
+    // All nodes must be executable from the UI - there is no concept of a non-executable node
+
+    const nodeTypesToTest = ['transform', 'if', 'http', 'rss', 'start'];
+    const dialog = page.locator('.node-editor-dialog');
+
+    for (const nodeType of nodeTypesToTest) {
+      await page.getByTestId(`node-type-${nodeType}`).click();
+      const node = page.getByTestId(`workflow-node-${nodeType}`);
+      await node.locator('.custom-node').dblclick({ force: true });
+      await expect(dialog).toBeVisible();
+      await expect(page.getByTestId('execute-btn')).toBeVisible();
+      await page.locator('.node-editor-close').click();
+      await expect(dialog).not.toBeVisible();
+    }
+  });
+
   test('can edit node properties in editor', async ({ page }) => {
     // Add a Scheduled node
     await page.getByTestId('node-type-scheduled').click();

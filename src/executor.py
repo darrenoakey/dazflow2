@@ -10,6 +10,7 @@ from typing import Any
 
 import dukpy
 
+from .credentials import get_credential_for_execution
 from .nodes import get_node_type
 
 
@@ -185,20 +186,27 @@ def execute_node(
     node_data = node.get("data", {})
     execute_fn = node_type["execute"]
 
+    # Get credential data if required
+    credential_data = None
+    if node_type.get("requiredCredential"):
+        cred_name = node_data.get("credentialName")
+        if cred_name:
+            credential_data = get_credential_for_execution(cred_name)
+
     if node_type.get("kind") == "map":
         # Map node: execute per-item with expression evaluation per-item
         node_output = []
         for item in input_data:
             # Evaluate expressions in node_data for this item
             evaluated_data = evaluate_data_expressions(node_data, item)
-            result = execute_fn(evaluated_data, item)
+            result = execute_fn(evaluated_data, item, credential_data)
             node_output.append(result)
     else:
         # Array node: execute once with full input
         # Use first item for expression evaluation context
         context = input_data[0] if input_data else {}
         evaluated_data = evaluate_data_expressions(node_data, context)
-        node_output = execute_fn(evaluated_data, input_data)
+        node_output = execute_fn(evaluated_data, input_data, credential_data)
 
     # Ensure output is a list
     if not isinstance(node_output, list):

@@ -136,7 +136,7 @@ def test_list_workflows(tmp_path, monkeypatch):
     (tmp_path / "subfolder").mkdir()
 
     client = TestClient(app)
-    response = client.get("/workflows")
+    response = client.get("/api/workflows")
     assert response.status_code == 200
     data = response.json()
     assert "items" in data
@@ -154,7 +154,7 @@ def test_list_workflows(tmp_path, monkeypatch):
 
 def test_list_workflows_nonexistent_path():
     client = TestClient(app)
-    response = client.get("/workflows?path=nonexistent")
+    response = client.get("/api/workflows?path=nonexistent")
     assert response.status_code == 404
 
 
@@ -170,7 +170,7 @@ def test_get_workflow(tmp_path, monkeypatch):
     (tmp_path / "test.json").write_text(json.dumps(workflow))
 
     client = TestClient(app)
-    response = client.get("/workflow/test.json")
+    response = client.get("/api/workflow/test.json")
     assert response.status_code == 200
     assert response.json() == workflow
 
@@ -181,7 +181,7 @@ def test_get_workflow_not_found(tmp_path, monkeypatch):
     monkeypatch.setattr(api_module, "WORKFLOWS_DIR", tmp_path)
 
     client = TestClient(app)
-    response = client.get("/workflow/nonexistent.json")
+    response = client.get("/api/workflow/nonexistent.json")
     assert response.status_code == 404
 
 
@@ -196,7 +196,7 @@ def test_save_workflow(tmp_path, monkeypatch):
     workflow = {"nodes": [{"id": "n1", "typeId": "start"}], "connections": []}
 
     client = TestClient(app)
-    response = client.put("/workflow/new.json", json={"workflow": workflow})
+    response = client.put("/api/workflow/new.json", json={"workflow": workflow})
     assert response.status_code == 200
     assert response.json()["saved"] is True
 
@@ -217,7 +217,7 @@ def test_execute_workflow(tmp_path, monkeypatch):
     workflow = {"nodes": [{"id": "n1", "typeId": "scheduled", "name": "sched1", "data": {}}], "connections": []}
 
     client = TestClient(app)
-    response = client.post("/workflow/test.json/execute", json={"workflow": workflow})
+    response = client.post("/api/workflow/test.json/execute", json={"workflow": workflow})
     assert response.status_code == 200
     data = response.json()
 
@@ -225,3 +225,127 @@ def test_execute_workflow(tmp_path, monkeypatch):
     assert "n1" in data["execution"]
     assert "stats" in data
     assert data["stats"]["execution_count"] == 1
+
+
+# ##################################################################
+# test modules endpoint
+# verifies modules endpoint returns node and credential types
+def test_get_modules():
+    client = TestClient(app)
+    response = client.get("/api/modules")
+    assert response.status_code == 200
+    data = response.json()
+
+    # Check structure
+    assert "nodeTypes" in data
+    assert "credentialTypes" in data
+    assert "moduleUIPaths" in data
+
+    # Check that core node types are loaded
+    node_type_ids = [nt["id"] for nt in data["nodeTypes"]]
+    assert "start" in node_type_ids
+    assert "scheduled" in node_type_ids
+    assert "set" in node_type_ids
+
+    # Core module has no credential types
+    assert isinstance(data["credentialTypes"], list)
+
+
+# ##################################################################
+# test credentials endpoint
+# verifies credential listing
+def test_list_credentials(monkeypatch):
+    def stub_list_credentials():
+        return [{"name": "test_cred", "type": "postgres", "data": {"host": "localhost"}}]
+
+    import src.api as api_module
+
+    monkeypatch.setattr(api_module, "list_credentials", stub_list_credentials)
+
+    client = TestClient(app)
+    response = client.get("/api/credentials")
+    assert response.status_code == 200
+    data = response.json()
+    assert "credentials" in data
+    assert len(data["credentials"]) == 1
+    assert data["credentials"][0]["name"] == "test_cred"
+
+
+def test_get_credential_not_found(monkeypatch):
+    def stub_get_credential(name):
+        return None
+
+    import src.api as api_module
+
+    monkeypatch.setattr(api_module, "get_credential", stub_get_credential)
+
+    client = TestClient(app)
+    response = client.get("/api/credential/nonexistent")
+    assert response.status_code == 404
+
+
+def test_get_credential_found(monkeypatch):
+    def stub_get_credential(name):
+        if name == "my_cred":
+            return {"type": "postgres", "data": {"host": "localhost"}}
+        return None
+
+    import src.api as api_module
+
+    monkeypatch.setattr(api_module, "get_credential", stub_get_credential)
+
+    client = TestClient(app)
+    response = client.get("/api/credential/my_cred")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "my_cred"
+    assert data["type"] == "postgres"
+
+
+def test_save_credential(monkeypatch):
+    def stub_save_credential(name, cred_type, data):
+        return True
+
+    import src.api as api_module
+
+    monkeypatch.setattr(api_module, "save_credential", stub_save_credential)
+
+    client = TestClient(app)
+    response = client.put(
+        "/api/credential/new_cred",
+        json={"type": "postgres", "data": {"host": "localhost", "user": "admin"}},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["saved"] is True
+    assert data["name"] == "new_cred"
+
+
+def test_delete_credential(monkeypatch):
+    def stub_delete_credential(name):
+        return True
+
+    import src.api as api_module
+
+    monkeypatch.setattr(api_module, "delete_credential", stub_delete_credential)
+
+    client = TestClient(app)
+    response = client.delete("/api/credential/old_cred")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["deleted"] is True
+
+
+def test_test_credential(monkeypatch):
+    def stub_verify_credential(name):
+        return {"status": True, "message": "Connection successful"}
+
+    import src.api as api_module
+
+    monkeypatch.setattr(api_module, "verify_credential", stub_verify_credential)
+
+    client = TestClient(app)
+    response = client.post("/api/credential/my_cred/test")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] is True
