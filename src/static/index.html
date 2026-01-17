@@ -464,6 +464,26 @@
         .property-input::placeholder {
             color: #555;
         }
+        .property-textarea {
+            width: 100%;
+            padding: 10px 12px;
+            background: #2a2a4e;
+            border: 1px solid #3a3a5e;
+            border-radius: 6px;
+            color: #eee;
+            font-size: 12px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            outline: none;
+            transition: border-color 0.2s;
+            resize: vertical;
+            min-height: 120px;
+        }
+        .property-textarea:focus {
+            border-color: #667eea;
+        }
+        .property-textarea::placeholder {
+            color: #555;
+        }
         .property-select {
             width: 100%;
             padding: 10px 12px;
@@ -1281,6 +1301,29 @@
             ]);
         }
 
+        function TextareaPropertyEditor({ property, onChange }) {
+            const [value, setValue] = useState(property.value);
+
+            const handleBlur = () => {
+                if (value !== property.value) {
+                    onChange(property.id, value);
+                }
+            };
+
+            return React.createElement('div', { className: 'property-group' }, [
+                React.createElement('label', { key: 'label', className: 'property-label' }, property.label),
+                React.createElement('textarea', {
+                    key: 'textarea',
+                    className: 'property-textarea',
+                    value: value,
+                    placeholder: property.placeholder || '',
+                    rows: 8,
+                    onChange: (e) => setValue(e.target.value),
+                    onBlur: handleBlur,
+                }),
+            ]);
+        }
+
         function NumberPropertyEditor({ property, onChange }) {
             const [value, setValue] = useState(property.value);
 
@@ -1397,6 +1440,8 @@
             switch (property.type) {
                 case 'text':
                     return React.createElement(TextPropertyEditor, { property, onChange });
+                case 'textarea':
+                    return React.createElement(TextareaPropertyEditor, { property, onChange });
                 case 'number':
                     return React.createElement(NumberPropertyEditor, { property, onChange });
                 case 'select':

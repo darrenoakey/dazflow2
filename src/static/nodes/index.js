@@ -3,6 +3,7 @@
 
 import start from './start.js';
 import scheduled from './scheduled.js';
+import hardwired from './hardwired.js';
 import rss from './rss.js';
 import ifNode from './if.js';
 import http from './http.js';
@@ -30,7 +31,7 @@ function normalizeNodeType(nodeType) {
 }
 
 // Build the node type definitions object from all imported nodes
-const nodeTypes = [start, scheduled, rss, ifNode, http, transform, set];
+const nodeTypes = [start, scheduled, hardwired, rss, ifNode, http, transform, set];
 
 const nodeTypeDefinitions = {};
 for (const nodeType of nodeTypes) {
