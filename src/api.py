@@ -5,12 +5,16 @@ from pathlib import Path
 import setproctitle
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.responses import StreamingResponse
 
 app = FastAPI(title="dazflow2")
 
 SERVER_START_TIME = time.time()
 STATIC_DIR = Path(__file__).parent / "static"
+
+# Mount static files for nodes directory (must be before routes)
+app.mount("/nodes", StaticFiles(directory=STATIC_DIR / "nodes"), name="nodes")
 
 
 # ##################################################################
