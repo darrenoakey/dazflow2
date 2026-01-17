@@ -2437,6 +2437,7 @@
             const categorized = getNodeTypesByCategory();
             const nodes = useWorkflowStore((state) => state.nodes);
             const connections = useWorkflowStore((state) => state.connections);
+            const ambientExecution = useWorkflowStore((state) => state.ambientExecution);
             const [showJson, setShowJson] = useState(false);
 
             function handleDragStart(event, typeId) {
@@ -2450,7 +2451,11 @@
                 onAddNode(typeId, { x: 300 + offset, y: 200 + offset });
             }
 
-            const workflowJson = JSON.stringify({ nodes, connections }, null, 2);
+            // Instance = workflow definition + execution state
+            const instanceJson = JSON.stringify({
+                workflow: { nodes, connections },
+                execution: ambientExecution,
+            }, null, 2);
 
             return React.createElement('div', { className: 'sidebar', 'data-testid': 'sidebar' }, [
                 React.createElement('div', { key: 'title', className: 'sidebar-title', 'data-testid': 'sidebar-title' }, 'Nodes'),
@@ -2483,14 +2488,14 @@
                         className: 'view-json-btn',
                         'data-testid': 'view-json-btn',
                         onClick: () => setShowJson(true),
-                    }, 'View JSON'),
+                    }, 'View Instance'),
                     React.createElement('div', { key: 'hint', className: 'sidebar-hint', 'data-testid': 'sidebar-hint' }, 'Click or drag to add'),
                 ]),
                 React.createElement(JsonModal, {
                     key: 'modal',
                     isOpen: showJson,
                     onClose: () => setShowJson(false),
-                    json: workflowJson,
+                    json: instanceJson,
                 }),
             ]);
         }

@@ -568,22 +568,24 @@ test.describe('Workflow Editor', () => {
     expect(jsonContent).toContain('"unit": "hours"');
   });
 
-  test('View JSON button shows workflow data', async ({ page }) => {
+  test('View Instance button shows workflow and execution data', async ({ page }) => {
     // Add a node
     await page.getByTestId('node-type-rss').click();
 
-    // Click View JSON button
+    // Click View Instance button
     await page.getByTestId('view-json-btn').click();
 
     // Modal should appear with JSON content
     const modal = page.locator('.json-modal');
     await expect(modal).toBeVisible();
 
-    // JSON should contain the node
+    // JSON should contain workflow and execution keys
     const jsonContent = await modal.locator('pre').textContent();
-    expect(jsonContent).toContain('"typeId": "rss"');
+    expect(jsonContent).toContain('"workflow"');
+    expect(jsonContent).toContain('"execution"');
     expect(jsonContent).toContain('"nodes"');
     expect(jsonContent).toContain('"connections"');
+    expect(jsonContent).toContain('"typeId": "rss"');
 
     // Close modal by clicking overlay
     await page.locator('.json-modal-overlay').click({ position: { x: 10, y: 10 } });
