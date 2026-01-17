@@ -2,7 +2,21 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Workflow Editor', () => {
   test.beforeEach(async ({ page }) => {
+    // Clear localStorage to get fresh state, then navigate to editor via dashboard
     await page.goto('/');
+    await page.evaluate(() => localStorage.removeItem('dazflow2-workflow'));
+    await page.reload();
+    // Wait for dashboard to load and show the file list
+    await expect(page.getByTestId('dashboard')).toBeVisible();
+    await expect(page.getByTestId('file-list')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('file-item-sample.json')).toBeVisible({ timeout: 10000 });
+    // Double-click sample.json to open the editor
+    await page.getByTestId('file-item-sample.json').dblclick();
+    // Wait for editor to be visible
+    await expect(page.getByTestId('editor')).toBeVisible({ timeout: 10000 });
+    // Delete any pre-existing nodes so tests start with empty canvas
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Delete');
   });
 
   test('loads the editor with sidebar and canvas', async ({ page }) => {
@@ -592,29 +606,205 @@ test.describe('Workflow Editor', () => {
     await expect(modal).not.toBeVisible();
   });
 
-  test('workflow state persists across page reload', async ({ page }) => {
-    // Clear localStorage first
-    await page.evaluate(() => localStorage.removeItem('dazflow2-workflow'));
+  test('can navigate from editor back to dashboard', async ({ page }) => {
+    // Verify we're in the editor (from beforeEach)
+    await expect(page.getByTestId('editor')).toBeVisible();
 
-    // Add nodes
-    await page.getByTestId('node-type-rss').click();
-    await page.getByTestId('node-type-http').click();
+    // Click back to dashboard button
+    await page.getByTestId('back-to-dashboard').click();
 
-    // Verify nodes exist
-    await expect(page.getByTestId('workflow-node-rss')).toHaveCount(1);
-    await expect(page.getByTestId('workflow-node-http')).toHaveCount(1);
+    // Verify we're back on the dashboard
+    await expect(page.getByTestId('dashboard')).toBeVisible();
+    await expect(page.getByTestId('dashboard-title')).toHaveText('dazflow');
+  });
+});
 
-    // Wait for localStorage to be updated
-    await page.waitForTimeout(100);
+test.describe('Dashboard', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+  });
 
-    // Reload the page
-    await page.reload();
+  test('loads dashboard as default view', async ({ page }) => {
+    await expect(page.getByTestId('dashboard')).toBeVisible();
+    await expect(page.getByTestId('dashboard-title')).toHaveText('dazflow');
+  });
 
-    // Verify nodes are restored after reload
-    await expect(page.getByTestId('workflow-node-rss')).toHaveCount(1);
-    await expect(page.getByTestId('workflow-node-http')).toHaveCount(1);
+  test('shows workflows and executions tabs', async ({ page }) => {
+    await expect(page.getByTestId('tab-workflows')).toBeVisible();
+    await expect(page.getByTestId('tab-executions')).toBeVisible();
+    // Workflows tab should be active by default
+    await expect(page.getByTestId('tab-workflows')).toHaveClass(/active/);
+  });
 
-    // Clean up
-    await page.evaluate(() => localStorage.removeItem('dazflow2-workflow'));
+  test('shows sample.json workflow', async ({ page }) => {
+    await expect(page.getByTestId('file-item-sample.json')).toBeVisible();
+    // Check stats display (may have runs from other tests)
+    await expect(page.getByTestId('file-item-sample.json')).toContainText('runs');
+  });
+
+  test('can switch to executions tab', async ({ page }) => {
+    await page.getByTestId('tab-executions').click();
+    await expect(page.getByTestId('tab-executions')).toHaveClass(/active/);
+    await expect(page.getByTestId('executions-tab')).toBeVisible();
+  });
+
+  test('double-clicking workflow opens editor', async ({ page }) => {
+    // Wait for file list to load
+    await expect(page.getByTestId('file-list')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('file-item-sample.json')).toBeVisible({ timeout: 10000 });
+    await page.getByTestId('file-item-sample.json').dblclick();
+    await expect(page.getByTestId('editor')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('sidebar')).toBeVisible();
+    await expect(page.getByTestId('canvas')).toBeVisible();
+  });
+
+  test('workflow item has hamburger menu button', async ({ page }) => {
+    await expect(page.getByTestId('file-list')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('menu-btn-sample.json')).toBeVisible();
+  });
+
+  test('clicking hamburger menu opens dropdown with Execute option', async ({ page }) => {
+    await expect(page.getByTestId('file-list')).toBeVisible({ timeout: 10000 });
+
+    // Click hamburger menu button
+    await page.getByTestId('menu-btn-sample.json').click();
+
+    // Dropdown should appear with Execute option
+    await expect(page.getByTestId('menu-dropdown-sample.json')).toBeVisible();
+    await expect(page.getByTestId('menu-execute-sample.json')).toBeVisible();
+    await expect(page.getByTestId('menu-execute-sample.json')).toHaveText('Execute');
+  });
+
+  test('clicking Execute queues the workflow', async ({ page }) => {
+    await expect(page.getByTestId('file-list')).toBeVisible({ timeout: 10000 });
+
+    // Intercept the queue API call
+    const queuePromise = page.waitForResponse(
+      response => response.url().includes('/workflow/sample.json/queue') && response.status() === 200
+    );
+
+    // Click hamburger menu button
+    await page.getByTestId('menu-btn-sample.json').click();
+
+    // Click Execute
+    await page.getByTestId('menu-execute-sample.json').click();
+
+    // Verify API was called successfully
+    const queueResponse = await queuePromise;
+    const responseData = await queueResponse.json();
+    expect(responseData.queue_id).toBeDefined();
+    expect(responseData.status).toBe('queued');
+
+    // Dropdown should close after clicking Execute
+    await expect(page.getByTestId('menu-dropdown-sample.json')).not.toBeVisible();
+  });
+
+  test('clicking outside dropdown closes it', async ({ page }) => {
+    await expect(page.getByTestId('file-list')).toBeVisible({ timeout: 10000 });
+
+    // Open dropdown
+    await page.getByTestId('menu-btn-sample.json').click();
+    await expect(page.getByTestId('menu-dropdown-sample.json')).toBeVisible();
+
+    // Click outside the dropdown (on the dashboard title)
+    await page.getByTestId('dashboard-title').click();
+
+    // Dropdown should close
+    await expect(page.getByTestId('menu-dropdown-sample.json')).not.toBeVisible();
+  });
+});
+
+test.describe('Executions', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('dashboard')).toBeVisible();
+  });
+
+  test('queued workflow appears in executions tab after completion', async ({ page }) => {
+    // Queue a workflow
+    await expect(page.getByTestId('file-list')).toBeVisible({ timeout: 10000 });
+    await page.getByTestId('menu-btn-sample.json').click();
+    await page.getByTestId('menu-execute-sample.json').click();
+
+    // Wait for execution to complete (workers process it)
+    await page.waitForTimeout(2000);
+
+    // Switch to executions tab
+    await page.getByTestId('tab-executions').click();
+    await expect(page.getByTestId('executions-tab')).toBeVisible();
+
+    // Should show at least one execution
+    await expect(page.getByTestId('executions-list')).toBeVisible({ timeout: 10000 });
+    const items = page.locator('[data-testid^="execution-item-"]');
+    await expect(items.first()).toBeVisible({ timeout: 10000 });
+  });
+
+  test('clicking execution opens read-only editor', async ({ page }) => {
+    // Queue a workflow first
+    await expect(page.getByTestId('file-list')).toBeVisible({ timeout: 10000 });
+    await page.getByTestId('menu-btn-sample.json').click();
+    await page.getByTestId('menu-execute-sample.json').click();
+    await page.waitForTimeout(2000);
+
+    // Switch to executions tab
+    await page.getByTestId('tab-executions').click();
+    await expect(page.getByTestId('executions-tab')).toBeVisible();
+    await expect(page.getByTestId('executions-list')).toBeVisible({ timeout: 10000 });
+
+    // Click the first execution
+    const firstItem = page.locator('[data-testid^="execution-item-"]').first();
+    await expect(firstItem).toBeVisible({ timeout: 10000 });
+    await firstItem.click();
+
+    // Should open the editor in read-only mode
+    await expect(page.getByTestId('editor')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('readonly-banner')).toBeVisible();
+    await expect(page.getByTestId('readonly-banner')).toContainText('Read Only');
+  });
+
+  test('read-only mode has back button that returns to executions', async ({ page }) => {
+    // Queue a workflow first
+    await expect(page.getByTestId('file-list')).toBeVisible({ timeout: 10000 });
+    await page.getByTestId('menu-btn-sample.json').click();
+    await page.getByTestId('menu-execute-sample.json').click();
+    await page.waitForTimeout(2000);
+
+    // Switch to executions tab and open execution
+    await page.getByTestId('tab-executions').click();
+    await expect(page.getByTestId('executions-list')).toBeVisible({ timeout: 10000 });
+    const firstItem = page.locator('[data-testid^="execution-item-"]').first();
+    await expect(firstItem).toBeVisible({ timeout: 10000 });
+    await firstItem.click();
+
+    // Verify read-only editor
+    await expect(page.getByTestId('editor')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('readonly-banner')).toBeVisible();
+
+    // Click back button
+    await page.getByTestId('readonly-back-btn').click();
+
+    // Should return to executions tab
+    await expect(page.getByTestId('dashboard')).toBeVisible();
+    await expect(page.getByTestId('tab-executions')).toHaveClass(/active/);
+  });
+
+  test('read-only mode disables sidebar node adding', async ({ page }) => {
+    // Queue and wait
+    await expect(page.getByTestId('file-list')).toBeVisible({ timeout: 10000 });
+    await page.getByTestId('menu-btn-sample.json').click();
+    await page.getByTestId('menu-execute-sample.json').click();
+    await page.waitForTimeout(2000);
+
+    // Open execution
+    await page.getByTestId('tab-executions').click();
+    await expect(page.getByTestId('executions-list')).toBeVisible({ timeout: 10000 });
+    const firstItem = page.locator('[data-testid^="execution-item-"]').first();
+    await expect(firstItem).toBeVisible({ timeout: 10000 });
+    await firstItem.click();
+
+    // Verify sidebar node types are disabled
+    await expect(page.getByTestId('editor')).toBeVisible({ timeout: 10000 });
+    const nodeType = page.getByTestId('node-type-scheduled');
+    await expect(nodeType).toHaveClass(/disabled/);
   });
 });

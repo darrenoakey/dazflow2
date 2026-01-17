@@ -1,0 +1,33 @@
+{
+  "nodes": [
+    {
+      "id": "node-1",
+      "typeId": "scheduled",
+      "name": "scheduled1",
+      "position": { "x": 100, "y": 150 },
+      "data": {
+        "interval": 5,
+        "unit": "minutes"
+      }
+    },
+    {
+      "id": "node-2",
+      "typeId": "append_to_file",
+      "name": "append1",
+      "position": { "x": 400, "y": 150 },
+      "data": {
+        "filepath": "local/work/output/timestamps.txt",
+        "content": "{{$.scheduled1.time}}"
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "conn-1",
+      "sourceNodeId": "node-1",
+      "sourceConnectorId": "trigger",
+      "targetNodeId": "node-2",
+      "targetConnectorId": "data"
+    }
+  ]
+}

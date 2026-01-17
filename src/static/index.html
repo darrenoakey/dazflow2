@@ -66,6 +66,13 @@
         .node-type-item:hover {
             background: #3a3a5e;
         }
+        .node-type-item.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .node-type-item.disabled:hover {
+            background: #2a2a4e;
+        }
         .node-type-item svg {
             width: 24px;
             height: 24px;
@@ -888,6 +895,255 @@
         .json-array-item {
             display: block;
         }
+
+        /* Dashboard Styles */
+        .dashboard {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background: #1a1a2e;
+        }
+        .dashboard-header {
+            padding: 24px 32px;
+            border-bottom: 1px solid #3a3a5e;
+        }
+        .dashboard-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #667eea;
+            margin: 0 0 16px 0;
+        }
+        .dashboard-tabs {
+            display: flex;
+            gap: 0;
+        }
+        .dashboard-tab {
+            padding: 10px 24px;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: #888;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .dashboard-tab:hover {
+            color: #ccc;
+        }
+        .dashboard-tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+        .dashboard-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 32px;
+        }
+        .file-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: #2a2a4e;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .file-item:hover {
+            background: #3a3a5e;
+        }
+        .file-item.folder {
+            border-left: 3px solid #667eea;
+        }
+        .file-item.workflow {
+            border-left: 3px solid #764ba2;
+        }
+        .file-item-icon {
+            width: 20px;
+            height: 20px;
+            color: #888;
+        }
+        .file-item-name {
+            flex: 1;
+            color: #eee;
+            font-size: 14px;
+        }
+        .file-item-stats {
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+            color: #666;
+        }
+        .file-item-stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .file-item-menu {
+            position: relative;
+        }
+        .file-item-menu-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background: transparent;
+            border: none;
+            border-radius: 4px;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .file-item-menu-btn:hover {
+            background: #3a3a5e;
+            color: #fff;
+        }
+        .file-item-menu-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+        .file-item-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            min-width: 120px;
+            background: #2a2a4e;
+            border: 1px solid #3a3a5e;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+            overflow: hidden;
+        }
+        .file-item-dropdown-item {
+            display: block;
+            width: 100%;
+            padding: 10px 14px;
+            background: transparent;
+            border: none;
+            color: #eee;
+            font-size: 13px;
+            text-align: left;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .file-item-dropdown-item:hover {
+            background: #3a3a5e;
+        }
+        .executions-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
+        }
+        .execution-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 12px 16px;
+            background: #2a2a4e;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .execution-item:hover {
+            background: #3a3a5e;
+        }
+        .execution-item.completed {
+            border-left: 3px solid #4caf50;
+        }
+        .execution-item.error {
+            border-left: 3px solid #f44336;
+        }
+        .exec-time {
+            color: #888;
+            font-size: 13px;
+            min-width: 160px;
+        }
+        .exec-workflow {
+            flex: 1;
+            color: #eee;
+            font-size: 14px;
+        }
+        .exec-status {
+            font-size: 16px;
+        }
+        .exec-status.completed {
+            color: #4caf50;
+        }
+        .exec-status.error {
+            color: #f44336;
+        }
+        .exec-duration {
+            color: #888;
+            font-size: 13px;
+            min-width: 60px;
+            text-align: right;
+        }
+        .executions-loading {
+            text-align: center;
+            padding: 20px;
+            color: #888;
+        }
+        .readonly-banner {
+            background: linear-gradient(135deg, #5a4a2e 0%, #4a3a1e 100%);
+            color: #ffd54f;
+            padding: 10px 16px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #6a5a3e;
+        }
+        .readonly-banner-text {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .readonly-banner-close {
+            background: transparent;
+            border: 1px solid #8a7a4e;
+            border-radius: 4px;
+            color: #ffd54f;
+            padding: 4px 12px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.15s;
+        }
+        .readonly-banner-close:hover {
+            background: #6a5a3e;
+        }
+        .back-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: #2a2a4e;
+            border: 1px solid #3a3a5e;
+            border-radius: 6px;
+            color: #888;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+            margin-bottom: 12px;
+        }
+        .back-btn:hover {
+            background: #3a3a5e;
+            color: #eee;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 48px;
+            color: #666;
+            font-size: 14px;
+        }
     </style>
     <link href="https://esm.sh/@xyflow/react@12/dist/style.css" rel="stylesheet">
 </head>
@@ -1098,9 +1354,158 @@
             editingNodeId: null,
             openEditorNodeId: null,
 
+            // Dashboard state
+            currentView: 'dashboard', // 'dashboard' | 'editor'
+            currentWorkflowPath: null,
+            dashboardPath: '',
+            dashboardTab: 'workflows', // 'workflows' | 'executions'
+            dashboardItems: [],
+            dashboardLoading: false,
+
             // Ambient execution - stores the most recent execution results for each node
             // Format: { [nodeId]: { input, nodeOutput, output (combined), executedAt } }
             ambientExecution: {},
+
+            // Dashboard actions
+            setCurrentView: (view) => set({ currentView: view }),
+            setDashboardPath: (path) => set({ dashboardPath: path }),
+            setDashboardTab: (tab) => set({ dashboardTab: tab }),
+            setDashboardItems: (items) => set({ dashboardItems: items }),
+
+            // Load workflows from server
+            loadDashboardItems: async (path = '') => {
+                set({ dashboardLoading: true });
+                try {
+                    const response = await fetch(`/workflows?path=${encodeURIComponent(path)}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        set({ dashboardItems: data.items, dashboardPath: path });
+                    }
+                } catch (e) {
+                    console.error('Failed to load workflows:', e);
+                } finally {
+                    set({ dashboardLoading: false });
+                }
+            },
+
+            // Load a workflow and switch to editor
+            loadWorkflow: async (path) => {
+                try {
+                    const response = await fetch(`/workflow/${encodeURIComponent(path)}`);
+                    if (response.ok) {
+                        const workflow = await response.json();
+                        set({
+                            nodes: workflow.nodes || [],
+                            connections: workflow.connections || [],
+                            nameCounts: {},
+                            viewport: { x: 0, y: 0, zoom: 1 },
+                            ambientExecution: {},
+                            currentWorkflowPath: path,
+                            currentView: 'editor',
+                        });
+                    }
+                } catch (e) {
+                    console.error('Failed to load workflow:', e);
+                }
+            },
+
+            // Save current workflow
+            saveWorkflow: async (path) => {
+                const state = get();
+                const workflow = { nodes: state.nodes, connections: state.connections };
+                try {
+                    const response = await fetch(`/workflow/${encodeURIComponent(path)}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ workflow }),
+                    });
+                    return response.ok;
+                } catch (e) {
+                    console.error('Failed to save workflow:', e);
+                    return false;
+                }
+            },
+
+            // Go back to dashboard
+            goToDashboard: () => {
+                set({ currentView: 'dashboard', currentWorkflowPath: null, isReadOnly: false, executionViewerId: null });
+                get().loadDashboardItems(get().dashboardPath);
+            },
+
+            // Read-only mode for viewing historical executions
+            isReadOnly: false,
+            executionViewerId: null,
+            executionViewerData: null,
+
+            // Executions list state
+            executionsList: [],
+            executionsLoading: false,
+            executionsHasMore: true,
+            executionsBeforeCursor: null,
+
+            // Load paginated executions list
+            loadExecutionsList: async (reset = false) => {
+                const state = get();
+                if (state.executionsLoading) return;
+
+                set({ executionsLoading: true });
+                try {
+                    const before = reset ? null : state.executionsBeforeCursor;
+                    const url = before
+                        ? `/executions?limit=50&before=${before}`
+                        : '/executions?limit=50';
+                    const response = await fetch(url);
+                    if (response.ok) {
+                        const data = await response.json();
+                        const newItems = reset ? data.items : [...state.executionsList, ...data.items];
+                        const lastItem = data.items[data.items.length - 1];
+                        set({
+                            executionsList: newItems,
+                            executionsHasMore: data.has_more,
+                            executionsBeforeCursor: lastItem?.completed_at || null,
+                        });
+                    }
+                } catch (e) {
+                    console.error('Failed to load executions:', e);
+                } finally {
+                    set({ executionsLoading: false });
+                }
+            },
+
+            // Load a historical execution and open in read-only editor
+            loadExecution: async (id) => {
+                try {
+                    const response = await fetch(`/execution/${encodeURIComponent(id)}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        set({
+                            currentView: 'editor',
+                            nodes: data.workflow.nodes || [],
+                            connections: data.workflow.connections || [],
+                            nameCounts: {},
+                            viewport: { x: 0, y: 0, zoom: 1 },
+                            ambientExecution: data.execution || {},
+                            executionViewerId: id,
+                            executionViewerData: data,
+                            isReadOnly: true,
+                            currentWorkflowPath: data.workflow_path,
+                        });
+                    }
+                } catch (e) {
+                    console.error('Failed to load execution:', e);
+                }
+            },
+
+            // Close execution viewer and return to executions tab
+            closeExecutionViewer: () => {
+                set({
+                    currentView: 'dashboard',
+                    dashboardTab: 'executions',
+                    isReadOnly: false,
+                    executionViewerId: null,
+                    executionViewerData: null,
+                });
+            },
 
             setViewport: (viewport) => set({ viewport }),
             setEditingNodeId: (nodeId) => set({ editingNodeId: nodeId }),
@@ -2179,6 +2584,7 @@
             const isNameUnique = useWorkflowStore((state) => state.isNameUnique);
             const setNodeExecution = useWorkflowStore((state) => state.setNodeExecution);
             const ambientExecution = useWorkflowStore((state) => state.ambientExecution);
+            const isReadOnly = useWorkflowStore((state) => state.isReadOnly);
 
             const [localName, setLocalName] = useState(node?.name || '');
             const [nameError, setNameError] = useState(false);
@@ -2301,7 +2707,7 @@
                             `Edit ${nodeType.name} Node`,
                         ]),
                         React.createElement('div', { key: 'actions', style: { display: 'flex', alignItems: 'center', gap: '12px' } }, [
-                            canExecute && React.createElement('button', {
+                            canExecute && !isReadOnly && React.createElement('button', {
                                 key: 'execute',
                                 className: 'execute-btn',
                                 onClick: handleExecute,
@@ -2429,20 +2835,272 @@
             );
         }
 
+        // WorkflowsTab Component
+        function WorkflowsTab() {
+            const dashboardPath = useWorkflowStore((state) => state.dashboardPath);
+            const dashboardItems = useWorkflowStore((state) => state.dashboardItems);
+            const dashboardLoading = useWorkflowStore((state) => state.dashboardLoading);
+            const loadDashboardItems = useWorkflowStore((state) => state.loadDashboardItems);
+            const loadWorkflow = useWorkflowStore((state) => state.loadWorkflow);
+            const [openMenu, setOpenMenu] = useState(null);
+
+            useEffect(() => {
+                loadDashboardItems(dashboardPath);
+            }, []);
+
+            // Close menu when clicking outside
+            useEffect(() => {
+                const handleClickOutside = () => setOpenMenu(null);
+                if (openMenu) {
+                    document.addEventListener('click', handleClickOutside);
+                    return () => document.removeEventListener('click', handleClickOutside);
+                }
+            }, [openMenu]);
+
+            const handleFolderClick = (path) => {
+                loadDashboardItems(path);
+            };
+
+            const handleWorkflowDoubleClick = (path) => {
+                loadWorkflow(path);
+            };
+
+            const handleUpClick = () => {
+                const parts = dashboardPath.split('/').filter(Boolean);
+                parts.pop();
+                loadDashboardItems(parts.join('/'));
+            };
+
+            const handleMenuClick = (e, path) => {
+                e.stopPropagation();
+                setOpenMenu(openMenu === path ? null : path);
+            };
+
+            const handleExecuteClick = async (e, path) => {
+                e.stopPropagation();
+                setOpenMenu(null);
+                try {
+                    const response = await fetch(`/workflow/${path}/queue`, { method: 'POST' });
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('Workflow queued:', data.queue_id);
+                    }
+                } catch (err) {
+                    console.error('Failed to queue workflow:', err);
+                }
+            };
+
+            const folderIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
+            const fileIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+            const menuIcon = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>';
+
+            if (dashboardLoading) {
+                return React.createElement('div', { className: 'empty-state' }, 'Loading...');
+            }
+
+            if (dashboardItems.length === 0 && !dashboardPath) {
+                return React.createElement('div', { className: 'empty-state', 'data-testid': 'empty-state' },
+                    'No workflows yet. Create your first workflow!'
+                );
+            }
+
+            return React.createElement('div', { className: 'file-list', 'data-testid': 'file-list' }, [
+                dashboardPath && React.createElement('div', {
+                    key: 'up',
+                    className: 'file-item folder',
+                    onClick: handleUpClick,
+                    'data-testid': 'folder-up',
+                }, [
+                    React.createElement('div', {
+                        key: 'icon',
+                        className: 'file-item-icon',
+                        dangerouslySetInnerHTML: { __html: folderIcon },
+                    }),
+                    React.createElement('span', { key: 'name', className: 'file-item-name' }, '..'),
+                ]),
+                ...dashboardItems.map((item) =>
+                    React.createElement('div', {
+                        key: item.path,
+                        className: `file-item ${item.type}`,
+                        onClick: item.type === 'folder' ? () => handleFolderClick(item.path) : undefined,
+                        onDoubleClick: item.type === 'workflow' ? () => handleWorkflowDoubleClick(item.path) : undefined,
+                        'data-testid': `file-item-${item.name}`,
+                    }, [
+                        React.createElement('div', {
+                            key: 'icon',
+                            className: 'file-item-icon',
+                            dangerouslySetInnerHTML: { __html: item.type === 'folder' ? folderIcon : fileIcon },
+                        }),
+                        React.createElement('span', { key: 'name', className: 'file-item-name' }, item.name),
+                        item.type === 'workflow' && item.stats && React.createElement('div', {
+                            key: 'stats',
+                            className: 'file-item-stats',
+                        }, [
+                            React.createElement('span', { key: 'runs', className: 'file-item-stat' },
+                                `${item.stats.execution_count} runs`
+                            ),
+                        ]),
+                        item.type === 'workflow' && React.createElement('div', {
+                            key: 'menu',
+                            className: 'file-item-menu',
+                        }, [
+                            React.createElement('button', {
+                                key: 'btn',
+                                className: 'file-item-menu-btn',
+                                onClick: (e) => handleMenuClick(e, item.path),
+                                'data-testid': `menu-btn-${item.name}`,
+                                dangerouslySetInnerHTML: { __html: menuIcon },
+                            }),
+                            openMenu === item.path && React.createElement('div', {
+                                key: 'dropdown',
+                                className: 'file-item-dropdown',
+                                'data-testid': `menu-dropdown-${item.name}`,
+                            }, [
+                                React.createElement('button', {
+                                    key: 'execute',
+                                    className: 'file-item-dropdown-item',
+                                    onClick: (e) => handleExecuteClick(e, item.path),
+                                    'data-testid': `menu-execute-${item.name}`,
+                                }, 'Execute'),
+                            ]),
+                        ]),
+                    ])
+                ),
+            ]);
+        }
+
+        // ExecutionsTab Component
+        function ExecutionsTab() {
+            const executionsList = useWorkflowStore((state) => state.executionsList);
+            const executionsLoading = useWorkflowStore((state) => state.executionsLoading);
+            const executionsHasMore = useWorkflowStore((state) => state.executionsHasMore);
+            const loadExecutionsList = useWorkflowStore((state) => state.loadExecutionsList);
+            const loadExecution = useWorkflowStore((state) => state.loadExecution);
+            const listRef = useRef(null);
+
+            // Initial load
+            useEffect(() => {
+                loadExecutionsList(true);
+            }, []);
+
+            // Infinite scroll - load more when near bottom
+            const handleScroll = (e) => {
+                const { scrollTop, scrollHeight, clientHeight } = e.target;
+                if (scrollHeight - scrollTop - clientHeight < 400 && executionsHasMore && !executionsLoading) {
+                    loadExecutionsList(false);
+                }
+            };
+
+            const formatTime = (timestamp) => {
+                if (!timestamp) return '-';
+                const date = new Date(timestamp * 1000);
+                return date.toLocaleString();
+            };
+
+            const formatDuration = (ms) => {
+                if (!ms) return '-';
+                if (ms < 1000) return `${ms}ms`;
+                return `${(ms / 1000).toFixed(1)}s`;
+            };
+
+            if (executionsList.length === 0 && !executionsLoading) {
+                return React.createElement('div', { className: 'empty-state', 'data-testid': 'executions-tab' },
+                    'No executions yet'
+                );
+            }
+
+            return React.createElement('div', {
+                'data-testid': 'executions-tab',
+            }, [
+                React.createElement('div', {
+                    key: 'list',
+                    className: 'executions-list',
+                    'data-testid': 'executions-list',
+                    onScroll: handleScroll,
+                    ref: listRef,
+                }, [
+                ...executionsList.map((exec) =>
+                    React.createElement('div', {
+                        key: exec.id,
+                        className: `execution-item ${exec.status}`,
+                        onClick: () => loadExecution(exec.id),
+                        'data-testid': `execution-item-${exec.id}`,
+                    }, [
+                        React.createElement('span', {
+                            key: 'time',
+                            className: 'exec-time',
+                        }, formatTime(exec.completed_at)),
+                        React.createElement('span', {
+                            key: 'workflow',
+                            className: 'exec-workflow',
+                        }, exec.workflow_path),
+                        React.createElement('span', {
+                            key: 'status',
+                            className: `exec-status ${exec.status}`,
+                        }, exec.status === 'completed' ? '✓' : '✗'),
+                        React.createElement('span', {
+                            key: 'duration',
+                            className: 'exec-duration',
+                        }, formatDuration(exec.duration_ms)),
+                    ])
+                ),
+                executionsLoading && React.createElement('div', {
+                    key: 'loading',
+                    className: 'executions-loading',
+                }, 'Loading...'),
+                ]),
+            ]);
+        }
+
+        // Dashboard Component
+        function Dashboard() {
+            const dashboardTab = useWorkflowStore((state) => state.dashboardTab);
+            const setDashboardTab = useWorkflowStore((state) => state.setDashboardTab);
+
+            return React.createElement('div', { className: 'dashboard', 'data-testid': 'dashboard' }, [
+                React.createElement('div', { key: 'header', className: 'dashboard-header' }, [
+                    React.createElement('h1', { key: 'title', className: 'dashboard-title', 'data-testid': 'dashboard-title' }, 'dazflow'),
+                    React.createElement('div', { key: 'tabs', className: 'dashboard-tabs' }, [
+                        React.createElement('button', {
+                            key: 'workflows',
+                            className: `dashboard-tab ${dashboardTab === 'workflows' ? 'active' : ''}`,
+                            onClick: () => setDashboardTab('workflows'),
+                            'data-testid': 'tab-workflows',
+                        }, 'Workflows'),
+                        React.createElement('button', {
+                            key: 'executions',
+                            className: `dashboard-tab ${dashboardTab === 'executions' ? 'active' : ''}`,
+                            onClick: () => setDashboardTab('executions'),
+                            'data-testid': 'tab-executions',
+                        }, 'Executions'),
+                    ]),
+                ]),
+                React.createElement('div', { key: 'content', className: 'dashboard-content' },
+                    dashboardTab === 'workflows'
+                        ? React.createElement(WorkflowsTab)
+                        : React.createElement(ExecutionsTab)
+                ),
+            ]);
+        }
+
         // Sidebar Component
         function Sidebar({ onAddNode }) {
             const categorized = getNodeTypesByCategory();
             const nodes = useWorkflowStore((state) => state.nodes);
             const connections = useWorkflowStore((state) => state.connections);
             const ambientExecution = useWorkflowStore((state) => state.ambientExecution);
+            const goToDashboard = useWorkflowStore((state) => state.goToDashboard);
+            const isReadOnly = useWorkflowStore((state) => state.isReadOnly);
             const [showJson, setShowJson] = useState(false);
 
             function handleDragStart(event, typeId) {
+                if (isReadOnly) return;
                 event.dataTransfer.setData('application/reactflow', typeId);
                 event.dataTransfer.effectAllowed = 'move';
             }
 
             function handleClick(typeId) {
+                if (isReadOnly) return;
                 // Stagger position based on current node count to avoid overlap
                 const offset = nodes.length * 40;
                 onAddNode(typeId, { x: 300 + offset, y: 200 + offset });
@@ -2455,18 +3113,24 @@
             }, null, 2);
 
             return React.createElement('div', { className: 'sidebar', 'data-testid': 'sidebar' }, [
+                !isReadOnly && React.createElement('button', {
+                    key: 'back',
+                    className: 'back-btn',
+                    onClick: goToDashboard,
+                    'data-testid': 'back-to-dashboard',
+                }, '\u2190 Dashboard'),
                 React.createElement('div', { key: 'title', className: 'sidebar-title', 'data-testid': 'sidebar-title' }, 'Nodes'),
                 ...Object.entries(categorized).map(([category, types]) =>
-                    React.createElement('div', { key: category, className: 'category-group' }, [
+                    React.createElement('div', { key: category, className: 'category-group', style: isReadOnly ? { opacity: 0.5, pointerEvents: 'none' } : {} }, [
                         React.createElement('div', { key: 'label', className: 'category-label' }, category),
                         React.createElement('div', { key: 'items', className: 'category-items' },
                             types.map((nt) =>
                                 React.createElement('div', {
                                     key: nt.id,
-                                    className: 'node-type-item',
+                                    className: `node-type-item${isReadOnly ? ' disabled' : ''}`,
                                     'data-testid': `node-type-${nt.id}`,
                                     onClick: () => handleClick(nt.id),
-                                    draggable: true,
+                                    draggable: !isReadOnly,
                                     onDragStart: (e) => handleDragStart(e, nt.id),
                                 }, [
                                     React.createElement('div', {
@@ -2486,7 +3150,11 @@
                         'data-testid': 'view-json-btn',
                         onClick: () => setShowJson(true),
                     }, 'View Instance'),
-                    React.createElement('div', { key: 'hint', className: 'sidebar-hint', 'data-testid': 'sidebar-hint' }, 'Click or drag to add'),
+                    React.createElement('div', {
+                        key: 'hint',
+                        className: 'sidebar-hint',
+                        'data-testid': 'sidebar-hint',
+                    }, isReadOnly ? 'Read-only mode' : 'Click or drag to add'),
                 ]),
                 React.createElement(JsonModal, {
                     key: 'modal',
@@ -2714,6 +3382,9 @@
             const openEditorNodeId = useWorkflowStore((state) => state.openEditorNodeId);
             const setOpenEditorNodeId = useWorkflowStore((state) => state.setOpenEditorNodeId);
             const nodes = useWorkflowStore((state) => state.nodes);
+            const isReadOnly = useWorkflowStore((state) => state.isReadOnly);
+            const executionViewerData = useWorkflowStore((state) => state.executionViewerData);
+            const closeExecutionViewer = useWorkflowStore((state) => state.closeExecutionViewer);
 
             // Keyboard shortcuts
             useEffect(() => {
@@ -2721,8 +3392,8 @@
                     const target = event.target;
                     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
 
-                    // Don't handle shortcuts if node editor is open
-                    if (openEditorNodeId) return;
+                    // Don't handle shortcuts if node editor is open or read-only
+                    if (openEditorNodeId || isReadOnly) return;
 
                     if (event.key === 'Delete' || event.key === 'Backspace') {
                         event.preventDefault();
@@ -2746,13 +3417,37 @@
                 }
                 window.addEventListener('keydown', handleKeyDown);
                 return () => window.removeEventListener('keydown', handleKeyDown);
-            }, [deleteSelected, selectNodes, clearSelection, nodes, selectedNodeIds, editingNodeId, setEditingNodeId, openEditorNodeId]);
+            }, [deleteSelected, selectNodes, clearSelection, nodes, selectedNodeIds, editingNodeId, setEditingNodeId, openEditorNodeId, isReadOnly]);
 
             const handleAddNode = useCallback((typeId, position) => {
+                if (isReadOnly) return;
                 addNode(typeId, position);
-            }, [addNode]);
+            }, [addNode, isReadOnly]);
+
+            const formatTimestamp = (ts) => {
+                if (!ts) return '';
+                return new Date(ts * 1000).toLocaleString();
+            };
 
             return React.createElement(ReactFlowProvider, null, [
+                isReadOnly && executionViewerData && React.createElement('div', {
+                    key: 'readonly-banner',
+                    className: 'readonly-banner',
+                    'data-testid': 'readonly-banner',
+                }, [
+                    React.createElement('div', { key: 'text', className: 'readonly-banner-text' }, [
+                        React.createElement('span', { key: 'icon' }, '📜'),
+                        React.createElement('span', { key: 'msg' },
+                            `Viewing execution from ${formatTimestamp(executionViewerData.completed_at)} - Read Only`
+                        ),
+                    ]),
+                    React.createElement('button', {
+                        key: 'close',
+                        className: 'readonly-banner-close',
+                        onClick: closeExecutionViewer,
+                        'data-testid': 'readonly-back-btn',
+                    }, '← Back to Executions'),
+                ]),
                 React.createElement('div', { key: 'main', className: 'editor', 'data-testid': 'editor' }, [
                     React.createElement(Sidebar, { key: 'sidebar', onAddNode: handleAddNode }),
                     React.createElement(Canvas, { key: 'canvas', onAddNode: handleAddNode }),
@@ -2767,6 +3462,11 @@
 
         // App Component
         function App() {
+            const currentView = useWorkflowStore((state) => state.currentView);
+
+            if (currentView === 'dashboard') {
+                return React.createElement(Dashboard);
+            }
             return React.createElement(Editor);
         }
 

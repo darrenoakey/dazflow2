@@ -9,6 +9,7 @@ import ifNode from './if.js';
 import http from './http.js';
 import transform from './transform.js';
 import set from './set.js';
+import appendToFile from './append_to_file.js';
 
 // Wrap map nodes to be array nodes
 // Map nodes define execute(nodeData, item) -> item
@@ -38,7 +39,7 @@ function normalizeNodeType(nodeType) {
 }
 
 // Build the node type definitions object from all imported nodes
-const nodeTypes = [start, scheduled, hardwired, rss, ifNode, http, transform, set];
+const nodeTypes = [start, scheduled, hardwired, rss, ifNode, http, transform, set, appendToFile];
 
 const nodeTypeDefinitions = {};
 for (const nodeType of nodeTypes) {

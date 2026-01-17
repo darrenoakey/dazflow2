@@ -5,6 +5,7 @@ Each node type defines how to execute given node data and input.
 
 import json
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 
@@ -85,6 +86,17 @@ def execute_rss(node_data: dict, _input_data: Any) -> list:
     return [{"feed_url": url, "status": "not_implemented"}]
 
 
+def execute_append_to_file(node_data: dict, _input_data: Any) -> list:
+    """Append to file node - appends content to a file."""
+    filepath = node_data.get("filepath", "")
+    content = node_data.get("content", "")
+    if filepath:
+        Path(filepath).parent.mkdir(parents=True, exist_ok=True)
+        with open(filepath, "a") as f:
+            f.write(str(content) + "\n")
+    return [{"written": bool(filepath), "filepath": filepath}]
+
+
 # Node type registry
 # kind: "map" means the node processes single items (infrastructure handles array iteration)
 NODE_TYPES = {
@@ -118,6 +130,10 @@ NODE_TYPES = {
     },
     "rss": {
         "execute": execute_rss,
+        "kind": "array",
+    },
+    "append_to_file": {
+        "execute": execute_append_to_file,
         "kind": "array",
     },
 }
