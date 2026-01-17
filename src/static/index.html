@@ -1456,7 +1456,9 @@
                     const response = await fetch(`/api/workflow/${encodeURIComponent(path)}`);
                     if (response.ok) {
                         const workflow = await response.json();
-                        history.pushState(null, '', `/editor/${path}`);
+                        // Strip .json from URL for cleaner paths
+                        const urlPath = path.replace(/\.json$/, '');
+                        history.pushState(null, '', `/editor/${urlPath}`);
                         set({
                             nodes: workflow.nodes || [],
                             connections: workflow.connections || [],
@@ -3741,7 +3743,11 @@
                     const pathname = window.location.pathname;
 
                     if (pathname.startsWith('/editor/')) {
-                        const path = pathname.slice(8);
+                        // Add .json extension if not present (URLs don't include .json)
+                        let path = pathname.slice(8);
+                        if (!path.endsWith('.json')) {
+                            path = path + '.json';
+                        }
                         loadWorkflow(path);
                     } else if (pathname.startsWith('/execution/')) {
                         const id = pathname.slice(11);
