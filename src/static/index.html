@@ -1473,15 +1473,15 @@
                 // Execute node to get its output
                 const nodeOutputResult = nodeType.execute(node.data, inputData);
 
-                // Merge input with node output: each item gets node's output merged in
-                // If input is [{a, b}, {c, d}] and node outputs [{x}, {y}]
-                // Combined is [{a, b, x}, {c, d, y}]
+                // Merge input with node output, namespaced by node name
+                // If input is [{scheduled1: {time}}] and this node "set1" outputs [{status}]
+                // Combined is [{scheduled1: {time}, set1: {status}}]
                 const inputArray = Array.isArray(inputData) ? inputData : [inputData || {}];
                 const outputArray = Array.isArray(nodeOutputResult) ? nodeOutputResult : [nodeOutputResult];
 
                 const combinedOutput = outputArray.map((out, i) => {
                     const inp = inputArray[i] || {};
-                    return { ...inp, ...out };
+                    return { ...inp, [node.name]: out };
                 });
 
                 setNodeExecution(nodeId, inputData, nodeOutputResult, combinedOutput);
