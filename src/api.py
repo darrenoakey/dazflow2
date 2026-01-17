@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import setproctitle
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -151,6 +151,9 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="dazflow2", lifespan=lifespan)
 
+# Create API router with /api prefix
+api_router = APIRouter(prefix="/api")
+
 # Mount static files for nodes directory (must be before routes)
 app.mount("/nodes", StaticFiles(directory=STATIC_DIR / "nodes"), name="nodes")
 
@@ -177,7 +180,7 @@ def save_workflow_stats(workflow_path: str, stats: dict):
 # ##################################################################
 # list workflows endpoint
 # returns list of workflows and folders with stats
-@app.get("/workflows")
+@api_router.get("/workflows")
 async def list_workflows(path: str = ""):
     base_path = WORKFLOWS_DIR / path if path else WORKFLOWS_DIR
     if not base_path.exists() or not base_path.is_dir():
@@ -206,7 +209,7 @@ async def list_workflows(path: str = ""):
 # ##################################################################
 # get enabled workflows endpoint
 # returns enabled state for all workflows
-@app.get("/workflows/enabled")
+@api_router.get("/workflows/enabled")
 async def get_workflows_enabled():
     return {"enabled": get_enabled_workflows()}
 
@@ -218,7 +221,7 @@ class SetEnabledRequest(BaseModel):
     enabled: bool
 
 
-@app.put("/workflow/{path:path}/enabled")
+@api_router.put("/workflow/{path:path}/enabled")
 async def set_workflow_enabled_endpoint(path: str, request: SetEnabledRequest):
     workflow_path = WORKFLOWS_DIR / path
     if not workflow_path.exists():
@@ -238,7 +241,7 @@ async def set_workflow_enabled_endpoint(path: str, request: SetEnabledRequest):
 # ##################################################################
 # get workflow endpoint
 # returns workflow json
-@app.get("/workflow/{path:path}")
+@api_router.get("/workflow/{path:path}")
 async def get_workflow(path: str):
     workflow_path = WORKFLOWS_DIR / path
     if not workflow_path.exists():
@@ -253,7 +256,7 @@ class SaveWorkflowRequest(BaseModel):
     workflow: dict
 
 
-@app.put("/workflow/{path:path}")
+@api_router.put("/workflow/{path:path}")
 async def save_workflow(path: str, request: SaveWorkflowRequest):
     workflow_path = WORKFLOWS_DIR / path
     workflow_path.parent.mkdir(parents=True, exist_ok=True)
@@ -269,7 +272,7 @@ class CreateWorkflowRequest(BaseModel):
     folder: str = ""
 
 
-@app.post("/workflows/new")
+@api_router.post("/workflows/new")
 async def create_workflow(request: CreateWorkflowRequest):
     # Ensure name ends with .json
     name = request.name if request.name.endswith(".json") else f"{request.name}.json"
@@ -297,7 +300,7 @@ class CreateFolderRequest(BaseModel):
     parent: str = ""
 
 
-@app.post("/folders/new")
+@api_router.post("/folders/new")
 async def create_folder(request: CreateFolderRequest):
     parent_path = WORKFLOWS_DIR / request.parent if request.parent else WORKFLOWS_DIR
 
@@ -319,7 +322,7 @@ class MoveWorkflowRequest(BaseModel):
     destination: str
 
 
-@app.post("/workflow/{path:path}/move")
+@api_router.post("/workflow/{path:path}/move")
 async def move_workflow(path: str, request: MoveWorkflowRequest):
     source_path = WORKFLOWS_DIR / path
     if not source_path.exists():
@@ -363,7 +366,7 @@ class ExecuteWorkflowResponse(BaseModel):
     stats: dict
 
 
-@app.post("/workflow/{path:path}/execute")
+@api_router.post("/workflow/{path:path}/execute")
 async def execute_workflow(path: str, request: ExecuteWorkflowRequest):
     start_time = time.time()
     workflow = request.workflow
@@ -397,7 +400,7 @@ class QueueWorkflowResponse(BaseModel):
     status: str
 
 
-@app.post("/workflow/{path:path}/queue")
+@api_router.post("/workflow/{path:path}/queue")
 async def queue_workflow_endpoint(path: str):
     workflow_path = WORKFLOWS_DIR / path
     if not workflow_path.exists():
@@ -413,7 +416,7 @@ async def queue_workflow_endpoint(path: str):
 # ##################################################################
 # get queue status endpoint
 # returns list of queued and running workflows
-@app.get("/queue")
+@api_router.get("/queue")
 async def get_queue():
     queued = get_queued_items()
     inprogress = get_inprogress_items()
@@ -443,7 +446,7 @@ async def get_queue():
 # ##################################################################
 # list executions endpoint
 # returns paginated list of completed/errored executions
-@app.get("/executions")
+@api_router.get("/executions")
 async def list_executions(limit: int = 100, before: float | None = None):
     """List executions, newest first, with pagination.
 
@@ -471,7 +474,7 @@ async def list_executions(limit: int = 100, before: float | None = None):
 # ##################################################################
 # get single execution endpoint
 # returns full execution instance by ID
-@app.get("/execution/{execution_id}")
+@api_router.get("/execution/{execution_id}")
 async def get_execution(execution_id: str):
     """Get full execution instance by ID."""
     # Search for the execution in index files
@@ -554,7 +557,7 @@ class ExecuteResponse(BaseModel):
     execution: dict
 
 
-@app.post("/execute", response_model=ExecuteResponse)
+@api_router.post("/execute", response_model=ExecuteResponse)
 async def execute(request: ExecuteRequest):
     """Execute a node and return updated execution state."""
     updated_execution = execute_node(
@@ -563,6 +566,19 @@ async def execute(request: ExecuteRequest):
         execution=request.execution,
     )
     return ExecuteResponse(execution=updated_execution)
+
+
+# Include the API router
+app.include_router(api_router)
+
+
+# ##################################################################
+# SPA catch-all route
+# serves index.html for any unmatched routes (for client-side routing)
+@app.get("/{_path:path}", response_class=HTMLResponse)
+async def spa_catch_all(_path: str):
+    index_path = STATIC_DIR / "index.html"
+    return FileResponse(index_path, media_type="text/html")
 
 
 # ##################################################################

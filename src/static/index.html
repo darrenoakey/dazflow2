@@ -1412,9 +1412,9 @@
             currentWorkflowPath: null,
             dashboardPath: '',
             dashboardTab: (() => {
-                // Initialize from URL hash
-                const hash = window.location.hash.slice(1);
-                if (hash === 'executions') return 'executions';
+                // Initialize from URL pathname
+                const path = window.location.pathname;
+                if (path === '/executions') return 'executions';
                 return 'workflows';
             })(),
             dashboardItems: [],
@@ -1428,7 +1428,8 @@
             setCurrentView: (view) => set({ currentView: view }),
             setDashboardPath: (path) => set({ dashboardPath: path }),
             setDashboardTab: (tab) => {
-                window.location.hash = tab === 'workflows' ? '' : tab;
+                const url = tab === 'workflows' ? '/' : `/${tab}`;
+                history.pushState(null, '', url);
                 set({ dashboardTab: tab });
             },
             setDashboardItems: (items) => set({ dashboardItems: items }),
@@ -1437,7 +1438,7 @@
             loadDashboardItems: async (path = '') => {
                 set({ dashboardLoading: true });
                 try {
-                    const response = await fetch(`/workflows?path=${encodeURIComponent(path)}`);
+                    const response = await fetch(`/api/workflows?path=${encodeURIComponent(path)}`);
                     if (response.ok) {
                         const data = await response.json();
                         set({ dashboardItems: data.items, dashboardPath: path });
@@ -1452,10 +1453,10 @@
             // Load a workflow and switch to editor
             loadWorkflow: async (path) => {
                 try {
-                    const response = await fetch(`/workflow/${encodeURIComponent(path)}`);
+                    const response = await fetch(`/api/workflow/${encodeURIComponent(path)}`);
                     if (response.ok) {
                         const workflow = await response.json();
-                        window.location.hash = `editor/${path}`;
+                        history.pushState(null, '', `/editor/${path}`);
                         set({
                             nodes: workflow.nodes || [],
                             connections: workflow.connections || [],
@@ -1476,7 +1477,7 @@
                 const state = get();
                 const workflow = { nodes: state.nodes, connections: state.connections };
                 try {
-                    const response = await fetch(`/workflow/${encodeURIComponent(path)}`, {
+                    const response = await fetch(`/api/workflow/${encodeURIComponent(path)}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ workflow }),
@@ -1490,7 +1491,7 @@
 
             // Go back to dashboard
             goToDashboard: () => {
-                window.location.hash = '';
+                history.pushState(null, '', '/');
                 set({ currentView: 'dashboard', currentWorkflowPath: null, isReadOnly: false, executionViewerId: null });
                 get().loadDashboardItems(get().dashboardPath);
             },
@@ -1515,8 +1516,8 @@
                 try {
                     const before = reset ? null : state.executionsBeforeCursor;
                     const url = before
-                        ? `/executions?limit=50&before=${before}`
-                        : '/executions?limit=50';
+                        ? `/api/executions?limit=50&before=${before}`
+                        : '/api/executions?limit=50';
                     const response = await fetch(url);
                     if (response.ok) {
                         const data = await response.json();
@@ -1538,10 +1539,10 @@
             // Load a historical execution and open in read-only editor
             loadExecution: async (id) => {
                 try {
-                    const response = await fetch(`/execution/${encodeURIComponent(id)}`);
+                    const response = await fetch(`/api/execution/${encodeURIComponent(id)}`);
                     if (response.ok) {
                         const data = await response.json();
-                        window.location.hash = `execution/${id}`;
+                        history.pushState(null, '', `/execution/${id}`);
                         set({
                             currentView: 'editor',
                             nodes: data.workflow.nodes || [],
@@ -1562,7 +1563,7 @@
 
             // Close execution viewer and return to executions tab
             closeExecutionViewer: () => {
-                window.location.hash = 'executions';
+                history.pushState(null, '', '/executions');
                 set({
                     currentView: 'dashboard',
                     dashboardTab: 'executions',
@@ -2711,7 +2712,7 @@
 
                 try {
                     const store = useWorkflowStore.getState();
-                    const response = await fetch('/execute', {
+                    const response = await fetch('/api/execute', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -2940,7 +2941,7 @@
                 const name = window.prompt('Enter workflow name:');
                 if (!name) return;
                 try {
-                    const response = await fetch('/workflows/new', {
+                    const response = await fetch('/api/workflows/new', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ name, folder: dashboardPath }),
@@ -2961,7 +2962,7 @@
                 const name = window.prompt('Enter folder name:');
                 if (!name) return;
                 try {
-                    const response = await fetch('/folders/new', {
+                    const response = await fetch('/api/folders/new', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ name, parent: dashboardPath }),
@@ -3001,7 +3002,7 @@
                 if (!sourcePath) return;
 
                 try {
-                    const response = await fetch(`/workflow/${sourcePath}/move`, {
+                    const response = await fetch(`/api/workflow/${sourcePath}/move`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ destination: targetFolder.path }),
@@ -3049,7 +3050,7 @@
                 e.stopPropagation();
                 setOpenMenu(null);
                 try {
-                    const response = await fetch(`/workflow/${path}/queue`, { method: 'POST' });
+                    const response = await fetch(`/api/workflow/${path}/queue`, { method: 'POST' });
                     if (response.ok) {
                         const data = await response.json();
                         console.log('Workflow queued:', data.queue_id);
@@ -3063,7 +3064,7 @@
                 e.stopPropagation();
                 const newEnabled = !item.enabled;
                 try {
-                    const response = await fetch(`/workflow/${item.path}/enabled`, {
+                    const response = await fetch(`/api/workflow/${item.path}/enabled`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ enabled: newEnabled }),
@@ -3322,34 +3323,6 @@
         function Dashboard() {
             const dashboardTab = useWorkflowStore((state) => state.dashboardTab);
             const setDashboardTab = useWorkflowStore((state) => state.setDashboardTab);
-
-            // Listen for browser back/forward navigation
-            useEffect(() => {
-                const handleHashChange = () => {
-                    const hash = window.location.hash.slice(1);
-                    const loadWorkflow = useWorkflowStore.getState().loadWorkflow;
-                    const loadExecution = useWorkflowStore.getState().loadExecution;
-
-                    if (hash.startsWith('editor/')) {
-                        const path = hash.slice(7);
-                        loadWorkflow(path);
-                    } else if (hash.startsWith('execution/')) {
-                        const id = hash.slice(10);
-                        loadExecution(id);
-                    } else {
-                        // Back to dashboard
-                        const newTab = hash === 'executions' ? 'executions' : 'workflows';
-                        useWorkflowStore.setState({
-                            currentView: 'dashboard',
-                            dashboardTab: newTab,
-                            isReadOnly: false,
-                            executionViewerId: null,
-                        });
-                    }
-                };
-                window.addEventListener('hashchange', handleHashChange);
-                return () => window.removeEventListener('hashchange', handleHashChange);
-            }, []);
 
             return React.createElement('div', { className: 'dashboard', 'data-testid': 'dashboard' }, [
                 React.createElement('div', { key: 'header', className: 'dashboard-header' }, [
@@ -3759,23 +3732,47 @@
             const currentView = useWorkflowStore((state) => state.currentView);
             const loadWorkflow = useWorkflowStore((state) => state.loadWorkflow);
             const loadExecution = useWorkflowStore((state) => state.loadExecution);
+            const loadDashboardItems = useWorkflowStore((state) => state.loadDashboardItems);
             const [initialLoad, setInitialLoad] = useState(true);
 
-            // Handle initial URL on mount
+            // Handle URL pathname navigation (initial load and browser back/forward)
             useEffect(() => {
-                if (!initialLoad) return;
-                setInitialLoad(false);
+                const handleNavigation = () => {
+                    const pathname = window.location.pathname;
 
-                const hash = window.location.hash.slice(1);
-                if (hash.startsWith('editor/')) {
-                    const path = hash.slice(7); // Remove 'editor/'
-                    loadWorkflow(path);
-                } else if (hash.startsWith('execution/')) {
-                    const id = hash.slice(10); // Remove 'execution/'
-                    loadExecution(id);
+                    if (pathname.startsWith('/editor/')) {
+                        const path = pathname.slice(8);
+                        loadWorkflow(path);
+                    } else if (pathname.startsWith('/execution/')) {
+                        const id = pathname.slice(11);
+                        loadExecution(id);
+                    } else {
+                        // Back to dashboard
+                        const newTab = pathname === '/executions' ? 'executions' : 'workflows';
+                        useWorkflowStore.setState({
+                            currentView: 'dashboard',
+                            dashboardTab: newTab,
+                            isReadOnly: false,
+                            executionViewerId: null,
+                            currentWorkflowPath: null,
+                        });
+                        loadDashboardItems('');
+                    }
+                };
+
+                // Handle initial load
+                if (initialLoad) {
+                    setInitialLoad(false);
+                    const pathname = window.location.pathname;
+                    if (pathname.startsWith('/editor/') || pathname.startsWith('/execution/')) {
+                        handleNavigation();
+                    }
                 }
-                // For 'executions' or empty hash, the dashboardTab is already set correctly
-            }, [initialLoad, loadWorkflow, loadExecution]);
+
+                // Listen for browser back/forward
+                window.addEventListener('popstate', handleNavigation);
+                return () => window.removeEventListener('popstate', handleNavigation);
+            }, [initialLoad, loadWorkflow, loadExecution, loadDashboardItems]);
 
             if (currentView === 'dashboard') {
                 return React.createElement(Dashboard);
