@@ -2228,52 +2228,48 @@
                 }
             };
 
-            // Execute a node - if input not available, execute upstream nodes first
-            const executeNode = (targetNodeId) => {
-                const store = useWorkflowStore.getState();
-                const targetNode = store.nodes.find(n => n.id === targetNodeId);
-                if (!targetNode) return;
+            // Execute a node via server API
+            // Server handles upstream execution, expression evaluation, etc.
+            const [isExecuting, setIsExecuting] = useState(false);
 
-                const targetNodeType = nodeTypeDefinitions[targetNode.typeId];
-                if (!targetNodeType?.execute) return;
+            const handleExecute = async () => {
+                if (isExecuting) return;
+                setIsExecuting(true);
 
-                // Find upstream connections
-                const incomingConns = store.connections.filter(c => c.targetNodeId === targetNodeId);
+                try {
+                    const store = useWorkflowStore.getState();
+                    const response = await fetch('/execute', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            node_id: nodeId,
+                            workflow: { nodes: store.nodes, connections: store.connections },
+                            execution: store.ambientExecution,
+                        }),
+                    });
 
-                // Get input from upstream - execute upstream if needed
-                let inputData = null;
-                for (const conn of incomingConns) {
-                    const sourceExecution = store.ambientExecution[conn.sourceNodeId];
-                    if (!sourceExecution?.output) {
-                        // Upstream hasn't been executed yet - execute it first
-                        executeNode(conn.sourceNodeId);
+                    if (!response.ok) {
+                        console.error('Execute failed:', response.statusText);
+                        return;
                     }
-                    // Now get the (hopefully available) output
-                    const updatedExecution = useWorkflowStore.getState().ambientExecution[conn.sourceNodeId];
-                    if (updatedExecution?.output) {
-                        inputData = updatedExecution.output;
-                        break;
+
+                    const result = await response.json();
+
+                    // Update all execution results from server
+                    // Server may have executed upstream nodes too
+                    for (const [execNodeId, execData] of Object.entries(result.execution)) {
+                        store.setNodeExecution(
+                            execNodeId,
+                            execData.input,
+                            execData.nodeOutput,
+                            execData.output
+                        );
                     }
+                } catch (err) {
+                    console.error('Execute error:', err);
+                } finally {
+                    setIsExecuting(false);
                 }
-
-                // Execute this node
-                const nodeInput = inputData || [];
-                const nodeOutputResult = targetNodeType.execute(targetNode.data, nodeInput);
-
-                // Merge input with node output, namespaced by node name
-                const inputArray = Array.isArray(nodeInput) ? nodeInput : [nodeInput || {}];
-                const outputArray = Array.isArray(nodeOutputResult) ? nodeOutputResult : [nodeOutputResult];
-
-                const combinedOutput = outputArray.map((out, i) => {
-                    const inp = inputArray[i] || {};
-                    return { ...inp, [targetNode.name]: out };
-                });
-
-                store.setNodeExecution(targetNodeId, nodeInput, nodeOutputResult, combinedOutput);
-            };
-
-            const handleExecute = () => {
-                executeNode(nodeId);
             };
 
             const handleKeyDown = (e) => {
@@ -2309,13 +2305,14 @@
                                 key: 'execute',
                                 className: 'execute-btn',
                                 onClick: handleExecute,
+                                disabled: isExecuting,
                                 'data-testid': 'execute-btn',
                             }, [
                                 React.createElement('span', {
                                     key: 'icon',
                                     dangerouslySetInnerHTML: { __html: playIcon },
                                 }),
-                                'Execute',
+                                isExecuting ? 'Executing...' : 'Execute',
                             ]),
                             React.createElement('button', {
                                 key: 'close',

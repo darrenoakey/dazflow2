@@ -6,7 +6,10 @@ import setproctitle
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from starlette.responses import StreamingResponse
+
+from .executor import execute_node
 
 app = FastAPI(title="dazflow2")
 
@@ -57,6 +60,30 @@ async def heartbeat():
 async def serve_index():
     index_path = STATIC_DIR / "index.html"
     return FileResponse(index_path, media_type="text/html")
+
+
+# ##################################################################
+# execute node endpoint
+# executes a node (and its upstream dependencies if needed)
+class ExecuteRequest(BaseModel):
+    node_id: str
+    workflow: dict
+    execution: dict
+
+
+class ExecuteResponse(BaseModel):
+    execution: dict
+
+
+@app.post("/execute", response_model=ExecuteResponse)
+async def execute(request: ExecuteRequest):
+    """Execute a node and return updated execution state."""
+    updated_execution = execute_node(
+        node_id=request.node_id,
+        workflow=request.workflow,
+        execution=request.execution,
+    )
+    return ExecuteResponse(execution=updated_execution)
 
 
 # ##################################################################
