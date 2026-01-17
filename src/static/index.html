@@ -940,6 +940,35 @@
             overflow-y: auto;
             padding: 24px 32px;
         }
+        .workflows-toolbar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .toolbar-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: #3a3a5e;
+            border: none;
+            border-radius: 6px;
+            color: #eee;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .toolbar-btn:hover {
+            background: #4a4a6e;
+        }
+        .toolbar-btn-icon {
+            width: 14px;
+            height: 14px;
+        }
+        .toolbar-btn-icon svg {
+            width: 100%;
+            height: 100%;
+        }
         .file-list {
             display: flex;
             flex-direction: column;
@@ -957,6 +986,11 @@
         }
         .file-item:hover {
             background: #3a3a5e;
+        }
+        .file-item.drag-over {
+            background: #4a4a6e;
+            outline: 2px dashed #667eea;
+            outline-offset: -2px;
         }
         .file-item.folder {
             border-left: 3px solid #667eea;
@@ -2896,10 +2930,92 @@
             const loadDashboardItems = useWorkflowStore((state) => state.loadDashboardItems);
             const loadWorkflow = useWorkflowStore((state) => state.loadWorkflow);
             const [openMenu, setOpenMenu] = useState(null);
+            const [dragOver, setDragOver] = useState(null);
 
             useEffect(() => {
                 loadDashboardItems(dashboardPath);
             }, []);
+
+            const handleNewWorkflow = async () => {
+                const name = window.prompt('Enter workflow name:');
+                if (!name) return;
+                try {
+                    const response = await fetch('/workflows/new', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, folder: dashboardPath }),
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        loadWorkflow(data.path);
+                    } else {
+                        const error = await response.json();
+                        window.alert(error.detail || 'Failed to create workflow');
+                    }
+                } catch (err) {
+                    console.error('Failed to create workflow:', err);
+                }
+            };
+
+            const handleNewFolder = async () => {
+                const name = window.prompt('Enter folder name:');
+                if (!name) return;
+                try {
+                    const response = await fetch('/folders/new', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, parent: dashboardPath }),
+                    });
+                    if (response.ok) {
+                        loadDashboardItems(dashboardPath);
+                    } else {
+                        const error = await response.json();
+                        window.alert(error.detail || 'Failed to create folder');
+                    }
+                } catch (err) {
+                    console.error('Failed to create folder:', err);
+                }
+            };
+
+            const handleDragStart = (e, item) => {
+                if (item.type !== 'workflow') return;
+                e.dataTransfer.setData('text/plain', item.path);
+                e.dataTransfer.effectAllowed = 'move';
+            };
+
+            const handleDragOver = (e, item) => {
+                if (item.type !== 'folder') return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                setDragOver(item.path);
+            };
+
+            const handleDragLeave = () => {
+                setDragOver(null);
+            };
+
+            const handleDrop = async (e, targetFolder) => {
+                e.preventDefault();
+                setDragOver(null);
+                const sourcePath = e.dataTransfer.getData('text/plain');
+                if (!sourcePath) return;
+
+                try {
+                    const response = await fetch(`/workflow/${sourcePath}/move`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ destination: targetFolder.path }),
+                    });
+                    if (response.ok) {
+                        loadDashboardItems(dashboardPath);
+                    } else {
+                        const error = await response.json();
+                        window.alert(error.detail || 'Failed to move workflow');
+                    }
+                } catch (err) {
+                    console.error('Failed to move workflow:', err);
+                }
+            };
 
             // Close menu when clicking outside
             useEffect(() => {
@@ -2969,34 +3085,100 @@
                 return React.createElement('div', { className: 'empty-state' }, 'Loading...');
             }
 
+            const plusIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+
             if (dashboardItems.length === 0 && !dashboardPath) {
-                return React.createElement('div', { className: 'empty-state', 'data-testid': 'empty-state' },
-                    'No workflows yet. Create your first workflow!'
-                );
+                return React.createElement('div', { 'data-testid': 'workflows-tab' }, [
+                    React.createElement('div', { key: 'toolbar', className: 'workflows-toolbar' }, [
+                        React.createElement('button', {
+                            key: 'new-workflow',
+                            className: 'toolbar-btn',
+                            onClick: handleNewWorkflow,
+                            'data-testid': 'new-workflow-btn',
+                        }, [
+                            React.createElement('span', {
+                                key: 'icon',
+                                className: 'toolbar-btn-icon',
+                                dangerouslySetInnerHTML: { __html: plusIcon },
+                            }),
+                            'New Workflow',
+                        ]),
+                        React.createElement('button', {
+                            key: 'new-folder',
+                            className: 'toolbar-btn',
+                            onClick: handleNewFolder,
+                            'data-testid': 'new-folder-btn',
+                        }, [
+                            React.createElement('span', {
+                                key: 'icon',
+                                className: 'toolbar-btn-icon',
+                                dangerouslySetInnerHTML: { __html: plusIcon },
+                            }),
+                            'New Folder',
+                        ]),
+                    ]),
+                    React.createElement('div', { key: 'empty', className: 'empty-state', 'data-testid': 'empty-state' },
+                        'No workflows yet. Create your first workflow!'
+                    ),
+                ]);
             }
 
-            return React.createElement('div', { className: 'file-list', 'data-testid': 'file-list' }, [
-                dashboardPath && React.createElement('div', {
-                    key: 'up',
-                    className: 'file-item folder',
-                    onClick: handleUpClick,
-                    'data-testid': 'folder-up',
-                }, [
-                    React.createElement('div', {
-                        key: 'icon',
-                        className: 'file-item-icon',
-                        dangerouslySetInnerHTML: { __html: folderIcon },
-                    }),
-                    React.createElement('span', { key: 'name', className: 'file-item-name' }, '..'),
-                ]),
-                ...dashboardItems.map((item) =>
-                    React.createElement('div', {
-                        key: item.path,
-                        className: `file-item ${item.type}`,
-                        onClick: item.type === 'folder' ? () => handleFolderClick(item.path) : undefined,
-                        onDoubleClick: item.type === 'workflow' ? () => handleWorkflowDoubleClick(item.path) : undefined,
-                        'data-testid': `file-item-${item.name}`,
+            return React.createElement('div', { 'data-testid': 'workflows-tab' }, [
+                React.createElement('div', { key: 'toolbar', className: 'workflows-toolbar' }, [
+                    React.createElement('button', {
+                        key: 'new-workflow',
+                        className: 'toolbar-btn',
+                        onClick: handleNewWorkflow,
+                        'data-testid': 'new-workflow-btn',
                     }, [
+                        React.createElement('span', {
+                            key: 'icon',
+                            className: 'toolbar-btn-icon',
+                            dangerouslySetInnerHTML: { __html: plusIcon },
+                        }),
+                        'New Workflow',
+                    ]),
+                    React.createElement('button', {
+                        key: 'new-folder',
+                        className: 'toolbar-btn',
+                        onClick: handleNewFolder,
+                        'data-testid': 'new-folder-btn',
+                    }, [
+                        React.createElement('span', {
+                            key: 'icon',
+                            className: 'toolbar-btn-icon',
+                            dangerouslySetInnerHTML: { __html: plusIcon },
+                        }),
+                        'New Folder',
+                    ]),
+                ]),
+                React.createElement('div', { key: 'list', className: 'file-list', 'data-testid': 'file-list' }, [
+                    dashboardPath && React.createElement('div', {
+                        key: 'up',
+                        className: 'file-item folder',
+                        onClick: handleUpClick,
+                        'data-testid': 'folder-up',
+                    }, [
+                        React.createElement('div', {
+                            key: 'icon',
+                            className: 'file-item-icon',
+                            dangerouslySetInnerHTML: { __html: folderIcon },
+                        }),
+                        React.createElement('span', { key: 'name', className: 'file-item-name' }, '..'),
+                    ]),
+                    ...dashboardItems.map((item) =>
+                        React.createElement('div', {
+                            key: item.path,
+                            className: `file-item ${item.type}${dragOver === item.path ? ' drag-over' : ''}`,
+                            onClick: item.type === 'folder' ? () => handleFolderClick(item.path) : undefined,
+                            onDoubleClick: item.type === 'workflow' ? () => handleWorkflowDoubleClick(item.path) : undefined,
+                            draggable: item.type === 'workflow',
+                            onDragStart: (e) => handleDragStart(e, item),
+                            onDragOver: (e) => handleDragOver(e, item),
+                            onDragLeave: handleDragLeave,
+                            onDrop: (e) => handleDrop(e, item),
+                            'data-testid': `file-item-${item.name}`,
+                        }, [
                         React.createElement('div', {
                             key: 'icon',
                             className: 'file-item-icon',
@@ -3043,6 +3225,7 @@
                         ]),
                     ])
                 ),
+                ]),
             ]);
         }
 

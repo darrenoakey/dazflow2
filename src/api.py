@@ -262,6 +262,96 @@ async def save_workflow(path: str, request: SaveWorkflowRequest):
 
 
 # ##################################################################
+# create new workflow endpoint
+# creates a new empty workflow with given name
+class CreateWorkflowRequest(BaseModel):
+    name: str
+    folder: str = ""
+
+
+@app.post("/workflows/new")
+async def create_workflow(request: CreateWorkflowRequest):
+    # Ensure name ends with .json
+    name = request.name if request.name.endswith(".json") else f"{request.name}.json"
+    folder_path = WORKFLOWS_DIR / request.folder if request.folder else WORKFLOWS_DIR
+
+    if not folder_path.exists():
+        raise HTTPException(status_code=404, detail="Folder not found")
+
+    workflow_path = folder_path / name
+    if workflow_path.exists():
+        raise HTTPException(status_code=409, detail="Workflow already exists")
+
+    # Create empty workflow
+    empty_workflow = {"nodes": [], "connections": []}
+    workflow_path.write_text(json.dumps(empty_workflow, indent=2))
+
+    rel_path = str(workflow_path.relative_to(WORKFLOWS_DIR))
+    return {"created": True, "path": rel_path}
+
+
+# ##################################################################
+# create new folder endpoint
+class CreateFolderRequest(BaseModel):
+    name: str
+    parent: str = ""
+
+
+@app.post("/folders/new")
+async def create_folder(request: CreateFolderRequest):
+    parent_path = WORKFLOWS_DIR / request.parent if request.parent else WORKFLOWS_DIR
+
+    if not parent_path.exists():
+        raise HTTPException(status_code=404, detail="Parent folder not found")
+
+    folder_path = parent_path / request.name
+    if folder_path.exists():
+        raise HTTPException(status_code=409, detail="Folder already exists")
+
+    folder_path.mkdir(parents=True)
+    rel_path = str(folder_path.relative_to(WORKFLOWS_DIR))
+    return {"created": True, "path": rel_path}
+
+
+# ##################################################################
+# move workflow endpoint
+class MoveWorkflowRequest(BaseModel):
+    destination: str
+
+
+@app.post("/workflow/{path:path}/move")
+async def move_workflow(path: str, request: MoveWorkflowRequest):
+    source_path = WORKFLOWS_DIR / path
+    if not source_path.exists():
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    # Destination can be a folder or a full path
+    dest = request.destination
+    if not dest.endswith(".json"):
+        # Moving to a folder - keep the original filename
+        dest = f"{dest}/{source_path.name}" if dest else source_path.name
+
+    dest_path = WORKFLOWS_DIR / dest
+
+    if dest_path.exists():
+        raise HTTPException(status_code=409, detail="Destination already exists")
+
+    # Ensure destination directory exists
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Move the file
+    source_path.rename(dest_path)
+
+    # Update enabled state if workflow was enabled
+    enabled = get_enabled_workflows()
+    if path in enabled:
+        set_workflow_enabled(path, False)
+        set_workflow_enabled(dest, True)
+
+    return {"moved": True, "from": path, "to": dest}
+
+
+# ##################################################################
 # execute workflow endpoint
 # executes all nodes in a workflow and updates stats
 class ExecuteWorkflowRequest(BaseModel):
