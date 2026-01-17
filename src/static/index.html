@@ -201,9 +201,6 @@
         .react-flow__background {
             background: #1a1a2e;
         }
-        .react-flow__minimap {
-            background: #1a1a2e;
-        }
         .react-flow__controls button {
             background: #2a2a4e;
             color: #ccc;
@@ -453,6 +450,16 @@
             margin-bottom: 6px;
             text-transform: uppercase;
             letter-spacing: 0.3px;
+        }
+        .property-instructions {
+            font-size: 11px;
+            color: #7a7a9a;
+            margin-bottom: 8px;
+            padding: 6px 10px;
+            background: #1a1a2e;
+            border-radius: 4px;
+            border-left: 2px solid #4a4a7a;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
         }
         .property-input {
             width: 100%;
@@ -1431,7 +1438,7 @@
             "@xyflow/react": "https://esm.sh/@xyflow/react@12?external=react,react-dom",
             "zustand": "https://esm.sh/zustand@4?external=react",
             "uuid": "https://esm.sh/uuid@9",
-            "nodes": "./nodes/index.js"
+            "nodes": "/nodes/index.js"
         }
     }
     </script>
@@ -1443,7 +1450,6 @@
             ReactFlow,
             Background,
             Controls,
-            MiniMap,
             Handle,
             Position,
             ReactFlowProvider,
@@ -2815,6 +2821,10 @@
 
             return React.createElement('div', { className: 'property-group' }, [
                 React.createElement('label', { key: 'label', className: 'property-label' }, property.label),
+                property.instructions && React.createElement('div', {
+                    key: 'instructions',
+                    className: 'property-instructions',
+                }, property.instructions),
                 React.createElement(ExpressionInput, {
                     key: 'textarea',
                     value: value,
@@ -4281,11 +4291,6 @@
                         color: '#3a3a5e',
                     }),
                     React.createElement(Controls, { key: 'controls' }),
-                    React.createElement(MiniMap, {
-                        key: 'minimap',
-                        nodeColor: () => '#667eea',
-                        maskColor: 'rgba(0, 0, 0, 0.5)',
-                    }),
                     // SVG defs for arrow marker
                     React.createElement('svg', { key: 'defs' },
                         React.createElement('defs', null,
@@ -4413,14 +4418,14 @@
                     const pathname = window.location.pathname;
 
                     if (pathname.startsWith('/editor/')) {
-                        // Add .json extension if not present (URLs don't include .json)
-                        let path = pathname.slice(8);
+                        // Decode URL-encoded path and add .json extension if not present
+                        let path = decodeURIComponent(pathname.slice(8));
                         if (!path.endsWith('.json')) {
                             path = path + '.json';
                         }
                         loadWorkflow(path);
                     } else if (pathname.startsWith('/execution/')) {
-                        const id = pathname.slice(11);
+                        const id = decodeURIComponent(pathname.slice(11));
                         loadExecution(id);
                     } else {
                         // Back to dashboard

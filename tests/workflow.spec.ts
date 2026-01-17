@@ -561,7 +561,7 @@ test.describe('Workflow Editor', () => {
     for (const nodeType of nodeTypesToTest) {
       await page.getByTestId(`node-type-${nodeType}`).click();
       const node = page.getByTestId(`workflow-node-${nodeType}`);
-      await node.locator('.custom-node').dblclick({ force: true });
+      await node.locator('.custom-node').dblclick();
       await expect(dialog).toBeVisible();
       await expect(page.getByTestId('execute-btn')).toBeVisible();
       await page.locator('.node-editor-close').click();

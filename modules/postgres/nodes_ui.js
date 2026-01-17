@@ -13,7 +13,7 @@ export const nodeTypes = [
             <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
             <path d="M3 12v7c0 1.66 4 3 9 3s9-1.34 9-3v-7"/>
         </svg>`,
-        defaultData: { query: 'SELECT 1' },
+        defaultData: { query: 'SELECT 1', params: [] },
         getConnectors: () => ({
             inputs: [{ id: 'trigger', name: 'trigger' }],
             outputs: [{ id: 'rows', name: 'rows' }],
@@ -24,6 +24,13 @@ export const nodeTypes = [
                 label: 'SQL Query',
                 type: 'textarea',
                 value: data.query ?? 'SELECT 1',
+                instructions: 'Use %(name)s syntax for bind variables, e.g. SELECT * FROM users WHERE id = %(user_id)s',
+            },
+            {
+                id: 'params',
+                label: 'Bind Variables',
+                type: 'fieldlist',
+                value: data.params ?? [],
             },
         ],
     },
