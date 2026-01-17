@@ -1,6 +1,6 @@
 """
 Workflow executor for dazflow2.
-Handles expression evaluation using V8 and node execution.
+Handles expression evaluation using Duktape and node execution.
 """
 
 import json
@@ -8,15 +8,9 @@ import re
 from datetime import datetime
 from typing import Any
 
-from py_mini_racer import MiniRacer
+import dukpy
 
 from .nodes import get_node_type
-
-
-# Create a V8 context for evaluating JavaScript expressions
-def create_js_context() -> MiniRacer:
-    """Create a fresh V8 context for expression evaluation."""
-    return MiniRacer()
 
 
 def evaluate_expression(expr: str, context_data: dict) -> tuple[Any, str | None]:
@@ -25,11 +19,11 @@ def evaluate_expression(expr: str, context_data: dict) -> tuple[Any, str | None]
 
     Returns: (result, error) - error is None if successful
     """
-    ctx = create_js_context()
     try:
-        # Set up $ as the context data
-        ctx.eval(f"var $ = {json.dumps(context_data)};")
-        result = ctx.eval(expr)
+        # dukpy.evaljs takes JavaScript code and returns result
+        # We set up $ as the context and return the expression result
+        js_code = f"var $ = {json.dumps(context_data)}; ({expr})"
+        result = dukpy.evaljs(js_code)
         return result, None
     except Exception as e:
         return None, str(e)
