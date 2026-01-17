@@ -3184,7 +3184,9 @@
                             className: 'file-item-icon',
                             dangerouslySetInnerHTML: { __html: item.type === 'folder' ? folderIcon : fileIcon },
                         }),
-                        React.createElement('span', { key: 'name', className: 'file-item-name' }, item.name),
+                        React.createElement('span', { key: 'name', className: 'file-item-name' },
+                            item.type === 'workflow' ? item.name.replace(/\.json$/, '') : item.name
+                        ),
                         item.type === 'workflow' && item.stats && React.createElement('div', {
                             key: 'stats',
                             className: 'file-item-stats',
