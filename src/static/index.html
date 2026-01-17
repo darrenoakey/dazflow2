@@ -1421,6 +1421,7 @@
                     const response = await fetch(`/workflow/${encodeURIComponent(path)}`);
                     if (response.ok) {
                         const workflow = await response.json();
+                        window.location.hash = `editor/${path}`;
                         set({
                             nodes: workflow.nodes || [],
                             connections: workflow.connections || [],
@@ -1455,6 +1456,7 @@
 
             // Go back to dashboard
             goToDashboard: () => {
+                window.location.hash = '';
                 set({ currentView: 'dashboard', currentWorkflowPath: null, isReadOnly: false, executionViewerId: null });
                 get().loadDashboardItems(get().dashboardPath);
             },
@@ -1505,6 +1507,7 @@
                     const response = await fetch(`/execution/${encodeURIComponent(id)}`);
                     if (response.ok) {
                         const data = await response.json();
+                        window.location.hash = `execution/${id}`;
                         set({
                             currentView: 'editor',
                             nodes: data.workflow.nodes || [],
@@ -1525,6 +1528,7 @@
 
             // Close execution viewer and return to executions tab
             closeExecutionViewer: () => {
+                window.location.hash = 'executions';
                 set({
                     currentView: 'dashboard',
                     dashboardTab: 'executions',
@@ -1930,9 +1934,10 @@
 
         // Expandable JSON Viewer Component
         // Shows JSON with expand/collapse on objects and arrays
-        // First array item auto-expanded, others collapsed
-        function JsonViewer({ data, defaultExpanded = false, isFirstItem = true }) {
-            const [expanded, setExpanded] = useState(defaultExpanded || isFirstItem);
+        // expandAll: fully expand all nested items recursively
+        // isFirstItem: auto-expand just this item (not children)
+        function JsonViewer({ data, defaultExpanded = false, isFirstItem = false, expandAll = false }) {
+            const [expanded, setExpanded] = useState(defaultExpanded || isFirstItem || expandAll);
 
             const handleToggle = (e) => {
                 e.stopPropagation();
@@ -1971,7 +1976,8 @@
                                 React.createElement(JsonViewer, {
                                     key: 'value',
                                     data: item,
-                                    isFirstItem: index === 0,
+                                    isFirstItem: !expandAll && index === 0,
+                                    expandAll: expandAll,
                                 }),
                                 index < data.length - 1 && React.createElement('span', { key: 'comma', className: 'json-comma' }, ','),
                             ])
@@ -2001,7 +2007,7 @@
                                 React.createElement(JsonViewer, {
                                     key: 'value',
                                     data: data[key],
-                                    isFirstItem: false,
+                                    expandAll: expandAll,
                                 }),
                                 index < keys.length - 1 && React.createElement('span', { key: 'comma', className: 'json-comma' }, ','),
                             ])
@@ -2757,6 +2763,7 @@
                     // Body with three panes
                     React.createElement('div', { key: 'body', className: 'node-editor-body' }, [
                         // Input pane - shows data from upstream nodes
+                        // First item fully expanded, rest collapsed
                         React.createElement('div', { key: 'input', className: 'node-editor-pane input-pane' }, [
                             React.createElement('div', { key: 'header', className: 'pane-header' }, 'Input'),
                             React.createElement('div', { key: 'content', className: 'pane-content' },
@@ -2765,7 +2772,25 @@
                                         key: 'input-content',
                                         className: 'json-viewer',
                                         'data-testid': 'execution-input',
-                                    }, React.createElement(JsonViewer, { data: upstreamData, defaultExpanded: true }))
+                                    }, Array.isArray(upstreamData) && upstreamData.length > 0
+                                        ? React.createElement('div', { className: 'json-array' }, [
+                                            React.createElement('span', { key: 'open', className: 'json-bracket' }, '['),
+                                            React.createElement('div', { key: 'items', className: 'json-indent' },
+                                                upstreamData.map((item, index) =>
+                                                    React.createElement('div', { key: index, className: 'json-array-item' }, [
+                                                        React.createElement(JsonViewer, {
+                                                            key: 'value',
+                                                            data: item,
+                                                            expandAll: index === 0, // Only first item fully expanded
+                                                        }),
+                                                        index < upstreamData.length - 1 && React.createElement('span', { key: 'comma', className: 'json-comma' }, ','),
+                                                    ])
+                                                )
+                                            ),
+                                            React.createElement('span', { key: 'close', className: 'json-bracket' }, ']'),
+                                        ])
+                                        : React.createElement(JsonViewer, { data: upstreamData, expandAll: true })
+                                    )
                                     : React.createElement('div', { className: 'no-data-message' }, 'No input data available')
                             ),
                         ]),
@@ -2802,6 +2827,7 @@
                             ]),
                         ]),
                         // Output pane - shows what THIS node produced (not the combined result)
+                        // All items fully expanded
                         React.createElement('div', { key: 'output', className: 'node-editor-pane output-pane' }, [
                             React.createElement('div', { key: 'header', className: 'pane-header' }, 'Output'),
                             React.createElement('div', { key: 'content', className: 'pane-content' },
@@ -2815,7 +2841,7 @@
                                             key: 'json',
                                             className: 'json-viewer',
                                             'data-testid': 'execution-output',
-                                        }, React.createElement(JsonViewer, { data: nodeOutput, defaultExpanded: true })),
+                                        }, React.createElement(JsonViewer, { data: nodeOutput, expandAll: true })),
                                     ])
                                     : React.createElement('div', { className: 'no-data-message' }, 'No output data available')
                             ),
@@ -3116,14 +3142,29 @@
             useEffect(() => {
                 const handleHashChange = () => {
                     const hash = window.location.hash.slice(1);
-                    const newTab = hash === 'executions' ? 'executions' : 'workflows';
-                    if (newTab !== dashboardTab) {
-                        useWorkflowStore.setState({ dashboardTab: newTab });
+                    const loadWorkflow = useWorkflowStore.getState().loadWorkflow;
+                    const loadExecution = useWorkflowStore.getState().loadExecution;
+
+                    if (hash.startsWith('editor/')) {
+                        const path = hash.slice(7);
+                        loadWorkflow(path);
+                    } else if (hash.startsWith('execution/')) {
+                        const id = hash.slice(10);
+                        loadExecution(id);
+                    } else {
+                        // Back to dashboard
+                        const newTab = hash === 'executions' ? 'executions' : 'workflows';
+                        useWorkflowStore.setState({
+                            currentView: 'dashboard',
+                            dashboardTab: newTab,
+                            isReadOnly: false,
+                            executionViewerId: null,
+                        });
                     }
                 };
                 window.addEventListener('hashchange', handleHashChange);
                 return () => window.removeEventListener('hashchange', handleHashChange);
-            }, [dashboardTab]);
+            }, []);
 
             return React.createElement('div', { className: 'dashboard', 'data-testid': 'dashboard' }, [
                 React.createElement('div', { key: 'header', className: 'dashboard-header' }, [
@@ -3531,6 +3572,25 @@
         // App Component
         function App() {
             const currentView = useWorkflowStore((state) => state.currentView);
+            const loadWorkflow = useWorkflowStore((state) => state.loadWorkflow);
+            const loadExecution = useWorkflowStore((state) => state.loadExecution);
+            const [initialLoad, setInitialLoad] = useState(true);
+
+            // Handle initial URL on mount
+            useEffect(() => {
+                if (!initialLoad) return;
+                setInitialLoad(false);
+
+                const hash = window.location.hash.slice(1);
+                if (hash.startsWith('editor/')) {
+                    const path = hash.slice(7); // Remove 'editor/'
+                    loadWorkflow(path);
+                } else if (hash.startsWith('execution/')) {
+                    const id = hash.slice(10); // Remove 'execution/'
+                    loadExecution(id);
+                }
+                // For 'executions' or empty hash, the dashboardTab is already set correctly
+            }, [initialLoad, loadWorkflow, loadExecution]);
 
             if (currentView === 'dashboard') {
                 return React.createElement(Dashboard);
