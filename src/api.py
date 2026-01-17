@@ -14,6 +14,15 @@ from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
 from .executor import execute_node
+from .triggers import (
+    get_enabled_workflows,
+    init_trigger_system,
+    register_workflow_triggers,
+    set_workflow_enabled,
+    start_trigger_system,
+    stop_trigger_system,
+    unregister_workflow_triggers,
+)
 from .worker import (
     get_inprogress_items,
     get_queued_items,
@@ -26,6 +35,11 @@ from .worker import (
 
 SERVER_START_TIME = time.time()
 STATIC_DIR = Path(__file__).parent / "static"
+
+# Executions cache (refreshed periodically by background task)
+_executions_cache: dict = {"items": [], "has_more": False, "last_updated": 0}
+_executions_cache_task: asyncio.Task | None = None
+EXECUTIONS_CACHE_INTERVAL = 10  # seconds
 PROJECT_ROOT = Path(__file__).parent.parent
 WORK_DIR = PROJECT_ROOT / "local" / "work"
 WORKFLOWS_DIR = WORK_DIR / "workflows"
@@ -54,6 +68,71 @@ def init_work_directories():
     # Initialize worker system
     init_worker_system(QUEUE_DIR, STATS_DIR)
 
+    # Initialize trigger system
+    init_trigger_system(WORK_DIR, WORKFLOWS_DIR)
+
+
+def _load_executions_from_disk(limit: int = 100) -> dict:
+    """Load executions from disk. Used by cache refresh."""
+    executions = []
+
+    if INDEXES_DIR.exists():
+        for index_file in INDEXES_DIR.glob("*.jsonl"):
+            try:
+                for line in index_file.read_text().strip().split("\n"):
+                    if line:
+                        entry = json.loads(line)
+                        executions.append(entry)
+            except (json.JSONDecodeError, OSError):
+                pass
+
+    # Sort by completed_at descending (newest first)
+    executions.sort(key=lambda x: x.get("completed_at", 0), reverse=True)
+
+    # Apply limit
+    has_more = len(executions) > limit
+    executions = executions[:limit]
+
+    return {"items": executions, "has_more": has_more, "last_updated": time.time()}
+
+
+async def _executions_cache_refresh_loop():
+    """Background task that refreshes the executions cache periodically."""
+    global _executions_cache
+    never_set = asyncio.Event()
+
+    while True:
+        try:
+            _executions_cache = _load_executions_from_disk()
+        except Exception:
+            pass  # Keep old cache on error
+
+        try:
+            await asyncio.wait_for(never_set.wait(), timeout=EXECUTIONS_CACHE_INTERVAL)
+        except asyncio.TimeoutError:
+            pass
+
+
+async def start_executions_cache():
+    """Start the executions cache refresh background task."""
+    global _executions_cache_task, _executions_cache
+    # Load initial cache synchronously
+    _executions_cache = _load_executions_from_disk()
+    # Start background refresh task
+    _executions_cache_task = asyncio.create_task(_executions_cache_refresh_loop())
+
+
+async def stop_executions_cache():
+    """Stop the executions cache refresh background task."""
+    global _executions_cache_task
+    if _executions_cache_task:
+        _executions_cache_task.cancel()
+        try:
+            await _executions_cache_task
+        except asyncio.CancelledError:
+            pass
+        _executions_cache_task = None
+
 
 # ##################################################################
 # lifespan context manager
@@ -62,7 +141,11 @@ def init_work_directories():
 async def lifespan(_app: FastAPI):
     init_work_directories()
     await start_workers()
+    await start_trigger_system()
+    await start_executions_cache()
     yield
+    await stop_executions_cache()
+    await stop_trigger_system()
     await stop_workers()
 
 
@@ -100,6 +183,7 @@ async def list_workflows(path: str = ""):
     if not base_path.exists() or not base_path.is_dir():
         raise HTTPException(status_code=404, detail="Path not found")
 
+    enabled_state = get_enabled_workflows()
     items = []
     for item in sorted(base_path.iterdir()):
         rel_path = str(item.relative_to(WORKFLOWS_DIR))
@@ -113,9 +197,42 @@ async def list_workflows(path: str = ""):
                     "path": rel_path,
                     "type": "workflow",
                     "stats": stats,
+                    "enabled": enabled_state.get(rel_path, False),
                 }
             )
     return {"items": items, "path": path}
+
+
+# ##################################################################
+# get enabled workflows endpoint
+# returns enabled state for all workflows
+@app.get("/workflows/enabled")
+async def get_workflows_enabled():
+    return {"enabled": get_enabled_workflows()}
+
+
+# ##################################################################
+# set workflow enabled endpoint
+# enables or disables workflow triggers
+class SetEnabledRequest(BaseModel):
+    enabled: bool
+
+
+@app.put("/workflow/{path:path}/enabled")
+async def set_workflow_enabled_endpoint(path: str, request: SetEnabledRequest):
+    workflow_path = WORKFLOWS_DIR / path
+    if not workflow_path.exists():
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    set_workflow_enabled(path, request.enabled)
+
+    if request.enabled:
+        workflow = json.loads(workflow_path.read_text())
+        await register_workflow_triggers(path, workflow)
+    else:
+        await unregister_workflow_triggers(path)
+
+    return {"path": path, "enabled": request.enabled}
 
 
 # ##################################################################
@@ -238,24 +355,15 @@ async def get_queue():
 # returns paginated list of completed/errored executions
 @app.get("/executions")
 async def list_executions(limit: int = 100, before: float | None = None):
-    """List executions, newest first, with pagination."""
-    executions = []
+    """List executions, newest first, with pagination.
 
-    # Read all index files and collect entries
-    if INDEXES_DIR.exists():
-        for index_file in INDEXES_DIR.glob("*.jsonl"):
-            try:
-                for line in index_file.read_text().strip().split("\n"):
-                    if line:
-                        entry = json.loads(line)
-                        executions.append(entry)
-            except (json.JSONDecodeError, OSError):
-                pass
+    Returns cached data that refreshes every 10 seconds server-side.
+    Multiple clients hitting this endpoint share the same cached result.
+    """
+    # Use cached data
+    executions = list(_executions_cache.get("items", []))
 
-    # Sort by completed_at descending (newest first)
-    executions.sort(key=lambda x: x.get("completed_at", 0), reverse=True)
-
-    # Filter by before cursor if provided
+    # Filter by before cursor if provided (for pagination)
     if before is not None:
         executions = [e for e in executions if e.get("completed_at", 0) < before]
 
@@ -263,7 +371,11 @@ async def list_executions(limit: int = 100, before: float | None = None):
     has_more = len(executions) > limit
     executions = executions[:limit]
 
-    return {"items": executions, "has_more": has_more}
+    return {
+        "items": executions,
+        "has_more": has_more,
+        "last_updated": _executions_cache.get("last_updated", 0),
+    }
 
 
 # ##################################################################

@@ -4,9 +4,10 @@ Each node type defines how to execute given node data and input.
 """
 
 import json
+import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 def execute_start(_node_data: dict, _input_data: Any) -> list:
@@ -97,6 +98,47 @@ def execute_append_to_file(node_data: dict, _input_data: Any) -> list:
     return [{"written": bool(filepath), "filepath": filepath}]
 
 
+# ##################################################################
+# Trigger registration functions
+# These return scheduling info for trigger nodes
+
+
+def register_scheduled(
+    node_data: dict, _callback: Callable, last_execution_time: float | None = None
+) -> dict:
+    """Register a scheduled trigger. Returns timing info for scheduler.
+
+    Args:
+        node_data: Node configuration (interval, unit)
+        _callback: Callback function (not used here, handled by scheduler)
+        last_execution_time: Unix timestamp of the last execution, or None if never run
+    """
+    interval = node_data.get("interval", 5)
+    unit = node_data.get("unit", "minutes")
+
+    # Convert to seconds
+    multipliers = {"seconds": 1, "minutes": 60, "hours": 3600, "days": 86400}
+    interval_seconds = interval * multipliers.get(unit, 60)
+
+    now = time.time()
+
+    if last_execution_time is None:
+        # Never executed before - fire immediately
+        trigger_at = now
+    else:
+        # Calculate next trigger based on last execution
+        trigger_at = last_execution_time + interval_seconds
+        # If that time has already passed, fire immediately
+        if trigger_at <= now:
+            trigger_at = now
+
+    return {
+        "type": "timed",
+        "trigger_at": trigger_at,
+        "interval_seconds": interval_seconds,
+    }
+
+
 # Node type registry
 # kind: "map" means the node processes single items (infrastructure handles array iteration)
 NODE_TYPES = {
@@ -106,6 +148,7 @@ NODE_TYPES = {
     },
     "scheduled": {
         "execute": execute_scheduled,
+        "register": register_scheduled,
         "kind": "array",
     },
     "hardwired": {

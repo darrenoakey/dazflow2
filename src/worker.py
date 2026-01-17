@@ -79,8 +79,20 @@ def get_inprogress_items() -> list[dict]:
     return sorted(items, key=lambda x: x.get("queued_at", 0))
 
 
-def queue_workflow(workflow_path: str, workflow: dict) -> str:
-    """Add a workflow to the execution queue. Returns queue item ID."""
+def queue_workflow(
+    workflow_path: str,
+    workflow: dict,
+    trigger_node_id: str | None = None,
+    trigger_output: list | None = None,
+) -> str:
+    """Add a workflow to the execution queue. Returns queue item ID.
+
+    Args:
+        workflow_path: Path to workflow file
+        workflow: Workflow definition
+        trigger_node_id: If provided, node ID that triggered this execution
+        trigger_output: If provided, pre-computed output for trigger node
+    """
     if not QUEUE_DIR:
         raise RuntimeError("Worker system not initialized")
 
@@ -91,11 +103,21 @@ def queue_workflow(workflow_path: str, workflow: dict) -> str:
     queue_id = f"{timestamp}-{workflow_slug}"
     queue_file = QUEUE_DIR / f"{queue_id}.json"
 
+    # Pre-populate execution with trigger output if provided
+    initial_execution = {}
+    if trigger_node_id and trigger_output:
+        initial_execution[trigger_node_id] = {
+            "input": [],
+            "nodeOutput": trigger_output,
+            "output": trigger_output,
+            "executedAt": now.isoformat(),
+        }
+
     queue_item = {
         "id": queue_id,
         "workflow_path": workflow_path,
         "workflow": workflow,  # Snapshot of workflow at queue time
-        "execution": {},
+        "execution": initial_execution,
         "queued_at": time.time(),
         "started_at": None,
         "completed_at": None,

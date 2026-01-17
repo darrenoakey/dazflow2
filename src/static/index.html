@@ -985,6 +985,25 @@
             align-items: center;
             gap: 4px;
         }
+        .toggle-btn {
+            padding: 4px 12px;
+            border-radius: 12px;
+            border: 1px solid #3a3a5e;
+            background: #2a2a4e;
+            color: #888;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .toggle-btn:hover {
+            border-color: #667eea;
+        }
+        .toggle-btn.enabled {
+            background: #667eea;
+            border-color: #667eea;
+            color: #fff;
+        }
         .file-item-menu {
             position: relative;
         }
@@ -1358,7 +1377,12 @@
             currentView: 'dashboard', // 'dashboard' | 'editor'
             currentWorkflowPath: null,
             dashboardPath: '',
-            dashboardTab: 'workflows', // 'workflows' | 'executions'
+            dashboardTab: (() => {
+                // Initialize from URL hash
+                const hash = window.location.hash.slice(1);
+                if (hash === 'executions') return 'executions';
+                return 'workflows';
+            })(),
             dashboardItems: [],
             dashboardLoading: false,
 
@@ -1369,7 +1393,10 @@
             // Dashboard actions
             setCurrentView: (view) => set({ currentView: view }),
             setDashboardPath: (path) => set({ dashboardPath: path }),
-            setDashboardTab: (tab) => set({ dashboardTab: tab }),
+            setDashboardTab: (tab) => {
+                window.location.hash = tab === 'workflows' ? '' : tab;
+                set({ dashboardTab: tab });
+            },
             setDashboardItems: (items) => set({ dashboardItems: items }),
 
             // Load workflows from server
@@ -2890,6 +2917,24 @@
                 }
             };
 
+            const handleToggleEnabled = async (e, item) => {
+                e.stopPropagation();
+                const newEnabled = !item.enabled;
+                try {
+                    const response = await fetch(`/workflow/${item.path}/enabled`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ enabled: newEnabled }),
+                    });
+                    if (response.ok) {
+                        // Reload to get updated state
+                        loadDashboardItems(dashboardPath);
+                    }
+                } catch (err) {
+                    console.error('Failed to toggle enabled:', err);
+                }
+            };
+
             const folderIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
             const fileIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
             const menuIcon = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>';
@@ -2940,6 +2985,12 @@
                                 `${item.stats.execution_count} runs`
                             ),
                         ]),
+                        item.type === 'workflow' && React.createElement('button', {
+                            key: 'toggle',
+                            className: `toggle-btn ${item.enabled ? 'enabled' : ''}`,
+                            onClick: (e) => handleToggleEnabled(e, item),
+                            'data-testid': `toggle-${item.name}`,
+                        }, item.enabled ? 'ON' : 'OFF'),
                         item.type === 'workflow' && React.createElement('div', {
                             key: 'menu',
                             className: 'file-item-menu',
@@ -2978,9 +3029,13 @@
             const loadExecution = useWorkflowStore((state) => state.loadExecution);
             const listRef = useRef(null);
 
-            // Initial load
+            // Initial load and auto-refresh every 10 seconds
             useEffect(() => {
                 loadExecutionsList(true);
+                const interval = setInterval(() => {
+                    loadExecutionsList(true);
+                }, 10000);
+                return () => clearInterval(interval);
             }, []);
 
             // Infinite scroll - load more when near bottom
@@ -3033,7 +3088,7 @@
                         React.createElement('span', {
                             key: 'workflow',
                             className: 'exec-workflow',
-                        }, exec.workflow_path),
+                        }, exec.workflow_path.replace(/\.json$/, '')),
                         React.createElement('span', {
                             key: 'status',
                             className: `exec-status ${exec.status}`,
@@ -3056,6 +3111,19 @@
         function Dashboard() {
             const dashboardTab = useWorkflowStore((state) => state.dashboardTab);
             const setDashboardTab = useWorkflowStore((state) => state.setDashboardTab);
+
+            // Listen for browser back/forward navigation
+            useEffect(() => {
+                const handleHashChange = () => {
+                    const hash = window.location.hash.slice(1);
+                    const newTab = hash === 'executions' ? 'executions' : 'workflows';
+                    if (newTab !== dashboardTab) {
+                        useWorkflowStore.setState({ dashboardTab: newTab });
+                    }
+                };
+                window.addEventListener('hashchange', handleHashChange);
+                return () => window.removeEventListener('hashchange', handleHashChange);
+            }, [dashboardTab]);
 
             return React.createElement('div', { className: 'dashboard', 'data-testid': 'dashboard' }, [
                 React.createElement('div', { key: 'header', className: 'dashboard-header' }, [
