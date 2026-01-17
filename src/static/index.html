@@ -628,6 +628,57 @@
             width: 14px;
             height: 14px;
         }
+
+        /* JSON Viewer styles */
+        .json-viewer {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .json-indent {
+            margin-left: 16px;
+        }
+        .json-bracket {
+            color: #888;
+        }
+        .json-toggle {
+            cursor: pointer;
+            user-select: none;
+        }
+        .json-toggle:hover {
+            color: #667eea;
+        }
+        .json-key {
+            color: #9cdcfe;
+        }
+        .json-colon {
+            color: #888;
+        }
+        .json-comma {
+            color: #888;
+        }
+        .json-string {
+            color: #ce9178;
+        }
+        .json-number {
+            color: #b5cea8;
+        }
+        .json-boolean {
+            color: #569cd6;
+        }
+        .json-null {
+            color: #569cd6;
+        }
+        .json-undefined {
+            color: #888;
+            font-style: italic;
+        }
+        .json-property {
+            display: block;
+        }
+        .json-array-item {
+            display: block;
+        }
     </style>
     <link href="https://esm.sh/@xyflow/react@12/dist/style.css" rel="stylesheet">
 </head>
@@ -723,7 +774,7 @@
             openEditorNodeId: null,
 
             // Ambient execution - stores the most recent execution results for each node
-            // Format: { [nodeId]: { input: [...], output: [...], executedAt: timestamp } }
+            // Format: { [nodeId]: { input, nodeOutput, output (combined), executedAt } }
             ambientExecution: {},
 
             setViewport: (viewport) => set({ viewport }),
@@ -731,13 +782,17 @@
             setOpenEditorNodeId: (nodeId) => set({ openEditorNodeId: nodeId }),
 
             // Store execution result for a node in the ambient execution
-            setNodeExecution: (nodeId, input, output) => {
+            // input: data received from upstream
+            // nodeOutput: what this specific node produced
+            // output: combined result (input merged with nodeOutput)
+            setNodeExecution: (nodeId, input, nodeOutput, output) => {
                 set((state) => ({
                     ambientExecution: {
                         ...state.ambientExecution,
                         [nodeId]: {
                             input,
-                            output,
+                            nodeOutput,
+                            output: output || nodeOutput, // If no combined provided, use nodeOutput
                             executedAt: new Date().toISOString(),
                         },
                     },
@@ -1116,6 +1171,92 @@
         const nodeTypes = { custom: CustomNode };
         const edgeTypes = { custom: CustomEdge };
 
+        // Expandable JSON Viewer Component
+        // Shows JSON with expand/collapse on objects and arrays
+        // First array item auto-expanded, others collapsed
+        function JsonViewer({ data, defaultExpanded = false, isFirstItem = true }) {
+            const [expanded, setExpanded] = useState(defaultExpanded || isFirstItem);
+
+            const handleToggle = (e) => {
+                e.stopPropagation();
+                setExpanded(!expanded);
+            };
+
+            if (data === null) return React.createElement('span', { className: 'json-null' }, 'null');
+            if (data === undefined) return React.createElement('span', { className: 'json-undefined' }, 'undefined');
+
+            const type = typeof data;
+
+            if (type === 'string') {
+                return React.createElement('span', { className: 'json-string' }, `"${data}"`);
+            }
+            if (type === 'number') {
+                return React.createElement('span', { className: 'json-number' }, String(data));
+            }
+            if (type === 'boolean') {
+                return React.createElement('span', { className: 'json-boolean' }, String(data));
+            }
+
+            if (Array.isArray(data)) {
+                if (data.length === 0) {
+                    return React.createElement('span', { className: 'json-bracket' }, '[]');
+                }
+                return React.createElement('div', { className: 'json-array' }, [
+                    React.createElement('span', {
+                        key: 'bracket-open',
+                        className: 'json-bracket json-toggle',
+                        onClick: handleToggle,
+                        title: expanded ? 'Collapse' : 'Expand',
+                    }, expanded ? '[' : `[${data.length} items...]`),
+                    expanded && React.createElement('div', { key: 'items', className: 'json-indent' },
+                        data.map((item, index) =>
+                            React.createElement('div', { key: index, className: 'json-array-item' }, [
+                                React.createElement(JsonViewer, {
+                                    key: 'value',
+                                    data: item,
+                                    isFirstItem: index === 0,
+                                }),
+                                index < data.length - 1 && React.createElement('span', { key: 'comma', className: 'json-comma' }, ','),
+                            ])
+                        )
+                    ),
+                    expanded && React.createElement('span', { key: 'bracket-close', className: 'json-bracket' }, ']'),
+                ]);
+            }
+
+            if (type === 'object') {
+                const keys = Object.keys(data);
+                if (keys.length === 0) {
+                    return React.createElement('span', { className: 'json-bracket' }, '{}');
+                }
+                return React.createElement('div', { className: 'json-object' }, [
+                    React.createElement('span', {
+                        key: 'bracket-open',
+                        className: 'json-bracket json-toggle',
+                        onClick: handleToggle,
+                        title: expanded ? 'Collapse' : 'Expand',
+                    }, expanded ? '{' : `{${keys.length} keys...}`),
+                    expanded && React.createElement('div', { key: 'props', className: 'json-indent' },
+                        keys.map((key, index) =>
+                            React.createElement('div', { key, className: 'json-property' }, [
+                                React.createElement('span', { key: 'key', className: 'json-key' }, `"${key}"`),
+                                React.createElement('span', { key: 'colon', className: 'json-colon' }, ': '),
+                                React.createElement(JsonViewer, {
+                                    key: 'value',
+                                    data: data[key],
+                                    isFirstItem: false,
+                                }),
+                                index < keys.length - 1 && React.createElement('span', { key: 'comma', className: 'json-comma' }, ','),
+                            ])
+                        )
+                    ),
+                    expanded && React.createElement('span', { key: 'bracket-close', className: 'json-bracket' }, '}'),
+                ]);
+            }
+
+            return React.createElement('span', null, String(data));
+        }
+
         // Property Editor Components
         function TextPropertyEditor({ property, onChange }) {
             const [value, setValue] = useState(property.value);
@@ -1270,6 +1411,7 @@
         // Node Editor Dialog
         function NodeEditorDialog({ nodeId, onClose }) {
             const node = useWorkflowStore((state) => state.nodes.find((n) => n.id === nodeId));
+            const connections = useWorkflowStore((state) => state.connections);
             const updateNodeData = useWorkflowStore((state) => state.updateNodeData);
             const updateNodeName = useWorkflowStore((state) => state.updateNodeName);
             const isNameUnique = useWorkflowStore((state) => state.isNameUnique);
@@ -1284,16 +1426,27 @@
             const nodeType = nodeTypeDefinitions[node.typeId];
             if (!nodeType) return null;
 
+            // Find input from upstream nodes
+            // Look at connections where this node is the target
+            const incomingConnections = connections.filter(c => c.targetNodeId === nodeId);
+            let upstreamData = null;
+            for (const conn of incomingConnections) {
+                const sourceExecution = ambientExecution[conn.sourceNodeId];
+                if (sourceExecution?.output) {
+                    upstreamData = sourceExecution.output;
+                    break; // Use first found input
+                }
+            }
+
             // Get execution data from ambient execution
             const nodeExecution = ambientExecution[nodeId];
-            const executionOutput = nodeExecution?.output || null;
-            const executionInput = nodeExecution?.input || null;
+            const nodeOutput = nodeExecution?.nodeOutput || null; // What THIS node produced
             const executionTime = nodeExecution?.executedAt
                 ? new Date(nodeExecution.executedAt).toLocaleTimeString()
                 : null;
 
             const properties = nodeType.getProperties(node.data);
-            const canExecute = nodeType.canExecute ? nodeType.canExecute(executionInput || {}) : false;
+            const canExecute = nodeType.canExecute ? nodeType.canExecute(upstreamData || {}) : false;
 
             const handlePropertyChange = (propertyId, value) => {
                 updateNodeData(nodeId, { [propertyId]: value });
@@ -1315,9 +1468,23 @@
 
             const handleExecute = () => {
                 if (!nodeType.execute) return;
-                const inputs = executionInput || [];
-                const output = nodeType.execute(node.data, inputs);
-                setNodeExecution(nodeId, inputs, output);
+                const inputData = upstreamData || [];
+
+                // Execute node to get its output
+                const nodeOutputResult = nodeType.execute(node.data, inputData);
+
+                // Merge input with node output: each item gets node's output merged in
+                // If input is [{a, b}, {c, d}] and node outputs [{x}, {y}]
+                // Combined is [{a, b, x}, {c, d, y}]
+                const inputArray = Array.isArray(inputData) ? inputData : [inputData || {}];
+                const outputArray = Array.isArray(nodeOutputResult) ? nodeOutputResult : [nodeOutputResult];
+
+                const combinedOutput = outputArray.map((out, i) => {
+                    const inp = inputArray[i] || {};
+                    return { ...inp, ...out };
+                });
+
+                setNodeExecution(nodeId, inputData, nodeOutputResult, combinedOutput);
             };
 
             const handleKeyDown = (e) => {
@@ -1370,11 +1537,17 @@
                     ]),
                     // Body with three panes
                     React.createElement('div', { key: 'body', className: 'node-editor-body' }, [
-                        // Input pane
+                        // Input pane - shows data from upstream nodes
                         React.createElement('div', { key: 'input', className: 'node-editor-pane input-pane' }, [
                             React.createElement('div', { key: 'header', className: 'pane-header' }, 'Input'),
                             React.createElement('div', { key: 'content', className: 'pane-content' },
-                                React.createElement('div', { className: 'no-data-message' }, 'No input data available')
+                                upstreamData
+                                    ? React.createElement('div', {
+                                        key: 'input-content',
+                                        className: 'json-viewer',
+                                        'data-testid': 'execution-input',
+                                    }, React.createElement(JsonViewer, { data: upstreamData, defaultExpanded: true }))
+                                    : React.createElement('div', { className: 'no-data-message' }, 'No input data available')
                             ),
                         ]),
                         // Editor pane
@@ -1408,21 +1581,21 @@
                                 ),
                             ]),
                         ]),
-                        // Output pane
+                        // Output pane - shows what THIS node produced (not the combined result)
                         React.createElement('div', { key: 'output', className: 'node-editor-pane output-pane' }, [
                             React.createElement('div', { key: 'header', className: 'pane-header' }, 'Output'),
                             React.createElement('div', { key: 'content', className: 'pane-content' },
-                                executionOutput
+                                nodeOutput
                                     ? React.createElement('div', { key: 'output-content' }, [
                                         executionTime && React.createElement('div', {
                                             key: 'time',
                                             className: 'execution-time',
                                         }, `Executed at ${executionTime}`),
-                                        React.createElement('pre', {
+                                        React.createElement('div', {
                                             key: 'json',
-                                            className: 'json-output',
+                                            className: 'json-viewer',
                                             'data-testid': 'execution-output',
-                                        }, JSON.stringify(executionOutput, null, 2)),
+                                        }, React.createElement(JsonViewer, { data: nodeOutput, defaultExpanded: true })),
                                     ])
                                     : React.createElement('div', { className: 'no-data-message' }, 'No output data available')
                             ),

@@ -455,16 +455,14 @@ test.describe('Workflow Editor', () => {
   });
 
   test('Set node maps over multiple input items (map node behavior)', async ({ page }) => {
-    // Add a Set node and configure it
+    // Add a Set node
     await page.getByTestId('node-type-set').click();
-    const node = page.getByTestId('workflow-node-set');
-    await expect(node).toBeVisible();
+    const setNode = page.getByTestId('workflow-node-set');
+    await expect(setNode).toBeVisible();
+    const setNodeId = await setNode.getAttribute('data-node-id');
 
-    // Get the node ID
-    const nodeId = await node.getAttribute('data-node-id');
-
-    // Open editor and add a field
-    await node.locator('.custom-node').dblclick();
+    // Configure Set node with a field
+    await setNode.locator('.custom-node').dblclick();
     const dialog = page.locator('.node-editor-dialog');
     await expect(dialog).toBeVisible();
 
@@ -472,42 +470,56 @@ test.describe('Workflow Editor', () => {
     const fieldItem = dialog.locator('.field-item');
     await fieldItem.locator('input').first().fill('status');
     await fieldItem.locator('input').nth(1).fill('"processed"');
-
-    // Close and reopen to ensure data is saved
     await page.locator('.node-editor-close').click();
 
-    // Inject 4 input items into ambient execution via store
-    await page.evaluate((id) => {
+    // Set up: create a fake upstream node and inject connection + execution data
+    await page.evaluate(({ targetId }) => {
       const store = (window as any).useWorkflowStore;
       if (store) {
-        store.getState().setNodeExecution(id, [
-          { name: 'item1' },
-          { name: 'item2' },
-          { name: 'item3' },
-          { name: 'item4' },
-        ], null);
-      }
-    }, nodeId);
+        // Create a fake upstream node ID
+        const fakeUpstreamId = 'fake-upstream-node';
 
-    // Open editor again
-    await node.locator('.custom-node').dblclick();
+        // Set up the upstream node's execution output with 4 items
+        store.getState().setNodeExecution(fakeUpstreamId,
+          [], // input
+          [{ name: 'item1' }, { name: 'item2' }, { name: 'item3' }, { name: 'item4' }], // nodeOutput
+          [{ name: 'item1' }, { name: 'item2' }, { name: 'item3' }, { name: 'item4' }]  // combined output
+        );
+
+        // Create a connection from fake upstream to Set
+        store.getState().addConnection({
+          sourceNodeId: fakeUpstreamId,
+          sourceConnectorId: 'output',
+          targetNodeId: targetId,
+          targetConnectorId: 'data',
+        });
+      }
+    }, { targetId: setNodeId });
+
+    // Open Set node editor - it should now see upstream data
+    await setNode.locator('.custom-node').dblclick();
     await expect(dialog).toBeVisible();
+
+    // Verify input pane shows upstream data
+    const inputPane = page.getByTestId('execution-input');
+    await expect(inputPane).toBeVisible();
 
     // Execute - should map over 4 items and produce 4 outputs
     await page.getByTestId('execute-btn').click();
 
-    // Check output is an array of 4 items
+    // Check output shows the mapped results
     const output = page.getByTestId('execution-output');
     await expect(output).toBeVisible();
-    const outputText = await output.textContent();
 
-    // Parse the JSON output and verify it has 4 items
-    const outputJson = JSON.parse(outputText!);
-    expect(Array.isArray(outputJson)).toBe(true);
-    expect(outputJson.length).toBe(4);
+    // Verify the actual execution result in the store (4 items, each with status)
+    const executionResult = await page.evaluate((nodeId) => {
+      const store = (window as any).useWorkflowStore;
+      return store?.getState().ambientExecution[nodeId!]?.nodeOutput;
+    }, setNodeId);
 
-    // Each item should have the 'status' field we configured
-    for (const item of outputJson) {
+    expect(Array.isArray(executionResult)).toBe(true);
+    expect(executionResult.length).toBe(4);
+    for (const item of executionResult) {
       expect(item.status).toBe('processed');
     }
 
