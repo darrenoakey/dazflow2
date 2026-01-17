@@ -865,6 +865,9 @@
             saveToStorage(state);
         });
 
+        // Expose store globally for testing
+        window.useWorkflowStore = useWorkflowStore;
+
         // Global double-click detection for nodes using position-based hit testing
         // This works around a React/ReactFlow issue where DOM elements get replaced between clicks
         (function setupGlobalNodeDoubleClick() {
@@ -1312,9 +1315,8 @@
 
             const handleExecute = () => {
                 if (!nodeType.execute) return;
-                const inputs = executionInput || {}; // Use inputs from ambient execution if available
+                const inputs = executionInput || [];
                 const output = nodeType.execute(node.data, inputs);
-                // Save to ambient execution
                 setNodeExecution(nodeId, inputs, output);
             };
 

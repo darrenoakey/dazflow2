@@ -454,6 +454,66 @@ test.describe('Workflow Editor', () => {
     await page.locator('.node-editor-close').click();
   });
 
+  test('Set node maps over multiple input items (map node behavior)', async ({ page }) => {
+    // Add a Set node and configure it
+    await page.getByTestId('node-type-set').click();
+    const node = page.getByTestId('workflow-node-set');
+    await expect(node).toBeVisible();
+
+    // Get the node ID
+    const nodeId = await node.getAttribute('data-node-id');
+
+    // Open editor and add a field
+    await node.locator('.custom-node').dblclick();
+    const dialog = page.locator('.node-editor-dialog');
+    await expect(dialog).toBeVisible();
+
+    await page.getByTestId('add-field-btn').click();
+    const fieldItem = dialog.locator('.field-item');
+    await fieldItem.locator('input').first().fill('status');
+    await fieldItem.locator('input').nth(1).fill('"processed"');
+
+    // Close and reopen to ensure data is saved
+    await page.locator('.node-editor-close').click();
+
+    // Inject 4 input items into ambient execution via store
+    await page.evaluate((id) => {
+      const store = (window as any).useWorkflowStore;
+      if (store) {
+        store.getState().setNodeExecution(id, [
+          { name: 'item1' },
+          { name: 'item2' },
+          { name: 'item3' },
+          { name: 'item4' },
+        ], null);
+      }
+    }, nodeId);
+
+    // Open editor again
+    await node.locator('.custom-node').dblclick();
+    await expect(dialog).toBeVisible();
+
+    // Execute - should map over 4 items and produce 4 outputs
+    await page.getByTestId('execute-btn').click();
+
+    // Check output is an array of 4 items
+    const output = page.getByTestId('execution-output');
+    await expect(output).toBeVisible();
+    const outputText = await output.textContent();
+
+    // Parse the JSON output and verify it has 4 items
+    const outputJson = JSON.parse(outputText!);
+    expect(Array.isArray(outputJson)).toBe(true);
+    expect(outputJson.length).toBe(4);
+
+    // Each item should have the 'status' field we configured
+    for (const item of outputJson) {
+      expect(item.status).toBe('processed');
+    }
+
+    await page.locator('.node-editor-close').click();
+  });
+
   test('can edit node properties in editor', async ({ page }) => {
     // Add a Scheduled node
     await page.getByTestId('node-type-scheduled').click();
