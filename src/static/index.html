@@ -1,0 +1,1987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>dazflow2</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body, #root {
+            width: 100%;
+            height: 100%;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+        }
+        .editor {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+        .sidebar {
+            width: 200px;
+            background: #1a1a2e;
+            border-right: 1px solid #3a3a5e;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .sidebar-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #667eea;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .category-label {
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+        }
+        .category-items {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .node-type-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #2a2a4e;
+            border-radius: 8px;
+            cursor: grab;
+            transition: background 0.15s;
+        }
+        .node-type-item:hover {
+            background: #3a3a5e;
+        }
+        .node-type-item svg {
+            width: 24px;
+            height: 24px;
+            color: #667eea;
+        }
+        .node-type-item span {
+            font-size: 13px;
+            color: #ccc;
+        }
+        .canvas-container {
+            flex: 1;
+            height: 100%;
+        }
+        .custom-node {
+            background: #2a2a4e;
+            border: 2px solid #4a4a6e;
+            border-radius: 12px;
+            padding: 12px;
+            min-width: 80px;
+            min-height: 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .custom-node.selected {
+            background: #3a3a5e;
+            border-color: #667eea;
+        }
+        .custom-node.no-inputs {
+            border-radius: 30px 12px 12px 30px;
+            padding-left: 16px;
+        }
+        .custom-node.no-outputs {
+            border-radius: 12px 30px 30px 12px;
+            padding-right: 16px;
+        }
+        .custom-node.no-inputs.no-outputs {
+            border-radius: 30px;
+            padding-left: 16px;
+            padding-right: 16px;
+        }
+        .custom-node .node-icon {
+            width: 32px;
+            height: 32px;
+            color: #667eea;
+        }
+        .node-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        .node-wrapper .node-name {
+            margin-top: 6px;
+            font-size: 10px;
+            color: #aaa;
+            max-width: 100px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            text-align: center;
+        }
+        .node-wrapper .node-name-input {
+            margin-top: 6px;
+            font-size: 10px;
+            color: #fff;
+            background: #2a2a4e;
+            border: 1px solid #667eea;
+            border-radius: 4px;
+            padding: 2px 6px;
+            width: 80px;
+            text-align: center;
+            outline: none;
+        }
+        .node-wrapper .node-name-input.error {
+            border-color: #e74c3c;
+            animation: shake 0.3s ease-in-out;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-4px); }
+            75% { transform: translateX(4px); }
+        }
+        .node-wrapper .connector-labels {
+            position: absolute;
+            top: 0;
+            height: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            font-size: 8px;
+            color: #777;
+            pointer-events: none;
+        }
+        .node-wrapper .connector-labels.left {
+            right: 100%;
+            margin-right: 8px;
+            text-align: right;
+        }
+        .node-wrapper .connector-labels.right {
+            left: 100%;
+            margin-left: 8px;
+            text-align: left;
+        }
+        .react-flow__handle {
+            width: 10px;
+            height: 10px;
+            border: 2px solid #4a4a6e;
+        }
+        .react-flow__handle-left {
+            background: #667eea;
+        }
+        .react-flow__handle-right {
+            background: #764ba2;
+        }
+        .react-flow__edge-path {
+            stroke: #5a5a7a;
+            stroke-width: 2;
+        }
+        .react-flow__edge.selected .react-flow__edge-path {
+            stroke: #667eea;
+            stroke-width: 3;
+        }
+        .react-flow__background {
+            background: #1a1a2e;
+        }
+        .react-flow__minimap {
+            background: #1a1a2e;
+        }
+        .react-flow__controls button {
+            background: #2a2a4e;
+            color: #ccc;
+            border: 1px solid #4a4a6e;
+            border-bottom: none;
+        }
+        .react-flow__controls button:last-child {
+            border-bottom: 1px solid #4a4a6e;
+        }
+        .react-flow__controls button:hover {
+            background: #3a3a5e;
+        }
+        .edge-button-container {
+            position: absolute;
+            pointer-events: all;
+            display: flex;
+            gap: 4px;
+        }
+        .edge-button {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: none;
+            background: #f87171;
+            color: #fff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .sidebar-hint {
+            font-size: 10px;
+            color: #555;
+            text-align: center;
+        }
+        .sidebar-footer {
+            margin-top: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .view-json-btn {
+            padding: 8px 12px;
+            background: #3a3a5e;
+            border: 1px solid #667eea;
+            border-radius: 6px;
+            color: #eee;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .view-json-btn:hover {
+            background: #4a4a6e;
+        }
+        .json-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .json-modal {
+            background: #1a1a2e;
+            border: 1px solid #3a3a5e;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 800px;
+            max-height: 80%;
+            display: flex;
+            flex-direction: column;
+        }
+        .json-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid #3a3a5e;
+        }
+        .json-modal-header h3 {
+            margin: 0;
+            font-size: 14px;
+            color: #eee;
+        }
+        .json-modal-close {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+        .json-modal-close:hover {
+            color: #eee;
+        }
+        .json-modal-body {
+            flex: 1;
+            overflow: auto;
+            padding: 16px;
+        }
+        .json-modal-body pre {
+            margin: 0;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            color: #9cdcfe;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .json-modal-footer {
+            padding: 12px 16px;
+            border-top: 1px solid #3a3a5e;
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+        .json-modal-btn {
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            border: none;
+        }
+        .json-modal-btn-primary {
+            background: #667eea;
+            color: #fff;
+        }
+        .json-modal-btn-primary:hover {
+            background: #5a6fd6;
+        }
+
+        /* Node Editor Dialog */
+        .node-editor-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .node-editor-dialog {
+            background: #1a1a2e;
+            border: 1px solid #3a3a5e;
+            border-radius: 12px;
+            width: 95%;
+            height: 90%;
+            max-width: 1400px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .node-editor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid #3a3a5e;
+            background: #252542;
+        }
+        .node-editor-header h2 {
+            margin: 0;
+            font-size: 16px;
+            color: #eee;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .node-editor-header .node-icon {
+            width: 24px;
+            height: 24px;
+        }
+        .node-editor-close {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+        .node-editor-close:hover {
+            color: #eee;
+        }
+        .node-editor-body {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        .node-editor-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .node-editor-pane.input-pane,
+        .node-editor-pane.output-pane {
+            background: #12121f;
+        }
+        .node-editor-pane.editor-pane {
+            border-left: 1px solid #3a3a5e;
+            border-right: 1px solid #3a3a5e;
+        }
+        .pane-header {
+            padding: 12px 16px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #888;
+            border-bottom: 1px solid #3a3a5e;
+        }
+        .pane-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        .input-pane .pane-content,
+        .output-pane .pane-content {
+            color: #666;
+            font-size: 12px;
+        }
+        .no-data-message {
+            color: #555;
+            font-style: italic;
+            font-size: 12px;
+        }
+
+        /* Property Editors */
+        .property-group {
+            margin-bottom: 16px;
+        }
+        .property-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            color: #999;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .property-input {
+            width: 100%;
+            padding: 10px 12px;
+            background: #2a2a4e;
+            border: 1px solid #3a3a5e;
+            border-radius: 6px;
+            color: #eee;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .property-input:focus {
+            border-color: #667eea;
+        }
+        .property-input::placeholder {
+            color: #555;
+        }
+        .property-select {
+            width: 100%;
+            padding: 10px 12px;
+            background: #2a2a4e;
+            border: 1px solid #3a3a5e;
+            border-radius: 6px;
+            color: #eee;
+            font-size: 13px;
+            outline: none;
+            cursor: pointer;
+        }
+        .property-select:focus {
+            border-color: #667eea;
+        }
+        .property-row {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        .property-row .property-group {
+            flex: 1;
+            margin-bottom: 0;
+        }
+        .property-description {
+            font-size: 11px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        /* Execute button */
+        .execute-btn {
+            padding: 8px 16px;
+            background: #28a745;
+            border: none;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.2s;
+        }
+        .execute-btn:hover {
+            background: #218838;
+        }
+        .execute-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        .execute-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* JSON output display */
+        .json-output {
+            background: #1a1a2e;
+            border: 1px solid #3a3a5e;
+            border-radius: 6px;
+            padding: 12px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            color: #9cdcfe;
+            white-space: pre-wrap;
+            word-break: break-all;
+            overflow-y: auto;
+            max-height: 100%;
+        }
+        .json-output .json-key {
+            color: #9cdcfe;
+        }
+        .json-output .json-string {
+            color: #ce9178;
+        }
+        .json-output .json-number {
+            color: #b5cea8;
+        }
+        .execution-time {
+            font-size: 10px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        /* Field list property editor */
+        .field-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .field-item {
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+            background: #252542;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #3a3a5e;
+        }
+        .field-item-inputs {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .field-item-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .field-item-row label {
+            font-size: 10px;
+            color: #777;
+            min-width: 40px;
+        }
+        .field-item-row input {
+            flex: 1;
+            padding: 6px 8px;
+            background: #1a1a2e;
+            border: 1px solid #3a3a5e;
+            border-radius: 4px;
+            color: #eee;
+            font-size: 12px;
+        }
+        .field-item-row input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .field-delete-btn {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px;
+            line-height: 1;
+        }
+        .field-delete-btn:hover {
+            color: #e74c3c;
+        }
+        .add-field-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: #2a2a4e;
+            border: 1px dashed #4a4a6e;
+            border-radius: 6px;
+            color: #888;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .add-field-btn:hover {
+            background: #3a3a5e;
+            border-color: #667eea;
+            color: #eee;
+        }
+        .add-field-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+    </style>
+    <link href="https://esm.sh/@xyflow/react@12/dist/style.css" rel="stylesheet">
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "https://esm.sh/react@18",
+            "react-dom": "https://esm.sh/react-dom@18",
+            "react-dom/client": "https://esm.sh/react-dom@18/client",
+            "react/jsx-runtime": "https://esm.sh/react@18/jsx-runtime",
+            "@xyflow/react": "https://esm.sh/@xyflow/react@12?external=react,react-dom",
+            "zustand": "https://esm.sh/zustand@4?external=react",
+            "uuid": "https://esm.sh/uuid@9"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import {
+            ReactFlow,
+            Background,
+            Controls,
+            MiniMap,
+            Handle,
+            Position,
+            ReactFlowProvider,
+            useReactFlow,
+            applyNodeChanges,
+            applyEdgeChanges,
+            getBezierPath,
+            EdgeLabelRenderer,
+            BaseEdge,
+        } from '@xyflow/react';
+        import { create } from 'zustand';
+        import { v4 as uuid } from 'uuid';
+
+        // LocalStorage key for persistence
+        const STORAGE_KEY = 'dazflow2-workflow';
+
+        // Load state from localStorage
+        function loadFromStorage() {
+            try {
+                const stored = localStorage.getItem(STORAGE_KEY);
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    return {
+                        nodes: parsed.nodes || [],
+                        connections: parsed.connections || [],
+                        nameCounts: parsed.nameCounts || {},
+                        viewport: parsed.viewport || { x: 0, y: 0, zoom: 1 },
+                    };
+                }
+            } catch (e) {
+                console.warn('Failed to load from localStorage:', e);
+            }
+            return null;
+        }
+
+        // Save state to localStorage
+        function saveToStorage(state) {
+            try {
+                const toSave = {
+                    nodes: state.nodes,
+                    connections: state.connections,
+                    nameCounts: state.nameCounts,
+                    viewport: state.viewport,
+                };
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+            } catch (e) {
+                console.warn('Failed to save to localStorage:', e);
+            }
+        }
+
+        // Node type definitions with SVG icons
+        const nodeTypeDefinitions = {
+            start: {
+                id: 'start',
+                name: 'Start',
+                category: 'Input',
+                icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>`,
+                defaultData: {},
+                getConnectors: () => ({
+                    inputs: [],
+                    outputs: [{ id: 'out', name: 'out' }],
+                }),
+                getProperties: () => [],
+            },
+            scheduled: {
+                id: 'scheduled',
+                name: 'Scheduled',
+                category: 'Input',
+                icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                </svg>`,
+                defaultData: { interval: 5, unit: 'minutes' },
+                getConnectors: () => ({
+                    inputs: [],
+                    outputs: [{ id: 'trigger', name: 'trigger' }],
+                }),
+                getProperties: (data) => [
+                    { id: 'interval', label: 'Interval', type: 'number', value: data.interval ?? 5, min: 1 },
+                    { id: 'unit', label: 'Unit', type: 'select', value: data.unit ?? 'minutes', options: [
+                        { value: 'seconds', label: 'Seconds' },
+                        { value: 'minutes', label: 'Minutes' },
+                        { value: 'hours', label: 'Hours' },
+                        { value: 'days', label: 'Days' },
+                    ]},
+                ],
+                // Execute returns output array - scheduled ignores inputs and returns current time
+                canExecute: (inputs) => true, // No inputs required
+                execute: (nodeData, inputs) => {
+                    return [{ time: new Date().toISOString() }];
+                },
+            },
+            rss: {
+                id: 'rss',
+                name: 'RSS',
+                category: 'Input',
+                icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="6" cy="18" r="3"/>
+                    <path d="M6 6a12 12 0 0 1 12 12"/>
+                    <path d="M6 12a6 6 0 0 1 6 6"/>
+                </svg>`,
+                defaultData: { url: '' },
+                getConnectors: () => ({
+                    inputs: [],
+                    outputs: [{ id: 'items', name: 'items' }],
+                }),
+                getProperties: (data) => [
+                    { id: 'url', label: 'Feed URL', type: 'text', value: data.url ?? '', placeholder: 'https://example.com/feed.xml' },
+                ],
+            },
+            if: {
+                id: 'if',
+                name: 'IF',
+                category: 'Logic',
+                icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 3L21 12L12 21L3 12L12 3Z"/>
+                    <path d="M12 8v4"/>
+                    <circle cx="12" cy="15" r="0.5" fill="currentColor"/>
+                </svg>`,
+                defaultData: { condition: '' },
+                getConnectors: () => ({
+                    inputs: [{ id: 'input', name: 'input' }],
+                    outputs: [
+                        { id: 'true', name: 'true' },
+                        { id: 'false', name: 'false' },
+                    ],
+                }),
+                getProperties: (data) => [
+                    { id: 'condition', label: 'Condition', type: 'text', value: data.condition ?? '', placeholder: 'e.g. item.value > 10' },
+                ],
+            },
+            http: {
+                id: 'http',
+                name: 'HTTP',
+                category: 'Action',
+                icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M2 12h20"/>
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                </svg>`,
+                defaultData: { url: '', method: 'GET' },
+                getConnectors: () => ({
+                    inputs: [{ id: 'trigger', name: 'trigger' }],
+                    outputs: [
+                        { id: 'success', name: 'success' },
+                        { id: 'error', name: 'error' },
+                    ],
+                }),
+                getProperties: (data) => [
+                    { id: 'method', label: 'Method', type: 'select', value: data.method ?? 'GET', options: [
+                        { value: 'GET', label: 'GET' },
+                        { value: 'POST', label: 'POST' },
+                        { value: 'PUT', label: 'PUT' },
+                        { value: 'DELETE', label: 'DELETE' },
+                        { value: 'PATCH', label: 'PATCH' },
+                    ]},
+                    { id: 'url', label: 'URL', type: 'text', value: data.url ?? '', placeholder: 'https://api.example.com/endpoint' },
+                ],
+            },
+            transform: {
+                id: 'transform',
+                name: 'Transform',
+                category: 'Transform',
+                icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>`,
+                defaultData: { expression: '' },
+                getConnectors: () => ({
+                    inputs: [{ id: 'data', name: 'data' }],
+                    outputs: [{ id: 'result', name: 'result' }],
+                }),
+                getProperties: (data) => [
+                    { id: 'expression', label: 'Expression', type: 'text', value: data.expression ?? '', placeholder: 'e.g. item.name.toUpperCase()' },
+                ],
+            },
+            set: {
+                id: 'set',
+                name: 'Set',
+                category: 'Transform',
+                icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 20h9"/>
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                </svg>`,
+                defaultData: { fields: [] },
+                getConnectors: () => ({
+                    inputs: [{ id: 'data', name: 'data' }],
+                    outputs: [{ id: 'output', name: 'output' }],
+                }),
+                getProperties: (data) => [
+                    { id: 'fields', label: 'Output Fields', type: 'fieldlist', value: data.fields ?? [] },
+                ],
+                canExecute: (inputs) => true,
+                execute: (nodeData, inputs) => {
+                    // Build output object from fields
+                    const result = {};
+                    const fields = nodeData.fields || [];
+                    for (const field of fields) {
+                        if (field.name) {
+                            // Try to parse value as JSON, fall back to string
+                            let value = field.value;
+                            try {
+                                value = JSON.parse(field.value);
+                            } catch (e) {
+                                // Keep as string if not valid JSON
+                            }
+                            result[field.name] = value;
+                        }
+                    }
+                    return [result];
+                },
+            },
+        };
+
+        // Group node types by category
+        function getNodeTypesByCategory() {
+            const grouped = {};
+            for (const nt of Object.values(nodeTypeDefinitions)) {
+                if (!grouped[nt.category]) {
+                    grouped[nt.category] = [];
+                }
+                grouped[nt.category].push(nt);
+            }
+            return grouped;
+        }
+
+        // Load initial state from localStorage
+        const initialState = loadFromStorage();
+
+        // Zustand store for workflow state
+        const useWorkflowStore = create((set, get) => ({
+            nodes: initialState?.nodes || [],
+            connections: initialState?.connections || [],
+            selectedNodeIds: [],
+            selectedEdgeIds: [],
+            nameCounts: initialState?.nameCounts || {},
+            viewport: initialState?.viewport || { x: 0, y: 0, zoom: 1 },
+            editingNodeId: null,
+            openEditorNodeId: null,
+
+            // Ambient execution - stores the most recent execution results for each node
+            // Format: { [nodeId]: { input: [...], output: [...], executedAt: timestamp } }
+            ambientExecution: {},
+
+            setViewport: (viewport) => set({ viewport }),
+            setEditingNodeId: (nodeId) => set({ editingNodeId: nodeId }),
+            setOpenEditorNodeId: (nodeId) => set({ openEditorNodeId: nodeId }),
+
+            // Store execution result for a node in the ambient execution
+            setNodeExecution: (nodeId, input, output) => {
+                set((state) => ({
+                    ambientExecution: {
+                        ...state.ambientExecution,
+                        [nodeId]: {
+                            input,
+                            output,
+                            executedAt: new Date().toISOString(),
+                        },
+                    },
+                }));
+            },
+
+            // Get execution result for a node
+            getNodeExecution: (nodeId) => {
+                return get().ambientExecution[nodeId] || null;
+            },
+
+            updateNodeData: (nodeId, dataUpdates) => {
+                set((state) => ({
+                    nodes: state.nodes.map((n) =>
+                        n.id === nodeId ? { ...n, data: { ...n.data, ...dataUpdates } } : n
+                    ),
+                }));
+            },
+
+            isNameUnique: (name, excludeNodeId) => {
+                const state = get();
+                return !state.nodes.some((n) => n.id !== excludeNodeId && n.name === name);
+            },
+
+            updateNodeName: (nodeId, name) => {
+                set((state) => ({
+                    nodes: state.nodes.map((n) => (n.id === nodeId ? { ...n, name } : n)),
+                    editingNodeId: null,
+                }));
+            },
+
+            addNode: (typeId, position) => {
+                const nodeType = nodeTypeDefinitions[typeId];
+                if (!nodeType) return '';
+
+                const id = uuid();
+                const state = get();
+                const count = (state.nameCounts[typeId] || 0) + 1;
+                const name = `${typeId}${count}`;
+
+                const newNode = {
+                    id,
+                    typeId,
+                    name,
+                    position,
+                    data: { ...nodeType.defaultData },
+                };
+
+                set({
+                    nodes: [...state.nodes, newNode],
+                    nameCounts: { ...state.nameCounts, [typeId]: count },
+                });
+
+                return id;
+            },
+
+            removeNode: (nodeId) => {
+                const state = get();
+                const newConnections = state.connections.filter(
+                    (c) => c.sourceNodeId !== nodeId && c.targetNodeId !== nodeId
+                );
+                set({
+                    nodes: state.nodes.filter((n) => n.id !== nodeId),
+                    connections: newConnections,
+                    selectedNodeIds: state.selectedNodeIds.filter((id) => id !== nodeId),
+                });
+            },
+
+            updateNodePosition: (nodeId, position) => {
+                set((state) => ({
+                    nodes: state.nodes.map((n) => (n.id === nodeId ? { ...n, position } : n)),
+                }));
+            },
+
+            addConnection: (connection) => {
+                const state = get();
+                if (connection.sourceNodeId === connection.targetNodeId) return null;
+
+                const isDuplicate = state.connections.some(
+                    (c) =>
+                        c.sourceNodeId === connection.sourceNodeId &&
+                        c.sourceConnectorId === connection.sourceConnectorId &&
+                        c.targetNodeId === connection.targetNodeId &&
+                        c.targetConnectorId === connection.targetConnectorId
+                );
+                if (isDuplicate) return null;
+
+                const id = uuid();
+                set({
+                    connections: [...state.connections, { ...connection, id }],
+                });
+                return id;
+            },
+
+            removeConnection: (connectionId) => {
+                set((state) => ({
+                    connections: state.connections.filter((c) => c.id !== connectionId),
+                    selectedEdgeIds: state.selectedEdgeIds.filter((id) => id !== connectionId),
+                }));
+            },
+
+            selectNodes: (nodeIds) => set({ selectedNodeIds: nodeIds, selectedEdgeIds: [] }),
+            selectEdges: (edgeIds) => set({ selectedEdgeIds: edgeIds, selectedNodeIds: [] }),
+            clearSelection: () => set({ selectedNodeIds: [], selectedEdgeIds: [] }),
+
+            deleteSelected: () => {
+                const state = get();
+                let newConnections = state.connections.filter((c) => !state.selectedEdgeIds.includes(c.id));
+                for (const nodeId of state.selectedNodeIds) {
+                    newConnections = newConnections.filter(
+                        (c) => c.sourceNodeId !== nodeId && c.targetNodeId !== nodeId
+                    );
+                }
+                set({
+                    nodes: state.nodes.filter((n) => !state.selectedNodeIds.includes(n.id)),
+                    connections: newConnections,
+                    selectedNodeIds: [],
+                    selectedEdgeIds: [],
+                });
+            },
+        }));
+
+        // Subscribe to store changes and save to localStorage
+        useWorkflowStore.subscribe((state) => {
+            saveToStorage(state);
+        });
+
+        // Global double-click detection for nodes using position-based hit testing
+        // This works around a React/ReactFlow issue where DOM elements get replaced between clicks
+        (function setupGlobalNodeDoubleClick() {
+            let lastMouseDown = { time: 0, nodeId: null, x: 0, y: 0 };
+
+            // Find which node (if any) contains the given point
+            function findNodeAtPoint(x, y) {
+                const nodeWrappers = document.querySelectorAll('[data-node-id]');
+                for (const wrapper of nodeWrappers) {
+                    const rect = wrapper.getBoundingClientRect();
+                    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                        return wrapper.getAttribute('data-node-id');
+                    }
+                }
+                return null;
+            }
+
+            document.addEventListener('mousedown', (e) => {
+                const now = Date.now();
+                const nodeId = findNodeAtPoint(e.clientX, e.clientY);
+
+                if (!nodeId) {
+                    lastMouseDown = { time: 0, nodeId: null, x: 0, y: 0 };
+                    return;
+                }
+
+                // Check if this is a double-click (same node, within 400ms, position close)
+                const isSameNode = lastMouseDown.nodeId === nodeId;
+                const isQuickEnough = now - lastMouseDown.time < 400;
+                const isCloseEnough = Math.abs(e.clientX - lastMouseDown.x) < 10 && Math.abs(e.clientY - lastMouseDown.y) < 10;
+
+                if (isSameNode && isQuickEnough && isCloseEnough) {
+                    // Double-click detected
+                    e.stopPropagation();
+                    e.preventDefault();
+                    useWorkflowStore.getState().setOpenEditorNodeId(nodeId);
+                    lastMouseDown = { time: 0, nodeId: null, x: 0, y: 0 };
+                } else {
+                    lastMouseDown = { time: now, nodeId, x: e.clientX, y: e.clientY };
+                }
+            }, true); // capture phase
+        })();
+
+        // Custom Node Component
+        const CustomNode = memo(function CustomNode({ data, selected }) {
+            const workflowNode = data.workflowNode;
+            const nodeType = nodeTypeDefinitions[workflowNode.typeId];
+            const editingNodeId = useWorkflowStore((state) => state.editingNodeId);
+            const updateNodeName = useWorkflowStore((state) => state.updateNodeName);
+            const setEditingNodeId = useWorkflowStore((state) => state.setEditingNodeId);
+            const isNameUnique = useWorkflowStore((state) => state.isNameUnique);
+            const isEditing = editingNodeId === workflowNode.id;
+            const inputRef = useRef(null);
+            const [nameError, setNameError] = useState(false);
+
+            const connectors = useMemo(() => {
+                if (!nodeType) return { inputs: [], outputs: [] };
+                return nodeType.getConnectors(workflowNode.data);
+            }, [nodeType, workflowNode.data]);
+
+            // Focus input when editing starts
+            useEffect(() => {
+                if (isEditing && inputRef.current) {
+                    inputRef.current.focus();
+                    inputRef.current.select();
+                    setNameError(false);
+                }
+            }, [isEditing]);
+
+            if (!nodeType) return null;
+
+            const inputCount = connectors.inputs.length;
+            const outputCount = connectors.outputs.length;
+            const shapeClasses = [
+                inputCount === 0 ? 'no-inputs' : '',
+                outputCount === 0 ? 'no-outputs' : '',
+            ].filter(Boolean).join(' ');
+
+            const handleNameKeyDown = (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.target.blur(); // This will trigger onBlur which saves
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    e.target.dataset.cancelled = 'true';
+                    setNameError(false);
+                    setEditingNodeId(null);
+                }
+            };
+
+            const handleNameBlur = (e) => {
+                if (e.target.dataset.cancelled !== 'true') {
+                    const newName = e.target.value.trim() || workflowNode.name;
+                    if (newName !== workflowNode.name && !isNameUnique(newName, workflowNode.id)) {
+                        // Name is not unique - show error and keep editing
+                        setNameError(true);
+                        e.target.focus();
+                        e.target.select();
+                        return;
+                    }
+                    setNameError(false);
+                    updateNodeName(workflowNode.id, newName);
+                }
+            };
+
+            return React.createElement('div', {
+                className: 'node-wrapper',
+                'data-testid': `workflow-node-${workflowNode.typeId}`,
+                'data-node-id': workflowNode.id,
+            }, [
+                // Input labels (outside node, to the left)
+                inputCount > 0 && React.createElement('div', {
+                    key: 'input-labels',
+                    className: 'connector-labels left',
+                }, connectors.inputs.map((i) => React.createElement('span', { key: i.id }, i.name))),
+                // Output labels (outside node, to the right)
+                outputCount > 0 && React.createElement('div', {
+                    key: 'output-labels',
+                    className: 'connector-labels right',
+                }, connectors.outputs.map((o) => React.createElement('span', { key: o.id }, o.name))),
+                // The actual node box (double-click handled by global position-based detection)
+                React.createElement('div', {
+                    key: 'node',
+                    className: `custom-node ${selected ? 'selected' : ''} ${shapeClasses}`,
+                }, [
+                    // Input handles
+                    ...connectors.inputs.map((input, idx) => {
+                        const top = inputCount === 1 ? '50%' : `${((idx + 1) / (inputCount + 1)) * 100}%`;
+                        return React.createElement(Handle, {
+                            key: input.id,
+                            type: 'target',
+                            position: Position.Left,
+                            id: input.id,
+                            style: { top },
+                            title: input.name,
+                        });
+                    }),
+                    // Icon
+                    React.createElement('div', {
+                        key: 'icon',
+                        className: 'node-icon',
+                        dangerouslySetInnerHTML: { __html: nodeType.icon },
+                    }),
+                    // Output handles
+                    ...connectors.outputs.map((output, idx) => {
+                        const top = outputCount === 1 ? '50%' : `${((idx + 1) / (outputCount + 1)) * 100}%`;
+                        return React.createElement(Handle, {
+                            key: output.id,
+                            type: 'source',
+                            position: Position.Right,
+                            id: output.id,
+                            style: { top },
+                            title: output.name,
+                        });
+                    }),
+                ]),
+                // Node name (below the node) - input if editing, text if not
+                isEditing
+                    ? React.createElement('input', {
+                        key: 'name-input',
+                        ref: inputRef,
+                        className: `node-name-input nodrag${nameError ? ' error' : ''}`,
+                        defaultValue: workflowNode.name,
+                        autoFocus: true,
+                        onKeyDown: handleNameKeyDown,
+                        onBlur: handleNameBlur,
+                        'data-testid': 'node-name-input',
+                    })
+                    : React.createElement('div', {
+                        key: 'name',
+                        className: 'node-name',
+                    }, workflowNode.name),
+            ]);
+        });
+
+        // Custom Edge Component
+        const CustomEdge = memo(function CustomEdge({
+            id,
+            sourceX,
+            sourceY,
+            targetX,
+            targetY,
+            sourcePosition,
+            targetPosition,
+            selected,
+        }) {
+            const [isHovered, setIsHovered] = useState(false);
+            const removeConnection = useWorkflowStore((state) => state.removeConnection);
+
+            const [edgePath, labelX, labelY] = getBezierPath({
+                sourceX,
+                sourceY,
+                sourcePosition,
+                targetX,
+                targetY,
+                targetPosition,
+            });
+
+            const showButtons = selected || isHovered;
+
+            return React.createElement(React.Fragment, null, [
+                // Invisible wider path for hover
+                React.createElement('path', {
+                    key: 'hover-path',
+                    d: edgePath,
+                    fill: 'none',
+                    stroke: 'transparent',
+                    strokeWidth: 20,
+                    onMouseEnter: () => setIsHovered(true),
+                    onMouseLeave: () => setIsHovered(false),
+                }),
+                // Visible edge
+                React.createElement(BaseEdge, {
+                    key: 'edge',
+                    id,
+                    path: edgePath,
+                    style: {
+                        stroke: selected ? '#667eea' : isHovered ? '#8a8aaa' : '#5a5a7a',
+                        strokeWidth: selected ? 3 : 2,
+                    },
+                    markerEnd: 'url(#arrow)',
+                }),
+                // Delete button
+                showButtons && React.createElement(EdgeLabelRenderer, { key: 'label' },
+                    React.createElement('div', {
+                        className: 'edge-button-container nodrag nopan',
+                        style: {
+                            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+                        },
+                        onMouseEnter: () => setIsHovered(true),
+                        onMouseLeave: () => setIsHovered(false),
+                    },
+                        React.createElement('button', {
+                            className: 'edge-button',
+                            onClick: (e) => {
+                                e.stopPropagation();
+                                removeConnection(id);
+                            },
+                            title: 'Delete connection',
+                        }, '\u00d7')
+                    )
+                ),
+            ]);
+        });
+
+        const nodeTypes = { custom: CustomNode };
+        const edgeTypes = { custom: CustomEdge };
+
+        // Property Editor Components
+        function TextPropertyEditor({ property, onChange }) {
+            const [value, setValue] = useState(property.value);
+
+            const handleBlur = () => {
+                if (value !== property.value) {
+                    onChange(property.id, value);
+                }
+            };
+
+            return React.createElement('div', { className: 'property-group' }, [
+                React.createElement('label', { key: 'label', className: 'property-label' }, property.label),
+                React.createElement('input', {
+                    key: 'input',
+                    type: 'text',
+                    className: 'property-input',
+                    value: value,
+                    placeholder: property.placeholder || '',
+                    onChange: (e) => setValue(e.target.value),
+                    onBlur: handleBlur,
+                }),
+            ]);
+        }
+
+        function NumberPropertyEditor({ property, onChange }) {
+            const [value, setValue] = useState(property.value);
+
+            const handleBlur = () => {
+                const numValue = Number(value);
+                if (!isNaN(numValue) && numValue !== property.value) {
+                    onChange(property.id, numValue);
+                }
+            };
+
+            return React.createElement('div', { className: 'property-group' }, [
+                React.createElement('label', { key: 'label', className: 'property-label' }, property.label),
+                React.createElement('input', {
+                    key: 'input',
+                    type: 'number',
+                    className: 'property-input',
+                    value: value,
+                    min: property.min,
+                    max: property.max,
+                    onChange: (e) => setValue(e.target.value),
+                    onBlur: handleBlur,
+                }),
+            ]);
+        }
+
+        function SelectPropertyEditor({ property, onChange }) {
+            return React.createElement('div', { className: 'property-group' }, [
+                React.createElement('label', { key: 'label', className: 'property-label' }, property.label),
+                React.createElement('select', {
+                    key: 'select',
+                    className: 'property-select',
+                    value: property.value,
+                    onChange: (e) => onChange(property.id, e.target.value),
+                },
+                    property.options.map((opt) =>
+                        React.createElement('option', { key: opt.value, value: opt.value }, opt.label)
+                    )
+                ),
+            ]);
+        }
+
+        function FieldListPropertyEditor({ property, onChange }) {
+            const fields = property.value || [];
+
+            const handleFieldChange = (index, key, value) => {
+                const newFields = [...fields];
+                newFields[index] = { ...newFields[index], [key]: value };
+                onChange(property.id, newFields);
+            };
+
+            const handleAddField = () => {
+                onChange(property.id, [...fields, { name: '', value: '' }]);
+            };
+
+            const handleDeleteField = (index) => {
+                const newFields = fields.filter((_, i) => i !== index);
+                onChange(property.id, newFields);
+            };
+
+            const plusIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+
+            return React.createElement('div', { className: 'property-group' }, [
+                React.createElement('label', { key: 'label', className: 'property-label' }, property.label),
+                React.createElement('div', { key: 'list', className: 'field-list' }, [
+                    ...fields.map((field, index) =>
+                        React.createElement('div', { key: index, className: 'field-item' }, [
+                            React.createElement('div', { key: 'inputs', className: 'field-item-inputs' }, [
+                                React.createElement('div', { key: 'name-row', className: 'field-item-row' }, [
+                                    React.createElement('label', { key: 'label' }, 'Name'),
+                                    React.createElement('input', {
+                                        key: 'input',
+                                        type: 'text',
+                                        value: field.name || '',
+                                        placeholder: 'field name',
+                                        onChange: (e) => handleFieldChange(index, 'name', e.target.value),
+                                    }),
+                                ]),
+                                React.createElement('div', { key: 'value-row', className: 'field-item-row' }, [
+                                    React.createElement('label', { key: 'label' }, 'Value'),
+                                    React.createElement('input', {
+                                        key: 'input',
+                                        type: 'text',
+                                        value: field.value || '',
+                                        placeholder: 'value (JSON or string)',
+                                        onChange: (e) => handleFieldChange(index, 'value', e.target.value),
+                                    }),
+                                ]),
+                            ]),
+                            React.createElement('button', {
+                                key: 'delete',
+                                className: 'field-delete-btn',
+                                onClick: () => handleDeleteField(index),
+                                title: 'Remove field',
+                            }, '×'),
+                        ])
+                    ),
+                    React.createElement('button', {
+                        key: 'add',
+                        className: 'add-field-btn',
+                        onClick: handleAddField,
+                        'data-testid': 'add-field-btn',
+                    }, [
+                        React.createElement('span', {
+                            key: 'icon',
+                            dangerouslySetInnerHTML: { __html: plusIcon },
+                        }),
+                        'Add Field',
+                    ]),
+                ]),
+            ]);
+        }
+
+        function PropertyEditor({ property, onChange }) {
+            switch (property.type) {
+                case 'text':
+                    return React.createElement(TextPropertyEditor, { property, onChange });
+                case 'number':
+                    return React.createElement(NumberPropertyEditor, { property, onChange });
+                case 'select':
+                    return React.createElement(SelectPropertyEditor, { property, onChange });
+                case 'fieldlist':
+                    return React.createElement(FieldListPropertyEditor, { property, onChange });
+                default:
+                    return null;
+            }
+        }
+
+        // Node Editor Dialog
+        function NodeEditorDialog({ nodeId, onClose }) {
+            const node = useWorkflowStore((state) => state.nodes.find((n) => n.id === nodeId));
+            const updateNodeData = useWorkflowStore((state) => state.updateNodeData);
+            const updateNodeName = useWorkflowStore((state) => state.updateNodeName);
+            const isNameUnique = useWorkflowStore((state) => state.isNameUnique);
+            const setNodeExecution = useWorkflowStore((state) => state.setNodeExecution);
+            const ambientExecution = useWorkflowStore((state) => state.ambientExecution);
+
+            const [localName, setLocalName] = useState(node?.name || '');
+            const [nameError, setNameError] = useState(false);
+
+            if (!node) return null;
+
+            const nodeType = nodeTypeDefinitions[node.typeId];
+            if (!nodeType) return null;
+
+            // Get execution data from ambient execution
+            const nodeExecution = ambientExecution[nodeId];
+            const executionOutput = nodeExecution?.output || null;
+            const executionInput = nodeExecution?.input || null;
+            const executionTime = nodeExecution?.executedAt
+                ? new Date(nodeExecution.executedAt).toLocaleTimeString()
+                : null;
+
+            const properties = nodeType.getProperties(node.data);
+            const canExecute = nodeType.canExecute ? nodeType.canExecute(executionInput || {}) : false;
+
+            const handlePropertyChange = (propertyId, value) => {
+                updateNodeData(nodeId, { [propertyId]: value });
+            };
+
+            const handleNameBlur = () => {
+                const trimmedName = localName.trim();
+                if (trimmedName && trimmedName !== node.name) {
+                    if (isNameUnique(trimmedName, nodeId)) {
+                        updateNodeName(nodeId, trimmedName);
+                        setNameError(false);
+                    } else {
+                        setNameError(true);
+                    }
+                } else if (!trimmedName) {
+                    setLocalName(node.name);
+                }
+            };
+
+            const handleExecute = () => {
+                if (!nodeType.execute) return;
+                const inputs = executionInput || {}; // Use inputs from ambient execution if available
+                const output = nodeType.execute(node.data, inputs);
+                // Save to ambient execution
+                setNodeExecution(nodeId, inputs, output);
+            };
+
+            const handleKeyDown = (e) => {
+                if (e.key === 'Escape') {
+                    onClose();
+                }
+            };
+
+            // Play icon SVG
+            const playIcon = `<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+
+            return React.createElement('div', {
+                className: 'node-editor-overlay',
+                onClick: onClose,
+                onKeyDown: handleKeyDown,
+            },
+                React.createElement('div', {
+                    className: 'node-editor-dialog',
+                    onClick: (e) => e.stopPropagation(),
+                }, [
+                    // Header
+                    React.createElement('div', { key: 'header', className: 'node-editor-header' }, [
+                        React.createElement('h2', { key: 'title' }, [
+                            React.createElement('span', {
+                                key: 'icon',
+                                className: 'node-icon',
+                                dangerouslySetInnerHTML: { __html: nodeType.icon },
+                            }),
+                            `Edit ${nodeType.name} Node`,
+                        ]),
+                        React.createElement('div', { key: 'actions', style: { display: 'flex', alignItems: 'center', gap: '12px' } }, [
+                            canExecute && React.createElement('button', {
+                                key: 'execute',
+                                className: 'execute-btn',
+                                onClick: handleExecute,
+                                'data-testid': 'execute-btn',
+                            }, [
+                                React.createElement('span', {
+                                    key: 'icon',
+                                    dangerouslySetInnerHTML: { __html: playIcon },
+                                }),
+                                'Execute',
+                            ]),
+                            React.createElement('button', {
+                                key: 'close',
+                                className: 'node-editor-close',
+                                onClick: onClose,
+                            }, '×'),
+                        ]),
+                    ]),
+                    // Body with three panes
+                    React.createElement('div', { key: 'body', className: 'node-editor-body' }, [
+                        // Input pane
+                        React.createElement('div', { key: 'input', className: 'node-editor-pane input-pane' }, [
+                            React.createElement('div', { key: 'header', className: 'pane-header' }, 'Input'),
+                            React.createElement('div', { key: 'content', className: 'pane-content' },
+                                React.createElement('div', { className: 'no-data-message' }, 'No input data available')
+                            ),
+                        ]),
+                        // Editor pane
+                        React.createElement('div', { key: 'editor', className: 'node-editor-pane editor-pane' }, [
+                            React.createElement('div', { key: 'header', className: 'pane-header' }, 'Properties'),
+                            React.createElement('div', { key: 'content', className: 'pane-content' }, [
+                                // Name property (common to all nodes)
+                                React.createElement('div', { key: 'name-group', className: 'property-group' }, [
+                                    React.createElement('label', { key: 'label', className: 'property-label' }, 'Name'),
+                                    React.createElement('input', {
+                                        key: 'input',
+                                        type: 'text',
+                                        className: `property-input${nameError ? ' error' : ''}`,
+                                        value: localName,
+                                        onChange: (e) => setLocalName(e.target.value),
+                                        onBlur: handleNameBlur,
+                                    }),
+                                    nameError && React.createElement('div', {
+                                        key: 'error',
+                                        className: 'property-description',
+                                        style: { color: '#e74c3c' },
+                                    }, 'Name must be unique'),
+                                ]),
+                                // Node-specific properties
+                                ...properties.map((prop) =>
+                                    React.createElement(PropertyEditor, {
+                                        key: prop.id,
+                                        property: prop,
+                                        onChange: handlePropertyChange,
+                                    })
+                                ),
+                            ]),
+                        ]),
+                        // Output pane
+                        React.createElement('div', { key: 'output', className: 'node-editor-pane output-pane' }, [
+                            React.createElement('div', { key: 'header', className: 'pane-header' }, 'Output'),
+                            React.createElement('div', { key: 'content', className: 'pane-content' },
+                                executionOutput
+                                    ? React.createElement('div', { key: 'output-content' }, [
+                                        executionTime && React.createElement('div', {
+                                            key: 'time',
+                                            className: 'execution-time',
+                                        }, `Executed at ${executionTime}`),
+                                        React.createElement('pre', {
+                                            key: 'json',
+                                            className: 'json-output',
+                                            'data-testid': 'execution-output',
+                                        }, JSON.stringify(executionOutput, null, 2)),
+                                    ])
+                                    : React.createElement('div', { className: 'no-data-message' }, 'No output data available')
+                            ),
+                        ]),
+                    ]),
+                ])
+            );
+        }
+
+        // JSON Modal Component
+        function JsonModal({ isOpen, onClose, json }) {
+            if (!isOpen) return null;
+
+            const handleCopy = () => {
+                navigator.clipboard.writeText(json);
+            };
+
+            return React.createElement('div', {
+                className: 'json-modal-overlay',
+                onClick: onClose,
+            },
+                React.createElement('div', {
+                    className: 'json-modal',
+                    onClick: (e) => e.stopPropagation(),
+                }, [
+                    React.createElement('div', { key: 'header', className: 'json-modal-header' }, [
+                        React.createElement('h3', { key: 'title' }, 'Workflow JSON'),
+                        React.createElement('button', {
+                            key: 'close',
+                            className: 'json-modal-close',
+                            onClick: onClose,
+                        }, '×'),
+                    ]),
+                    React.createElement('div', { key: 'body', className: 'json-modal-body' },
+                        React.createElement('pre', null, json)
+                    ),
+                    React.createElement('div', { key: 'footer', className: 'json-modal-footer' },
+                        React.createElement('button', {
+                            className: 'json-modal-btn json-modal-btn-primary',
+                            onClick: handleCopy,
+                        }, 'Copy to Clipboard')
+                    ),
+                ])
+            );
+        }
+
+        // Sidebar Component
+        function Sidebar({ onAddNode }) {
+            const categorized = getNodeTypesByCategory();
+            const nodes = useWorkflowStore((state) => state.nodes);
+            const connections = useWorkflowStore((state) => state.connections);
+            const [showJson, setShowJson] = useState(false);
+
+            function handleDragStart(event, typeId) {
+                event.dataTransfer.setData('application/reactflow', typeId);
+                event.dataTransfer.effectAllowed = 'move';
+            }
+
+            function handleClick(typeId) {
+                // Stagger position based on current node count to avoid overlap
+                const offset = nodes.length * 40;
+                onAddNode(typeId, { x: 300 + offset, y: 200 + offset });
+            }
+
+            const workflowJson = JSON.stringify({ nodes, connections }, null, 2);
+
+            return React.createElement('div', { className: 'sidebar', 'data-testid': 'sidebar' }, [
+                React.createElement('div', { key: 'title', className: 'sidebar-title', 'data-testid': 'sidebar-title' }, 'Nodes'),
+                ...Object.entries(categorized).map(([category, types]) =>
+                    React.createElement('div', { key: category, className: 'category-group' }, [
+                        React.createElement('div', { key: 'label', className: 'category-label' }, category),
+                        React.createElement('div', { key: 'items', className: 'category-items' },
+                            types.map((nt) =>
+                                React.createElement('div', {
+                                    key: nt.id,
+                                    className: 'node-type-item',
+                                    'data-testid': `node-type-${nt.id}`,
+                                    onClick: () => handleClick(nt.id),
+                                    draggable: true,
+                                    onDragStart: (e) => handleDragStart(e, nt.id),
+                                }, [
+                                    React.createElement('div', {
+                                        key: 'icon',
+                                        dangerouslySetInnerHTML: { __html: nt.icon },
+                                    }),
+                                    React.createElement('span', { key: 'name' }, nt.name),
+                                ])
+                            )
+                        ),
+                    ])
+                ),
+                React.createElement('div', { key: 'footer', className: 'sidebar-footer' }, [
+                    React.createElement('button', {
+                        key: 'json-btn',
+                        className: 'view-json-btn',
+                        'data-testid': 'view-json-btn',
+                        onClick: () => setShowJson(true),
+                    }, 'View JSON'),
+                    React.createElement('div', { key: 'hint', className: 'sidebar-hint', 'data-testid': 'sidebar-hint' }, 'Click or drag to add'),
+                ]),
+                React.createElement(JsonModal, {
+                    key: 'modal',
+                    isOpen: showJson,
+                    onClose: () => setShowJson(false),
+                    json: workflowJson,
+                }),
+            ]);
+        }
+
+        // Canvas Component
+        function Canvas({ onAddNode }) {
+            const reactFlowInstance = useRef(null);
+            const hasRestoredViewport = useRef(false);
+
+            const workflowNodes = useWorkflowStore((state) => state.nodes);
+            const connections = useWorkflowStore((state) => state.connections);
+            const selectedNodeIds = useWorkflowStore((state) => state.selectedNodeIds);
+            const selectedEdgeIds = useWorkflowStore((state) => state.selectedEdgeIds);
+            const storedViewport = useWorkflowStore((state) => state.viewport);
+            const updateNodePosition = useWorkflowStore((state) => state.updateNodePosition);
+            const addConnection = useWorkflowStore((state) => state.addConnection);
+            const removeConnection = useWorkflowStore((state) => state.removeConnection);
+            const selectNodes = useWorkflowStore((state) => state.selectNodes);
+            const selectEdges = useWorkflowStore((state) => state.selectEdges);
+            const removeNode = useWorkflowStore((state) => state.removeNode);
+            const setViewport = useWorkflowStore((state) => state.setViewport);
+            const setOpenEditorNodeId = useWorkflowStore((state) => state.setOpenEditorNodeId);
+
+            const nodes = useMemo(() => {
+                return workflowNodes.map((wn) => ({
+                    id: wn.id,
+                    type: 'custom',
+                    position: wn.position,
+                    data: { workflowNode: wn },
+                    selected: selectedNodeIds.includes(wn.id),
+                }));
+            }, [workflowNodes, selectedNodeIds]);
+
+            const edges = useMemo(() => {
+                return connections.map((c) => ({
+                    id: c.id,
+                    source: c.sourceNodeId,
+                    sourceHandle: c.sourceConnectorId,
+                    target: c.targetNodeId,
+                    targetHandle: c.targetConnectorId,
+                    type: 'custom',
+                    selected: selectedEdgeIds.includes(c.id),
+                }));
+            }, [connections, selectedEdgeIds]);
+
+            const onNodesChange = useCallback((changes) => {
+                for (const change of changes) {
+                    if (change.type === 'position' && change.position) {
+                        updateNodePosition(change.id, change.position);
+                    }
+                    if (change.type === 'remove') {
+                        removeNode(change.id);
+                    }
+                }
+                const selectChanges = changes.filter((c) => c.type === 'select');
+                if (selectChanges.length > 0) {
+                    const newNodes = applyNodeChanges(changes, nodes);
+                    const newSelectedIds = newNodes.filter((n) => n.selected).map((n) => n.id);
+                    selectNodes(newSelectedIds);
+                }
+            }, [updateNodePosition, removeNode, selectNodes, nodes]);
+
+            const onEdgesChange = useCallback((changes) => {
+                for (const change of changes) {
+                    if (change.type === 'remove') {
+                        removeConnection(change.id);
+                    }
+                }
+                const selectChanges = changes.filter((c) => c.type === 'select');
+                if (selectChanges.length > 0) {
+                    const newEdges = applyEdgeChanges(changes, edges);
+                    const newSelectedIds = newEdges.filter((e) => e.selected).map((e) => e.id);
+                    selectEdges(newSelectedIds);
+                }
+            }, [removeConnection, selectEdges, edges]);
+
+            const onConnect = useCallback((connection) => {
+                if (connection.source && connection.target && connection.sourceHandle && connection.targetHandle) {
+                    addConnection({
+                        sourceNodeId: connection.source,
+                        sourceConnectorId: connection.sourceHandle,
+                        targetNodeId: connection.target,
+                        targetConnectorId: connection.targetHandle,
+                    });
+                }
+            }, [addConnection]);
+
+            const isValidConnection = useCallback((connection) => {
+                if (connection.source === connection.target) return false;
+                const sourceNode = workflowNodes.find((n) => n.id === connection.source);
+                const targetNode = workflowNodes.find((n) => n.id === connection.target);
+                if (!sourceNode || !targetNode) return false;
+                const sourceType = nodeTypeDefinitions[sourceNode.typeId];
+                const targetType = nodeTypeDefinitions[targetNode.typeId];
+                if (!sourceType || !targetType) return false;
+                const sourceConnectors = sourceType.getConnectors(sourceNode.data);
+                const targetConnectors = targetType.getConnectors(targetNode.data);
+                const hasSourceHandle = sourceConnectors.outputs.some((o) => o.id === connection.sourceHandle);
+                const hasTargetHandle = targetConnectors.inputs.some((i) => i.id === connection.targetHandle);
+                return hasSourceHandle && hasTargetHandle;
+            }, [workflowNodes]);
+
+            const onDragOver = useCallback((event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+            }, []);
+
+            const onDrop = useCallback((event) => {
+                event.preventDefault();
+                const typeId = event.dataTransfer.getData('application/reactflow');
+                if (!typeId || !reactFlowInstance.current) return;
+                const position = reactFlowInstance.current.screenToFlowPosition({
+                    x: event.clientX,
+                    y: event.clientY,
+                });
+                onAddNode(typeId, position);
+            }, [onAddNode]);
+
+            const onMoveEnd = useCallback((event, viewport) => {
+                setViewport({ x: viewport.x, y: viewport.y, zoom: viewport.zoom });
+            }, [setViewport]);
+
+            const onNodeClick = useCallback((event, node) => {
+                selectNodes([node.id]);
+            }, [selectNodes]);
+
+            const onNodeDoubleClick = useCallback((event, node) => {
+                setOpenEditorNodeId(node.id);
+            }, [setOpenEditorNodeId]);
+
+            const onPaneClick = useCallback(() => {
+                selectNodes([]);
+            }, [selectNodes]);
+
+            const onInit = useCallback((instance) => {
+                reactFlowInstance.current = instance;
+                // Restore viewport from storage if we have one and haven't already
+                if (!hasRestoredViewport.current && storedViewport && (storedViewport.x !== 0 || storedViewport.y !== 0 || storedViewport.zoom !== 1)) {
+                    hasRestoredViewport.current = true;
+                    instance.setViewport(storedViewport);
+                }
+            }, [storedViewport]);
+
+            // Determine if we should fitView (only when no stored viewport with nodes)
+            const shouldFitView = !initialState || initialState.nodes.length === 0;
+
+            return React.createElement('div', { className: 'canvas-container', 'data-testid': 'canvas' },
+                React.createElement(ReactFlow, {
+                    nodes,
+                    edges,
+                    onNodesChange,
+                    onEdgesChange,
+                    onConnect,
+                    isValidConnection,
+                    nodeTypes,
+                    edgeTypes,
+                    onInit,
+                    onMoveEnd,
+                    onNodeClick,
+                    onNodeDoubleClick,
+                    onPaneClick,
+                    onDragOver,
+                    onDrop,
+                    fitView: shouldFitView,
+                    fitViewOptions: { padding: 0.2 },
+                    defaultViewport: storedViewport,
+                    minZoom: 0.1,
+                    maxZoom: 2,
+                    panOnDrag: [1, 2],
+                    selectionOnDrag: true,
+                    selectNodesOnDrag: false,
+                    defaultEdgeOptions: { type: 'custom' },
+                }, [
+                    React.createElement(Background, {
+                        key: 'bg',
+                        variant: 'dots',
+                        gap: 20,
+                        size: 1,
+                        color: '#3a3a5e',
+                    }),
+                    React.createElement(Controls, { key: 'controls' }),
+                    React.createElement(MiniMap, {
+                        key: 'minimap',
+                        nodeColor: () => '#667eea',
+                        maskColor: 'rgba(0, 0, 0, 0.5)',
+                    }),
+                    // SVG defs for arrow marker
+                    React.createElement('svg', { key: 'defs' },
+                        React.createElement('defs', null,
+                            React.createElement('marker', {
+                                id: 'arrow',
+                                viewBox: '0 0 10 10',
+                                refX: '8',
+                                refY: '5',
+                                markerWidth: '6',
+                                markerHeight: '6',
+                                orient: 'auto-start-reverse',
+                            },
+                                React.createElement('path', {
+                                    d: 'M 0 0 L 10 5 L 0 10 z',
+                                    fill: '#5a5a7a',
+                                })
+                            )
+                        )
+                    ),
+                ])
+            );
+        }
+
+        // Editor Component
+        function Editor() {
+            const addNode = useWorkflowStore((state) => state.addNode);
+            const deleteSelected = useWorkflowStore((state) => state.deleteSelected);
+            const selectNodes = useWorkflowStore((state) => state.selectNodes);
+            const clearSelection = useWorkflowStore((state) => state.clearSelection);
+            const selectedNodeIds = useWorkflowStore((state) => state.selectedNodeIds);
+            const editingNodeId = useWorkflowStore((state) => state.editingNodeId);
+            const setEditingNodeId = useWorkflowStore((state) => state.setEditingNodeId);
+            const openEditorNodeId = useWorkflowStore((state) => state.openEditorNodeId);
+            const setOpenEditorNodeId = useWorkflowStore((state) => state.setOpenEditorNodeId);
+            const nodes = useWorkflowStore((state) => state.nodes);
+
+            // Keyboard shortcuts
+            useEffect(() => {
+                function handleKeyDown(event) {
+                    const target = event.target;
+                    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
+
+                    // Don't handle shortcuts if node editor is open
+                    if (openEditorNodeId) return;
+
+                    if (event.key === 'Delete' || event.key === 'Backspace') {
+                        event.preventDefault();
+                        deleteSelected();
+                    }
+                    if ((event.ctrlKey || event.metaKey) && event.key === 'a') {
+                        event.preventDefault();
+                        selectNodes(nodes.map((n) => n.id));
+                    }
+                    if (event.key === 'Escape') {
+                        if (editingNodeId) {
+                            setEditingNodeId(null);
+                        } else {
+                            clearSelection();
+                        }
+                    }
+                    if (event.key === ' ' && selectedNodeIds.length === 1 && !editingNodeId) {
+                        event.preventDefault();
+                        setEditingNodeId(selectedNodeIds[0]);
+                    }
+                }
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [deleteSelected, selectNodes, clearSelection, nodes, selectedNodeIds, editingNodeId, setEditingNodeId, openEditorNodeId]);
+
+            const handleAddNode = useCallback((typeId, position) => {
+                addNode(typeId, position);
+            }, [addNode]);
+
+            return React.createElement(ReactFlowProvider, null, [
+                React.createElement('div', { key: 'main', className: 'editor', 'data-testid': 'editor' }, [
+                    React.createElement(Sidebar, { key: 'sidebar', onAddNode: handleAddNode }),
+                    React.createElement(Canvas, { key: 'canvas', onAddNode: handleAddNode }),
+                ]),
+                openEditorNodeId && React.createElement(NodeEditorDialog, {
+                    key: 'node-editor',
+                    nodeId: openEditorNodeId,
+                    onClose: () => setOpenEditorNodeId(null),
+                }),
+            ]);
+        }
+
+        // App Component
+        function App() {
+            return React.createElement(Editor);
+        }
+
+        // Mount
+        const root = createRoot(document.getElementById('root'));
+        root.render(React.createElement(App));
+    </script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+import argparse
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).parent
+TEST_OUT = PROJECT_ROOT / "output" / "testing"
+
+
+# ##################################################################
+# run command
+# executes a shell command and returns the exit code
+def run_cmd(cmd: list[str]) -> int:
+    return subprocess.call(cmd, cwd=PROJECT_ROOT)
+
+
+# ##################################################################
+# start command
+# starts the fastapi server with uvicorn with hot reload enabled
+def command_start(_: argparse.Namespace) -> int:
+    os.chdir(PROJECT_ROOT)
+    os.execv(
+        sys.executable,
+        [sys.executable, "-m", "uvicorn",
+         "src.api:app",
+         "--host", "0.0.0.0",
+         "--port", "31415",
+         "--reload",
+         "--reload-include", "*.html",
+         "--reload-include", "*.css",
+         "--reload-include", "*.js"]
+    )
+
+
+# ##################################################################
+# test command
+# runs a specific test target
+def command_test(args: argparse.Namespace) -> int:
+    TEST_OUT.mkdir(parents=True, exist_ok=True)
+    target = args.target
+    log = TEST_OUT / (target.replace("/", "_").replace("::", "_") + ".log")
+    result = run_cmd([
+        sys.executable, "-m", "pytest",
+        "-q", target,
+        "--maxfail=1",
+        "--disable-warnings",
+    ])
+    print(f"Test output: {log}")
+    return result
+
+
+# ##################################################################
+# lint command
+# runs ruff linter
+def command_lint(_: argparse.Namespace) -> int:
+    return run_cmd([
+        sys.executable, "-m", "ruff",
+        "check",
+        "--line-length", "120",
+        "src/",
+    ])
+
+
+# ##################################################################
+# check command
+# runs full test suite and quality gates
+def command_check(_: argparse.Namespace) -> int:
+    return run_cmd(["dazpycheck"])
+
+
+# ##################################################################
+# main
+# parse arguments and dispatch to the appropriate command
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="dazflow2 project runner")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    p_start = sub.add_parser("start", help="Start server with hot reload")
+    p_start.set_defaults(func=command_start)
+
+    p_test = sub.add_parser("test", help="Run a single test target")
+    p_test.add_argument("target", help="e.g. src/api_test.py::test_health")
+    p_test.set_defaults(func=command_test)
+
+    p_lint = sub.add_parser("lint", help="Run linter")
+    p_lint.set_defaults(func=command_lint)
+
+    p_check = sub.add_parser("check", help="Run full suite and gates")
+    p_check.set_defaults(func=command_check)
+
+    args = parser.parse_args(argv)
+    return args.func(args)
+
+
+# ##################################################################
+# standard dispatch
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
