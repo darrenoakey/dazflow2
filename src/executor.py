@@ -5,7 +5,7 @@ Handles expression evaluation using Duktape and node execution.
 
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import dukpy
@@ -155,6 +155,22 @@ def execute_node(
     if not node_type or not node_type.get("execute"):
         return execution
 
+    # Check if node is pinned - if so, return pinned output without executing
+    node_data = node.get("data", {})
+    if node_data.get("pinned") and "pinnedOutput" in node_data:
+        pinned_output = node_data["pinnedOutput"]
+        # Normalize to list if needed
+        if not isinstance(pinned_output, list):
+            pinned_output = [pinned_output]
+        execution[node_id] = {
+            "input": None,
+            "nodeOutput": pinned_output,
+            "output": pinned_output,
+            "executedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "pinned": True,
+        }
+        return execution
+
     # Find upstream connections
     incoming = [c for c in connections if c.get("targetNodeId") == node_id]
 
@@ -183,7 +199,6 @@ def execute_node(
         input_data = [{}]
 
     # Execute the node
-    node_data = node.get("data", {})
     execute_fn = node_type["execute"]
 
     # Get credential data if required

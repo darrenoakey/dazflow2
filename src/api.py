@@ -24,6 +24,7 @@ from .credentials import (
 from .executor import execute_node
 from .module_loader import (
     get_credential_types_for_api,
+    get_dynamic_enum_values,
     get_modules_ui_paths,
     get_node_types_for_api,
     load_all_modules,
@@ -258,6 +259,40 @@ async def test_credential_data_endpoint(request: Request):
 
     result = test_credential_data(cred_type, cred_data)
     return result
+
+
+# ##################################################################
+# dynamic enum endpoint
+# gets dynamic enum values for a node property
+@api_router.post("/dynamic-enum")
+async def get_dynamic_enum_endpoint(request: Request):
+    """Get dynamic enum values for a node property.
+
+    Request body: {
+        nodeTypeId: string,
+        enumKey: string,
+        nodeData: object,
+        credentialName: string (optional)
+    }
+    """
+    body = await request.json()
+    node_type_id = body.get("nodeTypeId", "")
+    enum_key = body.get("enumKey", "")
+    node_data = body.get("nodeData", {})
+    credential_name = body.get("credentialName", "")
+
+    if not node_type_id or not enum_key:
+        return {"options": []}
+
+    # Get credential data if credential name is provided
+    credential_data = None
+    if credential_name:
+        cred = get_credential(credential_name, mask_private=False)
+        if cred:
+            credential_data = cred.get("data", {})
+
+    options = get_dynamic_enum_values(node_type_id, enum_key, node_data, credential_data)
+    return {"options": options}
 
 
 # ##################################################################
@@ -662,12 +697,28 @@ class ExecuteResponse(BaseModel):
 @api_router.post("/execute", response_model=ExecuteResponse)
 async def execute(request: ExecuteRequest):
     """Execute a node and return updated execution state."""
-    updated_execution = execute_node(
-        node_id=request.node_id,
-        workflow=request.workflow,
-        execution=request.execution,
-    )
-    return ExecuteResponse(execution=updated_execution)
+    try:
+        updated_execution = execute_node(
+            node_id=request.node_id,
+            workflow=request.workflow,
+            execution=request.execution,
+        )
+        return ExecuteResponse(execution=updated_execution)
+    except Exception as e:
+        # Return the error in execution result so frontend can display it
+        import traceback
+
+        error_msg = f"{type(e).__name__}: {e}"
+        tb = traceback.format_exc()
+        print(f"Execute error: {error_msg}\n{tb}")  # Log to server
+        error_execution = dict(request.execution)
+        error_execution[request.node_id] = {
+            "input": None,
+            "nodeOutput": [{"error": error_msg}],
+            "output": [{"error": error_msg}],
+            "executedAt": None,
+        }
+        return ExecuteResponse(execution=error_execution)
 
 
 # Include the API router

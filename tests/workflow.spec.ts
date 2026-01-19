@@ -635,6 +635,145 @@ test.describe('Workflow Editor', () => {
     await expect(page.getByTestId('dashboard')).toBeVisible();
     await expect(page.getByTestId('dashboard-title')).toHaveText('dazflow');
   });
+
+  test('can pin output and see pin indicator on canvas', async ({ page }) => {
+    // Add a Scheduled node
+    await page.getByTestId('node-type-scheduled').click();
+    const node = page.getByTestId('workflow-node-scheduled');
+    await expect(node).toBeVisible();
+
+    // Double-click to open editor
+    await node.locator('.custom-node').dblclick();
+    const dialog = page.locator('.node-editor-dialog');
+    await expect(dialog).toBeVisible();
+
+    // Execute to get output first (can't pin without output)
+    await page.getByTestId('execute-btn').click();
+    await expect(page.getByTestId('execution-output')).toBeVisible();
+
+    // Find and click the Pin button in output pane header
+    const pinBtn = dialog.locator('button:has-text("Pin")');
+    await expect(pinBtn).toBeVisible();
+    await pinBtn.click();
+
+    // Should now show PINNED badge and Unpin button
+    await expect(dialog.locator('text=📌 PINNED').first()).toBeVisible();
+    const unpinBtn = dialog.locator('button:has-text("Unpin")');
+    await expect(unpinBtn).toBeVisible();
+
+    // Close editor
+    await page.locator('.node-editor-close').click();
+    await expect(dialog).not.toBeVisible();
+
+    // Verify pin indicator is visible on canvas
+    const pinIndicator = node.locator('.node-pin-indicator');
+    await expect(pinIndicator).toBeVisible();
+  });
+
+  test('pinned node returns pinned output instead of executing', async ({ page }) => {
+    // Add a Scheduled node
+    await page.getByTestId('node-type-scheduled').click();
+    const node = page.getByTestId('workflow-node-scheduled');
+    const nodeId = await node.getAttribute('data-node-id');
+
+    // Open editor and execute
+    await node.locator('.custom-node').dblclick();
+    const dialog = page.locator('.node-editor-dialog');
+    await expect(dialog).toBeVisible();
+    await page.getByTestId('execute-btn').click();
+    await expect(page.getByTestId('execution-output')).toBeVisible();
+
+    // Pin the output
+    await dialog.locator('button:has-text("Pin")').click();
+    await expect(dialog.locator('text=📌 PINNED').first()).toBeVisible();
+
+    // Get the pinned output time
+    const firstOutputText = await page.getByTestId('execution-output').textContent();
+
+    // Close and reopen editor
+    await page.locator('.node-editor-close').click();
+    await node.locator('.custom-node').dblclick();
+    await expect(dialog).toBeVisible();
+
+    // Execute again - should return pinned output (same time)
+    await page.getByTestId('execute-btn').click();
+
+    // Output should still be the same (pinned value)
+    const secondOutputText = await page.getByTestId('execution-output').textContent();
+    expect(secondOutputText).toBe(firstOutputText);
+
+    // Close editor
+    await page.locator('.node-editor-close').click();
+  });
+
+  test('can unpin output', async ({ page }) => {
+    // Add a Scheduled node
+    await page.getByTestId('node-type-scheduled').click();
+    const node = page.getByTestId('workflow-node-scheduled');
+
+    // Open editor, execute, and pin
+    await node.locator('.custom-node').dblclick();
+    const dialog = page.locator('.node-editor-dialog');
+    await expect(dialog).toBeVisible();
+    await page.getByTestId('execute-btn').click();
+    await expect(page.getByTestId('execution-output')).toBeVisible();
+    await dialog.locator('button:has-text("Pin")').click();
+    await expect(dialog.locator('text=📌 PINNED').first()).toBeVisible();
+
+    // Click Unpin
+    await dialog.locator('button:has-text("Unpin")').click();
+
+    // Pin badge should be gone
+    await expect(dialog.locator('text=📌 PINNED')).not.toBeVisible();
+
+    // Close editor
+    await page.locator('.node-editor-close').click();
+
+    // Pin indicator should not be visible on canvas
+    const pinIndicator = node.locator('.node-pin-indicator');
+    await expect(pinIndicator).not.toBeVisible();
+  });
+
+  test('edit button opens editor modal for pinned output', async ({ page }) => {
+    // Add a Scheduled node
+    await page.getByTestId('node-type-scheduled').click();
+    const node = page.getByTestId('workflow-node-scheduled');
+
+    // Open editor, execute, and pin first
+    await node.locator('.custom-node').dblclick();
+    const dialog = page.locator('.node-editor-dialog');
+    await expect(dialog).toBeVisible();
+
+    // Execute to get output
+    await page.getByTestId('execute-btn').click();
+    await expect(page.getByTestId('execution-output')).toBeVisible();
+
+    // Pin the output first
+    await dialog.locator('button:has-text("Pin")').click();
+    await expect(dialog.locator('text=📌 PINNED').first()).toBeVisible();
+
+    // Click Edit button to open the modal
+    const editBtn = dialog.locator('button:has-text("Edit")');
+    await expect(editBtn).toBeVisible();
+    await editBtn.click();
+
+    // Output editor modal should appear
+    const editorModal = page.locator('.expr-editor-dialog');
+    await expect(editorModal).toBeVisible();
+    await expect(editorModal.locator('h3')).toHaveText('Edit Pinned Output');
+
+    // The modal should contain the pinned output JSON
+    const textarea = editorModal.locator('textarea');
+    const content = await textarea.inputValue();
+    expect(content).toContain('"time"');
+
+    // Close editor modal by clicking Cancel button
+    await editorModal.locator('button:has-text("Cancel")').click();
+    await expect(editorModal).not.toBeVisible();
+
+    // Close node editor
+    await page.locator('.node-editor-close').click();
+  });
 });
 
 test.describe('Dashboard', () => {

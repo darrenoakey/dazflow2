@@ -187,3 +187,33 @@ def get_credential_types_for_api() -> list[dict]:
         }
         result.append(api_def)
     return result
+
+
+def get_dynamic_enum_values(
+    node_type_id: str, enum_key: str, node_data: dict, credential_data: dict | None
+) -> list[dict]:
+    """Get dynamic enum values for a node property.
+
+    Args:
+        node_type_id: The node type ID (e.g., "discord_trigger")
+        enum_key: The enum key (e.g., "server_id" or "channel_id")
+        node_data: Current node data (for dependent dropdowns)
+        credential_data: Credential data for the node's required credential
+
+    Returns:
+        List of {value, label} dicts for the dropdown options
+    """
+    node_type = get_node_type(node_type_id)
+    if not node_type:
+        return []
+
+    dynamic_enums = node_type.get("dynamicEnums", {})
+    if enum_key not in dynamic_enums:
+        return []
+
+    enum_fn = dynamic_enums[enum_key]
+    try:
+        return enum_fn(node_data, credential_data)
+    except Exception as e:
+        print(f"Error getting dynamic enum values for {node_type_id}.{enum_key}: {e}")
+        return []

@@ -154,7 +154,7 @@ def test_build_params_dict_quoted_string_unquoted():
     assert _build_params_dict(params) == {"name": "John Doe"}
 
 
-def test_build_params_dict_skips_empty_names():
+def test_build_params_dict_ignores_empty_names():
     params = [{"name": "", "value": "test"}, {"name": "valid", "value": "value"}]
     assert _build_params_dict(params) == {"valid": "value"}
 

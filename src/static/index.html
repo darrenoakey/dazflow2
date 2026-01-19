@@ -121,6 +121,16 @@
             height: 32px;
             color: #667eea;
         }
+        .custom-node .node-pin-indicator {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            font-size: 12px;
+            background: #2a2a4e;
+            border-radius: 50%;
+            padding: 2px;
+            line-height: 1;
+        }
         .node-wrapper {
             display: flex;
             flex-direction: column;
@@ -2112,6 +2122,9 @@
 
             if (!nodeType) return null;
 
+            // Check if node is pinned
+            const isPinned = workflowNode.data?.pinned || false;
+
             const inputCount = connectors.inputs.length;
             const outputCount = connectors.outputs.length;
             const shapeClasses = [
@@ -2184,6 +2197,12 @@
                         className: 'node-icon',
                         dangerouslySetInnerHTML: { __html: nodeType.icon },
                     }),
+                    // Pin indicator
+                    isPinned && React.createElement('div', {
+                        key: 'pin-indicator',
+                        className: 'node-pin-indicator',
+                        title: 'Pinned output',
+                    }, '📌'),
                     // Output handles
                     ...connectors.outputs.map((output, idx) => {
                         const top = outputCount === 1 ? '50%' : `${((idx + 1) / (outputCount + 1)) * 100}%`;
@@ -2782,14 +2801,16 @@
         // Property Editor Components
         function TextPropertyEditor({ property, onChange, inputData }) {
             const [value, setValue] = useState(property.value);
+            const valueRef = useRef(value);
 
             const handleChange = (newValue) => {
                 setValue(newValue);
+                valueRef.current = newValue;
             };
 
             const handleBlur = () => {
-                if (value !== property.value) {
-                    onChange(property.id, value);
+                if (valueRef.current !== property.value) {
+                    onChange(property.id, valueRef.current);
                 }
             };
 
@@ -2808,14 +2829,16 @@
 
         function TextareaPropertyEditor({ property, onChange, inputData }) {
             const [value, setValue] = useState(property.value);
+            const valueRef = useRef(value);
 
             const handleChange = (newValue) => {
                 setValue(newValue);
+                valueRef.current = newValue;
             };
 
             const handleBlur = () => {
-                if (value !== property.value) {
-                    onChange(property.id, value);
+                if (valueRef.current !== property.value) {
+                    onChange(property.id, valueRef.current);
                 }
             };
 
@@ -2952,7 +2975,64 @@
             ]);
         }
 
-        function PropertyEditor({ property, onChange, inputData }) {
+        function DynamicSelectPropertyEditor({ property, onChange, nodeTypeId, credentialName, nodeData }) {
+            const [options, setOptions] = useState([]);
+            const [hasFetched, setHasFetched] = useState(false);
+
+            // Fetch options immediately on mount and when dependencies change
+            // Backend returns cached data instantly, refreshes in background if stale
+            const fetchOptions = async () => {
+                try {
+                    const response = await fetch('/api/dynamic-enum', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            nodeTypeId,
+                            enumKey: property.enumKey,
+                            nodeData,
+                            credentialName,
+                        }),
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        setOptions(data.options || []);
+                    }
+                } catch (e) {
+                    console.error('Failed to load options:', e);
+                }
+            };
+
+            // Fetch on mount and when dependencies change
+            useEffect(() => {
+                fetchOptions();
+            }, [credentialName, JSON.stringify(nodeData), property.enumKey]);
+
+            // Also refetch when dropdown is focused (to pick up background refreshes)
+            const handleFocus = () => {
+                if (hasFetched) {
+                    fetchOptions();  // Silently refresh
+                }
+                setHasFetched(true);
+            };
+
+            return React.createElement('div', { className: 'property-group' }, [
+                React.createElement('label', { key: 'label', className: 'property-label' }, property.label),
+                React.createElement('select', {
+                    key: 'select',
+                    className: 'property-select',
+                    value: property.value || '',
+                    onChange: (e) => onChange(property.id, e.target.value),
+                    onFocus: handleFocus,
+                }, [
+                    React.createElement('option', { key: '__placeholder', value: '' }, 'Select a value'),
+                    ...options.map((opt) =>
+                        React.createElement('option', { key: opt.value, value: opt.value }, opt.label)
+                    ),
+                ]),
+            ]);
+        }
+
+        function PropertyEditor({ property, onChange, inputData, nodeTypeId, credentialName, nodeData }) {
             switch (property.type) {
                 case 'text':
                     return React.createElement(TextPropertyEditor, { property, onChange, inputData });
@@ -2962,11 +3042,110 @@
                     return React.createElement(NumberPropertyEditor, { property, onChange });
                 case 'select':
                     return React.createElement(SelectPropertyEditor, { property, onChange });
+                case 'dynamicSelect':
+                    return React.createElement(DynamicSelectPropertyEditor, {
+                        property, onChange, nodeTypeId, credentialName, nodeData
+                    });
                 case 'fieldlist':
                     return React.createElement(FieldListPropertyEditor, { property, onChange, inputData });
                 default:
                     return null;
             }
+        }
+
+        // Output Editor Modal - for editing pinned node output
+        function OutputEditorModal({ value, onSave, onClose }) {
+            const [localValue, setLocalValue] = useState(() => {
+                try {
+                    return JSON.stringify(value, null, 2);
+                } catch {
+                    return '{}';
+                }
+            });
+            const [error, setError] = useState(null);
+
+            const handleSave = () => {
+                try {
+                    const parsed = JSON.parse(localValue);
+                    onSave(parsed);
+                    onClose();
+                } catch (e) {
+                    setError('Invalid JSON: ' + e.message);
+                }
+            };
+
+            const handleKeyDown = (e) => {
+                if (e.key === 'Escape') {
+                    onClose();
+                } else if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    handleSave();
+                }
+            };
+
+            return React.createElement('div', {
+                className: 'expr-editor-overlay',
+                onClick: onClose,
+                onKeyDown: handleKeyDown,
+            },
+                React.createElement('div', {
+                    className: 'expr-editor-dialog',
+                    style: { width: '600px', maxWidth: '90vw' },
+                    onClick: (e) => e.stopPropagation(),
+                }, [
+                    React.createElement('div', { key: 'header', className: 'expr-editor-header' }, [
+                        React.createElement('h3', { key: 'title' }, 'Edit Pinned Output'),
+                        React.createElement('button', {
+                            key: 'close',
+                            className: 'expr-editor-close',
+                            onClick: onClose,
+                        }, '×'),
+                    ]),
+                    React.createElement('div', { key: 'body', style: { padding: '16px' } }, [
+                        React.createElement('textarea', {
+                            key: 'editor',
+                            className: 'property-textarea',
+                            style: {
+                                width: '100%',
+                                height: '400px',
+                                fontFamily: 'monospace',
+                                fontSize: '13px',
+                            },
+                            value: localValue,
+                            onChange: (e) => {
+                                setLocalValue(e.target.value);
+                                setError(null);
+                            },
+                            autoFocus: true,
+                        }),
+                        error && React.createElement('div', {
+                            key: 'error',
+                            style: { color: '#e74c3c', marginTop: '8px', fontSize: '12px' },
+                        }, error),
+                    ]),
+                    React.createElement('div', {
+                        key: 'footer',
+                        style: {
+                            padding: '12px 16px',
+                            borderTop: '1px solid #3a3a5e',
+                            display: 'flex',
+                            justifyContent: 'flex-end',
+                            gap: '8px',
+                        },
+                    }, [
+                        React.createElement('button', {
+                            key: 'cancel',
+                            className: 'toolbar-btn',
+                            onClick: onClose,
+                        }, 'Cancel'),
+                        React.createElement('button', {
+                            key: 'save',
+                            className: 'execute-btn',
+                            onClick: handleSave,
+                        }, 'Save'),
+                    ]),
+                ])
+            );
         }
 
         // Node Editor Dialog
@@ -2982,8 +3161,13 @@
 
             const [localName, setLocalName] = useState(node?.name || '');
             const [nameError, setNameError] = useState(false);
+            const [showOutputEditor, setShowOutputEditor] = useState(false);
 
             if (!node) return null;
+
+            // Pin state from node data
+            const isPinned = node.data?.pinned || false;
+            const pinnedOutput = node.data?.pinnedOutput;
 
             const nodeType = nodeTypeDefinitions[node.typeId];
             if (!nodeType) return null;
@@ -3003,11 +3187,22 @@
             // Get execution data from ambient execution
             const nodeExecution = ambientExecution[nodeId];
             const nodeOutput = nodeExecution?.nodeOutput || null; // What THIS node produced
+            const fullOutput = nodeExecution?.output || null; // Combined output (input + nodeOutput under node name)
             const executionTime = nodeExecution?.executedAt
                 ? new Date(nodeExecution.executedAt).toLocaleTimeString()
                 : null;
 
             const properties = nodeType.getProperties(node.data);
+
+            // Build combined output like the executor does: {...input, [nodeName]: nodeOutput}
+            const buildCombinedOutput = (rawOutput) => {
+                if (!rawOutput) return null;
+                const outputArray = Array.isArray(rawOutput) ? rawOutput : [rawOutput];
+                return outputArray.map((out, i) => {
+                    const inp = (upstreamData && upstreamData[i]) || {};
+                    return { ...inp, [node.name]: out };
+                });
+            };
 
             const handlePropertyChange = (propertyId, value) => {
                 updateNodeData(nodeId, { [propertyId]: value });
@@ -3025,6 +3220,41 @@
                 } else if (!trimmedName) {
                     setLocalName(node.name);
                 }
+            };
+
+            // Pin/unpin the current output
+            const handlePin = () => {
+                if (!fullOutput) return;
+                updateNodeData(nodeId, { pinned: true, pinnedOutput: fullOutput });
+                // Update ambient execution so downstream nodes see the pinned output
+                setNodeExecution(nodeId, upstreamData, nodeOutput, fullOutput);
+            };
+
+            const handleUnpin = () => {
+                updateNodeData(nodeId, { pinned: false, pinnedOutput: undefined });
+                // Clear ambient execution - node will need to be re-executed
+                setNodeExecution(nodeId, null, null, null);
+            };
+
+            // Edit pinned output - auto-pins first if not pinned
+            const handleEdit = () => {
+                if (!isPinned) {
+                    // Auto-pin with current output or empty default
+                    const output = fullOutput || buildCombinedOutput([{}]);
+                    updateNodeData(nodeId, { pinned: true, pinnedOutput: output });
+                    // Update ambient execution
+                    setNodeExecution(nodeId, upstreamData, nodeOutput, output);
+                }
+                setShowOutputEditor(true);
+            };
+
+            // Save edited output - user edits the full combined output
+            const handleSaveOutput = (newOutput) => {
+                // Ensure it's an array
+                const output = Array.isArray(newOutput) ? newOutput : [newOutput];
+                updateNodeData(nodeId, { pinnedOutput: output });
+                // Update ambient execution with the new pinned output
+                setNodeExecution(nodeId, upstreamData, output, output);
             };
 
             // Execute a node via server API
@@ -3048,7 +3278,20 @@
                     });
 
                     if (!response.ok) {
-                        console.error('Execute failed:', response.statusText);
+                        // Try to get error details from response
+                        let errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+                        try {
+                            const errorBody = await response.text();
+                            if (errorBody) errorMsg += `\n${errorBody}`;
+                        } catch {}
+                        console.error('Execute failed:', errorMsg);
+                        // Store error in execution so it displays
+                        store.setNodeExecution(
+                            nodeId,
+                            null,
+                            [{ error: errorMsg }],
+                            [{ error: errorMsg }]
+                        );
                         return;
                     }
 
@@ -3066,6 +3309,14 @@
                     }
                 } catch (err) {
                     console.error('Execute error:', err);
+                    // Store error in execution so it displays
+                    const store = useWorkflowStore.getState();
+                    store.setNodeExecution(
+                        nodeId,
+                        null,
+                        [{ error: String(err) }],
+                        [{ error: String(err) }]
+                    );
                 } finally {
                     setIsExecuting(false);
                 }
@@ -3182,6 +3433,9 @@
                                         property: prop,
                                         onChange: handlePropertyChange,
                                         inputData: upstreamData,
+                                        nodeTypeId: node.typeId,
+                                        credentialName: node.data.credentialName,
+                                        nodeData: node.data,
                                     })
                                 ),
                             ]),
@@ -3189,24 +3443,94 @@
                         // Output pane - shows what THIS node produced (not the combined result)
                         // All items fully expanded
                         React.createElement('div', { key: 'output', className: 'node-editor-pane output-pane' }, [
-                            React.createElement('div', { key: 'header', className: 'pane-header' }, 'Output'),
+                            React.createElement('div', {
+                                key: 'header',
+                                className: 'pane-header',
+                                style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+                            }, [
+                                React.createElement('span', { key: 'title' }, [
+                                    'Output',
+                                    isPinned && React.createElement('span', {
+                                        key: 'pinned-badge',
+                                        style: {
+                                            marginLeft: '8px',
+                                            fontSize: '10px',
+                                            background: '#5b8def',
+                                            color: '#fff',
+                                            padding: '2px 6px',
+                                            borderRadius: '4px',
+                                            fontWeight: 'normal',
+                                        },
+                                    }, '📌 PINNED'),
+                                ]),
+                                !isReadOnly && React.createElement('div', {
+                                    key: 'actions',
+                                    style: { display: 'flex', gap: '4px' },
+                                }, [
+                                    // Edit button - always available
+                                    React.createElement('button', {
+                                        key: 'edit',
+                                        className: 'toolbar-btn',
+                                        style: { padding: '2px 8px', fontSize: '11px' },
+                                        onClick: handleEdit,
+                                        title: isPinned ? 'Edit pinned output' : 'Pin and edit output',
+                                    }, '✏️ Edit'),
+                                    // Pin/Unpin button
+                                    isPinned
+                                        ? React.createElement('button', {
+                                            key: 'unpin',
+                                            className: 'toolbar-btn',
+                                            style: { padding: '2px 8px', fontSize: '11px' },
+                                            onClick: handleUnpin,
+                                            title: 'Unpin output',
+                                        }, '📌 Unpin')
+                                        : React.createElement('button', {
+                                            key: 'pin',
+                                            className: 'toolbar-btn',
+                                            style: { padding: '2px 8px', fontSize: '11px' },
+                                            onClick: handlePin,
+                                            disabled: !fullOutput,
+                                            title: fullOutput ? 'Pin current output' : 'Execute node first to pin output',
+                                        }, '📌 Pin'),
+                                ]),
+                            ]),
                             React.createElement('div', { key: 'content', className: 'pane-content' },
-                                nodeOutput
-                                    ? React.createElement('div', { key: 'output-content' }, [
-                                        executionTime && React.createElement('div', {
-                                            key: 'time',
-                                            className: 'execution-time',
-                                        }, `Executed at ${executionTime}`),
+                                // Show pinned output if pinned, otherwise show execution output
+                                isPinned && pinnedOutput
+                                    ? React.createElement('div', { key: 'pinned-content' }, [
+                                        React.createElement('div', {
+                                            key: 'info',
+                                            style: { fontSize: '11px', color: '#888', marginBottom: '8px' },
+                                        }, 'This output is pinned. The node will return this value without executing.'),
                                         React.createElement('div', {
                                             key: 'json',
                                             className: 'json-viewer',
                                             'data-testid': 'execution-output',
-                                        }, React.createElement(JsonViewer, { data: nodeOutput, expandAll: true })),
+                                        }, React.createElement(JsonViewer, { data: pinnedOutput, expandAll: true })),
                                     ])
-                                    : React.createElement('div', { className: 'no-data-message' }, 'No output data available')
+                                    : fullOutput
+                                        ? React.createElement('div', { key: 'output-content' }, [
+                                            executionTime && React.createElement('div', {
+                                                key: 'time',
+                                                className: 'execution-time',
+                                            }, `Executed at ${executionTime}`),
+                                            React.createElement('div', {
+                                                key: 'json',
+                                                className: 'json-viewer',
+                                                'data-testid': 'execution-output',
+                                            }, React.createElement(JsonViewer, { data: fullOutput, expandAll: true })),
+                                        ])
+                                        : React.createElement('div', { className: 'no-data-message' }, 'No output data available')
                             ),
                         ]),
                     ]),
+                    // Output editor modal
+                    showOutputEditor && React.createElement(OutputEditorModal, {
+                        key: 'output-editor',
+                        value: pinnedOutput || fullOutput || buildCombinedOutput([{}]),
+                        onSave: handleSaveOutput,
+                        onClose: () => setShowOutputEditor(false),
+                    }),
                 ])
             );
         }

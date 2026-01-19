@@ -4,10 +4,18 @@ Uses Python keyring for secure credential storage.
 """
 
 import json
+import sys
+from pathlib import Path
 
 import keyring
 
-from .module_loader import get_credential_type
+# Handle both package and direct imports
+try:
+    from .module_loader import get_credential_type
+except ImportError:
+    # Direct import - ensure src is in path
+    sys.path.insert(0, str(Path(__file__).parent))
+    from module_loader import get_credential_type
 
 KEYRING_SERVICE = "dazflow2"
 HIDE_SENTINEL = "HIDE_PASSWORD_FOR_SECURITY"
