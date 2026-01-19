@@ -1,6 +1,11 @@
 """Tests for server configuration."""
 
-from src.config import ServerConfig, get_config, set_config
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+
+from config import ServerConfig, get_config, set_config
 
 
 # ##################################################################
@@ -65,20 +70,20 @@ def test_concurrency_groups_file_property_with_dot():
 # test get_config and set_config
 def test_get_config_creates_default():
     # Reset global config
-    import src.config
+    import config as config_module
 
-    src.config._config = None
+    config_module._config = None
 
-    config = get_config()
-    assert config.port == 5000
-    assert config.data_dir == "."
+    cfg = get_config()
+    assert cfg.port == 5000
+    assert cfg.data_dir == "."
 
 
 def test_get_config_returns_same_instance():
     # Reset global config
-    import src.config
+    import config as config_module
 
-    src.config._config = None
+    config_module._config = None
 
     config1 = get_config()
     config2 = get_config()
@@ -87,9 +92,9 @@ def test_get_config_returns_same_instance():
 
 def test_set_config_changes_global():
     # Reset global config
-    import src.config
+    import config as config_module
 
-    src.config._config = None
+    config_module._config = None
 
     custom_config = ServerConfig(port=9000, data_dir="/custom")
     set_config(custom_config)
@@ -102,9 +107,9 @@ def test_set_config_changes_global():
 
 def test_set_config_overrides_previous():
     # Reset global config
-    import src.config
+    import config as config_module
 
-    src.config._config = None
+    config_module._config = None
 
     config1 = ServerConfig(port=8000, data_dir="/first")
     set_config(config1)
