@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
+from .config import get_config
 from .credentials import (
     delete_credential,
     get_credential,
@@ -56,14 +57,38 @@ _executions_cache: dict = {"items": [], "has_more": False, "last_updated": 0}
 _executions_cache_task: asyncio.Task | None = None
 EXECUTIONS_CACHE_INTERVAL = 10  # seconds
 PROJECT_ROOT = Path(__file__).parent.parent
-WORK_DIR = PROJECT_ROOT / "local" / "work"
-WORKFLOWS_DIR = WORK_DIR / "workflows"
-STATS_DIR = WORK_DIR / "stats"
-OUTPUT_DIR = WORK_DIR / "output"
-QUEUE_DIR = WORK_DIR / "queue"
-EXECUTIONS_DIR = WORK_DIR / "executions"
-INDEXES_DIR = WORK_DIR / "indexes"
 SAMPLE_WORKFLOW = PROJECT_ROOT / "sample.json"
+
+
+# ##################################################################
+# get work directory paths based on config
+# returns paths relative to the configured data directory
+def _get_work_dir() -> Path:
+    return Path(get_config().data_dir) / "local" / "work"
+
+
+def _get_workflows_dir() -> Path:
+    return _get_work_dir() / "workflows"
+
+
+def _get_stats_dir() -> Path:
+    return _get_work_dir() / "stats"
+
+
+def _get_output_dir() -> Path:
+    return _get_work_dir() / "output"
+
+
+def _get_queue_dir() -> Path:
+    return _get_work_dir() / "queue"
+
+
+def _get_executions_dir() -> Path:
+    return _get_work_dir() / "executions"
+
+
+def _get_indexes_dir() -> Path:
+    return _get_work_dir() / "indexes"
 
 
 # ##################################################################
@@ -71,20 +96,26 @@ SAMPLE_WORKFLOW = PROJECT_ROOT / "sample.json"
 # creates workflows, stats, output, and queue directories
 # copies sample.json if workflows dir is empty
 def init_work_directories():
-    WORKFLOWS_DIR.mkdir(parents=True, exist_ok=True)
-    STATS_DIR.mkdir(parents=True, exist_ok=True)
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    QUEUE_DIR.mkdir(parents=True, exist_ok=True)
+    workflows_dir = _get_workflows_dir()
+    stats_dir = _get_stats_dir()
+    output_dir = _get_output_dir()
+    queue_dir = _get_queue_dir()
+    work_dir = _get_work_dir()
+
+    workflows_dir.mkdir(parents=True, exist_ok=True)
+    stats_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    queue_dir.mkdir(parents=True, exist_ok=True)
 
     # Copy sample.json if workflows dir is empty
-    if SAMPLE_WORKFLOW.exists() and not any(WORKFLOWS_DIR.iterdir()):
-        shutil.copy(SAMPLE_WORKFLOW, WORKFLOWS_DIR / "sample.json")
+    if SAMPLE_WORKFLOW.exists() and not any(workflows_dir.iterdir()):
+        shutil.copy(SAMPLE_WORKFLOW, workflows_dir / "sample.json")
 
     # Initialize worker system
-    init_worker_system(QUEUE_DIR, STATS_DIR)
+    init_worker_system(queue_dir, stats_dir)
 
     # Initialize trigger system
-    init_trigger_system(WORK_DIR, WORKFLOWS_DIR)
+    init_trigger_system(work_dir, workflows_dir)
 
     # Load all modules
     load_all_modules()
@@ -93,9 +124,10 @@ def init_work_directories():
 def _load_executions_from_disk(limit: int = 100) -> dict:
     """Load executions from disk. Used by cache refresh."""
     executions = []
+    indexes_dir = _get_indexes_dir()
 
-    if INDEXES_DIR.exists():
-        for index_file in INDEXES_DIR.glob("*.jsonl"):
+    if indexes_dir.exists():
+        for index_file in indexes_dir.glob("*.jsonl"):
             try:
                 for line in index_file.read_text().strip().split("\n"):
                     if line:
@@ -299,7 +331,8 @@ async def get_dynamic_enum_endpoint(request: Request):
 # get stats for a workflow
 # returns stats dict or creates default stats
 def get_workflow_stats(workflow_path: str) -> dict:
-    stats_path = STATS_DIR / (workflow_path + ".stats.json")
+    stats_dir = _get_stats_dir()
+    stats_path = stats_dir / (workflow_path + ".stats.json")
     if stats_path.exists():
         return json.loads(stats_path.read_text())
     return {"execution_count": 0, "total_execution_time_ms": 0, "last_execution": None}
@@ -309,7 +342,8 @@ def get_workflow_stats(workflow_path: str) -> dict:
 # save stats for a workflow
 # persists stats to the stats directory
 def save_workflow_stats(workflow_path: str, stats: dict):
-    stats_path = STATS_DIR / (workflow_path + ".stats.json")
+    stats_dir = _get_stats_dir()
+    stats_path = stats_dir / (workflow_path + ".stats.json")
     stats_path.parent.mkdir(parents=True, exist_ok=True)
     stats_path.write_text(json.dumps(stats))
 
@@ -319,14 +353,15 @@ def save_workflow_stats(workflow_path: str, stats: dict):
 # returns list of workflows and folders with stats
 @api_router.get("/workflows")
 async def list_workflows(path: str = ""):
-    base_path = WORKFLOWS_DIR / path if path else WORKFLOWS_DIR
+    workflows_dir = _get_workflows_dir()
+    base_path = workflows_dir / path if path else workflows_dir
     if not base_path.exists() or not base_path.is_dir():
         raise HTTPException(status_code=404, detail="Path not found")
 
     enabled_state = get_enabled_workflows()
     items = []
     for item in sorted(base_path.iterdir()):
-        rel_path = str(item.relative_to(WORKFLOWS_DIR))
+        rel_path = str(item.relative_to(workflows_dir))
         if item.is_dir():
             items.append({"name": item.name, "path": rel_path, "type": "folder"})
         elif item.suffix == ".json":
@@ -360,7 +395,8 @@ class SetEnabledRequest(BaseModel):
 
 @api_router.put("/workflow/{path:path}/enabled")
 async def set_workflow_enabled_endpoint(path: str, request: SetEnabledRequest):
-    workflow_path = WORKFLOWS_DIR / path
+    workflows_dir = _get_workflows_dir()
+    workflow_path = workflows_dir / path
     if not workflow_path.exists():
         raise HTTPException(status_code=404, detail="Workflow not found")
 
@@ -380,7 +416,8 @@ async def set_workflow_enabled_endpoint(path: str, request: SetEnabledRequest):
 # returns workflow json
 @api_router.get("/workflow/{path:path}")
 async def get_workflow(path: str):
-    workflow_path = WORKFLOWS_DIR / path
+    workflows_dir = _get_workflows_dir()
+    workflow_path = workflows_dir / path
     if not workflow_path.exists():
         raise HTTPException(status_code=404, detail="Workflow not found")
     return json.loads(workflow_path.read_text())
@@ -395,7 +432,8 @@ class SaveWorkflowRequest(BaseModel):
 
 @api_router.put("/workflow/{path:path}")
 async def save_workflow(path: str, request: SaveWorkflowRequest):
-    workflow_path = WORKFLOWS_DIR / path
+    workflows_dir = _get_workflows_dir()
+    workflow_path = workflows_dir / path
     workflow_path.parent.mkdir(parents=True, exist_ok=True)
     workflow_path.write_text(json.dumps(request.workflow, indent=2))
     return {"saved": True, "path": path}
@@ -411,9 +449,10 @@ class CreateWorkflowRequest(BaseModel):
 
 @api_router.post("/workflows/new")
 async def create_workflow(request: CreateWorkflowRequest):
+    workflows_dir = _get_workflows_dir()
     # Ensure name ends with .json
     name = request.name if request.name.endswith(".json") else f"{request.name}.json"
-    folder_path = WORKFLOWS_DIR / request.folder if request.folder else WORKFLOWS_DIR
+    folder_path = workflows_dir / request.folder if request.folder else workflows_dir
 
     if not folder_path.exists():
         raise HTTPException(status_code=404, detail="Folder not found")
@@ -426,7 +465,7 @@ async def create_workflow(request: CreateWorkflowRequest):
     empty_workflow = {"nodes": [], "connections": []}
     workflow_path.write_text(json.dumps(empty_workflow, indent=2))
 
-    rel_path = str(workflow_path.relative_to(WORKFLOWS_DIR))
+    rel_path = str(workflow_path.relative_to(workflows_dir))
     return {"created": True, "path": rel_path}
 
 
@@ -439,7 +478,8 @@ class CreateFolderRequest(BaseModel):
 
 @api_router.post("/folders/new")
 async def create_folder(request: CreateFolderRequest):
-    parent_path = WORKFLOWS_DIR / request.parent if request.parent else WORKFLOWS_DIR
+    workflows_dir = _get_workflows_dir()
+    parent_path = workflows_dir / request.parent if request.parent else workflows_dir
 
     if not parent_path.exists():
         raise HTTPException(status_code=404, detail="Parent folder not found")
@@ -449,7 +489,7 @@ async def create_folder(request: CreateFolderRequest):
         raise HTTPException(status_code=409, detail="Folder already exists")
 
     folder_path.mkdir(parents=True)
-    rel_path = str(folder_path.relative_to(WORKFLOWS_DIR))
+    rel_path = str(folder_path.relative_to(workflows_dir))
     return {"created": True, "path": rel_path}
 
 
@@ -461,7 +501,8 @@ class MoveWorkflowRequest(BaseModel):
 
 @api_router.post("/workflow/{path:path}/move")
 async def move_workflow(path: str, request: MoveWorkflowRequest):
-    source_path = WORKFLOWS_DIR / path
+    workflows_dir = _get_workflows_dir()
+    source_path = workflows_dir / path
     if not source_path.exists():
         raise HTTPException(status_code=404, detail="Workflow not found")
 
@@ -471,7 +512,7 @@ async def move_workflow(path: str, request: MoveWorkflowRequest):
         # Moving to a folder - keep the original filename
         dest = f"{dest}/{source_path.name}" if dest else source_path.name
 
-    dest_path = WORKFLOWS_DIR / dest
+    dest_path = workflows_dir / dest
 
     if dest_path.exists():
         raise HTTPException(status_code=409, detail="Destination already exists")
@@ -539,7 +580,8 @@ class QueueWorkflowResponse(BaseModel):
 
 @api_router.post("/workflow/{path:path}/queue")
 async def queue_workflow_endpoint(path: str):
-    workflow_path = WORKFLOWS_DIR / path
+    workflows_dir = _get_workflows_dir()
+    workflow_path = workflows_dir / path
     if not workflow_path.exists():
         raise HTTPException(status_code=404, detail="Workflow not found")
 
@@ -614,18 +656,20 @@ async def list_executions(limit: int = 100, before: float | None = None):
 @api_router.get("/execution/{execution_id}")
 async def get_execution(execution_id: str):
     """Get full execution instance by ID."""
+    indexes_dir = _get_indexes_dir()
+    work_dir = _get_work_dir()
     # Search for the execution in index files
-    if not INDEXES_DIR.exists():
+    if not indexes_dir.exists():
         raise HTTPException(status_code=404, detail="Execution not found")
 
-    for index_file in INDEXES_DIR.glob("*.jsonl"):
+    for index_file in indexes_dir.glob("*.jsonl"):
         try:
             for line in index_file.read_text().strip().split("\n"):
                 if line:
                     entry = json.loads(line)
                     if entry.get("id") == execution_id:
                         # Found the entry - load the full file
-                        file_path = WORK_DIR / entry["file"]
+                        file_path = work_dir / entry["file"]
                         if file_path.exists():
                             return json.loads(file_path.read_text())
                         raise HTTPException(status_code=404, detail="Execution file not found")
@@ -741,10 +785,11 @@ def main():
     import uvicorn
 
     setproctitle.setproctitle("dazflow2-api")
+    config = get_config()
     uvicorn.run(
         "src.api:app",
         host="0.0.0.0",
-        port=31415,
+        port=config.port,
         workers=10,
         reload=False,
     )

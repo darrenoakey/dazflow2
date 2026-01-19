@@ -19,14 +19,24 @@ def run_cmd(cmd: list[str]) -> int:
 # ##################################################################
 # start command
 # starts the fastapi server with uvicorn with hot reload enabled
-def command_start(_: argparse.Namespace) -> int:
+def command_start(args: argparse.Namespace) -> int:
+    # Set config before starting server
+    if args.port or args.data_dir:
+        from src.config import ServerConfig, set_config
+        config = ServerConfig(
+            port=args.port if args.port else 5000,
+            data_dir=args.data_dir if args.data_dir else "."
+        )
+        set_config(config)
+
     os.chdir(PROJECT_ROOT)
+    port_str = str(args.port) if args.port else "31415"
     os.execv(
         sys.executable,
         [sys.executable, "-m", "uvicorn",
          "src.api:app",
          "--host", "0.0.0.0",
-         "--port", "31415",
+         "--port", port_str,
          "--reload",
          "--reload-include", "*.html",
          "--reload-include", "*.css",
@@ -78,6 +88,8 @@ def main(argv: list[str]) -> int:
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     p_start = sub.add_parser("start", help="Start server with hot reload")
+    p_start.add_argument("--port", type=int, help="Port to listen on (default 31415)")
+    p_start.add_argument("--data-dir", type=str, help="Data directory (default .)")
     p_start.set_defaults(func=command_start)
 
     p_test = sub.add_parser("test", help="Run a single test target")

@@ -57,19 +57,20 @@ def test_heartbeat_generator():
 # test init_work_directories
 # verifies directories are created
 def test_init_work_directories(tmp_path, monkeypatch):
-    # Use temp paths
-    workflows = tmp_path / "workflows"
-    stats = tmp_path / "stats"
-    output = tmp_path / "output"
+    # Set config to use temp path
+    from src.config import ServerConfig, set_config
+
+    set_config(ServerConfig(data_dir=str(tmp_path)))
 
     import src.api as api_module
 
-    monkeypatch.setattr(api_module, "WORKFLOWS_DIR", workflows)
-    monkeypatch.setattr(api_module, "STATS_DIR", stats)
-    monkeypatch.setattr(api_module, "OUTPUT_DIR", output)
     monkeypatch.setattr(api_module, "SAMPLE_WORKFLOW", tmp_path / "nonexistent.json")
 
     init_work_directories()
+
+    workflows = tmp_path / "local" / "work" / "workflows"
+    stats = tmp_path / "local" / "work" / "stats"
+    output = tmp_path / "local" / "work" / "output"
 
     assert workflows.exists()
     assert stats.exists()
@@ -79,10 +80,12 @@ def test_init_work_directories(tmp_path, monkeypatch):
 # ##################################################################
 # test get_workflow_stats
 # verifies stats retrieval and defaults
-def test_get_workflow_stats_returns_default(tmp_path, monkeypatch):
-    import src.api as api_module
+def test_get_workflow_stats_returns_default(tmp_path):
+    from src.config import ServerConfig, set_config
 
-    monkeypatch.setattr(api_module, "STATS_DIR", tmp_path)
+    stats_dir = tmp_path / "local" / "work" / "stats"
+    stats_dir.mkdir(parents=True, exist_ok=True)
+    set_config(ServerConfig(data_dir=str(tmp_path)))
 
     stats = get_workflow_stats("test")
     assert stats["execution_count"] == 0
@@ -90,13 +93,15 @@ def test_get_workflow_stats_returns_default(tmp_path, monkeypatch):
     assert stats["last_execution"] is None
 
 
-def test_get_workflow_stats_reads_existing(tmp_path, monkeypatch):
-    import src.api as api_module
+def test_get_workflow_stats_reads_existing(tmp_path):
+    from src.config import ServerConfig, set_config
 
-    monkeypatch.setattr(api_module, "STATS_DIR", tmp_path)
+    stats_dir = tmp_path / "local" / "work" / "stats"
+    stats_dir.mkdir(parents=True, exist_ok=True)
+    set_config(ServerConfig(data_dir=str(tmp_path)))
 
     # Create a stats file
-    stats_file = tmp_path / "test.stats.json"
+    stats_file = stats_dir / "test.stats.json"
     stats_file.write_text(
         json.dumps({"execution_count": 5, "total_execution_time_ms": 1000, "last_execution": "2024-01-01T00:00:00Z"})
     )
@@ -109,15 +114,17 @@ def test_get_workflow_stats_reads_existing(tmp_path, monkeypatch):
 # ##################################################################
 # test save_workflow_stats
 # verifies stats are persisted
-def test_save_workflow_stats(tmp_path, monkeypatch):
-    import src.api as api_module
+def test_save_workflow_stats(tmp_path):
+    from src.config import ServerConfig, set_config
 
-    monkeypatch.setattr(api_module, "STATS_DIR", tmp_path)
+    stats_dir = tmp_path / "local" / "work" / "stats"
+    stats_dir.mkdir(parents=True, exist_ok=True)
+    set_config(ServerConfig(data_dir=str(tmp_path)))
 
     stats = {"execution_count": 3, "total_execution_time_ms": 500, "last_execution": "2024-01-01T12:00:00Z"}
     save_workflow_stats("myworkflow", stats)
 
-    saved_file = tmp_path / "myworkflow.stats.json"
+    saved_file = stats_dir / "myworkflow.stats.json"
     assert saved_file.exists()
     assert json.loads(saved_file.read_text()) == stats
 
@@ -125,15 +132,18 @@ def test_save_workflow_stats(tmp_path, monkeypatch):
 # ##################################################################
 # test list_workflows endpoint
 # verifies workflow listing returns correct structure
-def test_list_workflows(tmp_path, monkeypatch):
-    import src.api as api_module
+def test_list_workflows(tmp_path):
+    from src.config import ServerConfig, set_config
 
-    monkeypatch.setattr(api_module, "WORKFLOWS_DIR", tmp_path)
-    monkeypatch.setattr(api_module, "STATS_DIR", tmp_path / "stats")
+    workflows_dir = tmp_path / "local" / "work" / "workflows"
+    workflows_dir.mkdir(parents=True, exist_ok=True)
+    stats_dir = tmp_path / "local" / "work" / "stats"
+    stats_dir.mkdir(parents=True, exist_ok=True)
+    set_config(ServerConfig(data_dir=str(tmp_path)))
 
     # Create test files
-    (tmp_path / "test.json").write_text("{}")
-    (tmp_path / "subfolder").mkdir()
+    (workflows_dir / "test.json").write_text("{}")
+    (workflows_dir / "subfolder").mkdir()
 
     client = TestClient(app)
     response = client.get("/api/workflows")
@@ -161,13 +171,15 @@ def test_list_workflows_nonexistent_path():
 # ##################################################################
 # test get_workflow endpoint
 # verifies workflow retrieval
-def test_get_workflow(tmp_path, monkeypatch):
-    import src.api as api_module
+def test_get_workflow(tmp_path):
+    from src.config import ServerConfig, set_config
 
-    monkeypatch.setattr(api_module, "WORKFLOWS_DIR", tmp_path)
+    workflows_dir = tmp_path / "local" / "work" / "workflows"
+    workflows_dir.mkdir(parents=True, exist_ok=True)
+    set_config(ServerConfig(data_dir=str(tmp_path)))
 
     workflow = {"nodes": [{"id": "n1"}], "connections": []}
-    (tmp_path / "test.json").write_text(json.dumps(workflow))
+    (workflows_dir / "test.json").write_text(json.dumps(workflow))
 
     client = TestClient(app)
     response = client.get("/api/workflow/test.json")
@@ -175,10 +187,12 @@ def test_get_workflow(tmp_path, monkeypatch):
     assert response.json() == workflow
 
 
-def test_get_workflow_not_found(tmp_path, monkeypatch):
-    import src.api as api_module
+def test_get_workflow_not_found(tmp_path):
+    from src.config import ServerConfig, set_config
 
-    monkeypatch.setattr(api_module, "WORKFLOWS_DIR", tmp_path)
+    workflows_dir = tmp_path / "local" / "work" / "workflows"
+    workflows_dir.mkdir(parents=True, exist_ok=True)
+    set_config(ServerConfig(data_dir=str(tmp_path)))
 
     client = TestClient(app)
     response = client.get("/api/workflow/nonexistent.json")
@@ -188,10 +202,12 @@ def test_get_workflow_not_found(tmp_path, monkeypatch):
 # ##################################################################
 # test save_workflow endpoint
 # verifies workflow saving
-def test_save_workflow(tmp_path, monkeypatch):
-    import src.api as api_module
+def test_save_workflow(tmp_path):
+    from src.config import ServerConfig, set_config
 
-    monkeypatch.setattr(api_module, "WORKFLOWS_DIR", tmp_path)
+    workflows_dir = tmp_path / "local" / "work" / "workflows"
+    workflows_dir.mkdir(parents=True, exist_ok=True)
+    set_config(ServerConfig(data_dir=str(tmp_path)))
 
     workflow = {"nodes": [{"id": "n1", "typeId": "start"}], "connections": []}
 
@@ -201,18 +217,21 @@ def test_save_workflow(tmp_path, monkeypatch):
     assert response.json()["saved"] is True
 
     # Verify file was created
-    saved = json.loads((tmp_path / "new.json").read_text())
+    saved = json.loads((workflows_dir / "new.json").read_text())
     assert saved == workflow
 
 
 # ##################################################################
 # test execute_workflow endpoint
 # verifies workflow execution and stats update
-def test_execute_workflow(tmp_path, monkeypatch):
-    import src.api as api_module
+def test_execute_workflow(tmp_path):
+    from src.config import ServerConfig, set_config
 
-    monkeypatch.setattr(api_module, "WORKFLOWS_DIR", tmp_path)
-    monkeypatch.setattr(api_module, "STATS_DIR", tmp_path / "stats")
+    workflows_dir = tmp_path / "local" / "work" / "workflows"
+    workflows_dir.mkdir(parents=True, exist_ok=True)
+    stats_dir = tmp_path / "local" / "work" / "stats"
+    stats_dir.mkdir(parents=True, exist_ok=True)
+    set_config(ServerConfig(data_dir=str(tmp_path)))
 
     workflow = {"nodes": [{"id": "n1", "typeId": "scheduled", "name": "sched1", "data": {}}], "connections": []}
 
