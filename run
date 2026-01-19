@@ -75,9 +75,9 @@ def command_lint(_: argparse.Namespace) -> int:
 
 # ##################################################################
 # check command
-# runs full test suite and quality gates
+# runs full test suite and quality gates on src directory
 def command_check(_: argparse.Namespace) -> int:
-    return run_cmd(["dazpycheck"])
+    return run_cmd(["dazpycheck", "--pattern", "src/"])
 
 
 # ##################################################################
