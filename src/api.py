@@ -8,12 +8,13 @@ from pathlib import Path
 from typing import Any
 
 import setproctitle
-from fastapi import APIRouter, FastAPI, HTTPException, Request
+from fastapi import APIRouter, FastAPI, HTTPException, Request, WebSocket
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
+from .agent_ws import handle_agent_connection
 from .agents import get_registry
 from .config import get_config
 from .credentials import (
@@ -368,6 +369,15 @@ def delete_agent(name: str):
 
     registry.delete_agent(name)
     return {"status": "deleted"}
+
+
+# ##################################################################
+# agent websocket endpoint
+# websocket connection for agents to connect to server
+@app.websocket("/ws/agent/{name}/{secret}")
+async def agent_websocket(websocket: WebSocket, name: str, secret: str):
+    """WebSocket endpoint for agent connections."""
+    await handle_agent_connection(websocket, name, secret)
 
 
 # ##################################################################
