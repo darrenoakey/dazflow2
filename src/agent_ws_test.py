@@ -1,22 +1,18 @@
 """Tests for agent WebSocket handler."""
 
-import sys
 import tempfile
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent))
 
 import pytest
 from fastapi.testclient import TestClient
 
-from agent_ws import (
+from .agent_ws import (
     get_connected_agents,
     handle_agent_connection,
     is_agent_connected,
     send_to_agent,
 )
-from agents import AgentRegistry, set_registry
-from config import ServerConfig, set_config
+from .agents import AgentRegistry, set_registry
+from .config import ServerConfig, set_config
 
 
 # ##################################################################

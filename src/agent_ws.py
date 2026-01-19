@@ -1,14 +1,10 @@
 """WebSocket handler for agent connections."""
 
-import sys
 from datetime import UTC, datetime
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent))
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from agents import get_registry
+from .agents import get_registry
 
 # Track connected agents
 _connected_agents: dict[str, WebSocket] = {}

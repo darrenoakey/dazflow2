@@ -1,5 +1,6 @@
 """Server configuration system."""
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -9,8 +10,8 @@ class ServerConfig:
     """Configuration for the dazflow2 server.
 
     Attributes:
-        port: TCP port to listen on (default 5000)
-        data_dir: Directory for all persistent data (default ".")
+        port: TCP port to listen on (default 5000, can be overridden with DAZFLOW_PORT env var)
+        data_dir: Directory for all persistent data (default ".", can be overridden with DAZFLOW_DATA_DIR env var)
     """
 
     port: int = 5000
@@ -43,11 +44,13 @@ _config: ServerConfig | None = None
 
 # ##################################################################
 # get global config instance
-# creates default config if none exists
+# creates default config if none exists, reading from environment variables
 def get_config() -> ServerConfig:
     global _config
     if _config is None:
-        _config = ServerConfig()
+        port = int(os.environ.get("DAZFLOW_PORT", "5000"))
+        data_dir = os.environ.get("DAZFLOW_DATA_DIR", ".")
+        _config = ServerConfig(port=port, data_dir=data_dir)
     return _config
 
 
