@@ -3,13 +3,10 @@
 import hashlib
 import json
 import secrets
-import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
-
-from config import get_config
+from .config import get_config
 
 
 @dataclass

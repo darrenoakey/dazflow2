@@ -659,3 +659,129 @@ def test_delete_agent_not_found(tmp_path):
     client = TestClient(app)
     response = client.delete("/api/agents/nonexistent")
     assert response.status_code == 404
+
+
+# ##################################################################
+# test built-in agent functionality
+# verifies built-in agent is created and can be managed
+
+
+def test_builtin_agent_secret_storage(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.api import _store_builtin_secret, _get_builtin_secret
+
+    # Setup isolated environment
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+
+    # Store secret
+    test_secret = "test-secret-123"
+    _store_builtin_secret(test_secret)
+
+    # Verify it was stored
+    secret_file = tmp_path / "builtin_agent_secret"
+    assert secret_file.exists()
+
+    # Retrieve secret
+    retrieved = _get_builtin_secret()
+    assert retrieved == test_secret
+
+
+def test_builtin_agent_secret_not_found(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.api import _get_builtin_secret
+
+    # Setup isolated environment
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+
+    # No secret file exists
+    retrieved = _get_builtin_secret()
+    assert retrieved is None
+
+
+def test_builtin_agent_created_on_startup(tmp_path, monkeypatch):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+    from src.api import start_builtin_agent, stop_builtin_agent
+    import asyncio
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    registry = AgentRegistry(str(agents_file))
+    set_registry(registry)
+
+    # Mock the DazflowAgent to prevent actual connection
+    class MockAgent:
+        def __init__(self, server_url, name, secret):
+            self.server_url = server_url
+            self.name = name
+            self.secret = secret
+            self.running = True
+
+        async def run(self):
+            # Simulate agent running without actually connecting
+            while self.running:
+                await asyncio.sleep(0.1)
+
+        def stop(self):
+            self.running = False
+
+    # Patch the import
+
+    original_import = __import__
+
+    def custom_import(name, *args, **kwargs):
+        if name == "agent":
+            # Return a module-like object with DazflowAgent
+            class MockAgentModule:
+                DazflowAgent = MockAgent
+
+            return MockAgentModule()
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.__import__", custom_import)
+
+    # Start built-in agent
+    async def test_startup():
+        await start_builtin_agent()
+
+        # Verify agent was created
+        builtin = registry.get_agent("built-in")
+        assert builtin is not None
+        assert builtin.name == "built-in"
+        assert builtin.enabled is True
+
+        # Verify secret was stored
+        secret_file = tmp_path / "builtin_agent_secret"
+        assert secret_file.exists()
+
+        # Cleanup
+        await stop_builtin_agent()
+
+    asyncio.run(test_startup())
+
+
+def test_builtin_agent_can_be_disabled(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    registry = AgentRegistry(str(agents_file))
+    set_registry(registry)
+
+    # Create built-in agent
+    registry.create_agent("built-in")
+
+    # Disable via API
+    client = TestClient(app)
+    response = client.put("/api/agents/built-in", json={"enabled": False})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "built-in"
+    assert data["enabled"] is False
+
+    # Verify it persisted
+    builtin = registry.get_agent("built-in")
+    assert builtin.enabled is False

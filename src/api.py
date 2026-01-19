@@ -1,6 +1,7 @@
 import asyncio
 import json
 import shutil
+import sys
 import time
 from contextlib import asynccontextmanager
 from dataclasses import asdict
@@ -52,6 +53,9 @@ from .worker import (
     wake_workers,
 )
 
+# Add agent directory to path for importing DazflowAgent
+sys.path.insert(0, str(Path(__file__).parent.parent / "agent"))
+
 SERVER_START_TIME = time.time()
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -61,6 +65,10 @@ _executions_cache_task: asyncio.Task | None = None
 EXECUTIONS_CACHE_INTERVAL = 10  # seconds
 PROJECT_ROOT = Path(__file__).parent.parent
 SAMPLE_WORKFLOW = PROJECT_ROOT / "sample.json"
+
+# Built-in agent state
+_builtin_agent = None
+_builtin_agent_task: asyncio.Task | None = None
 
 
 # ##################################################################
@@ -92,6 +100,26 @@ def _get_executions_dir() -> Path:
 
 def _get_indexes_dir() -> Path:
     return _get_work_dir() / "indexes"
+
+
+# ##################################################################
+# store built-in agent secret to file
+# persists secret for built-in agent so it survives restarts
+def _store_builtin_secret(secret: str) -> None:
+    config = get_config()
+    secret_file = Path(config.data_dir) / "builtin_agent_secret"
+    secret_file.write_text(secret)
+
+
+# ##################################################################
+# get built-in agent secret from file
+# returns secret if file exists, otherwise None
+def _get_builtin_secret() -> str | None:
+    config = get_config()
+    secret_file = Path(config.data_dir) / "builtin_agent_secret"
+    if secret_file.exists():
+        return secret_file.read_text().strip()
+    return None
 
 
 # ##################################################################
@@ -187,6 +215,58 @@ async def stop_executions_cache():
         _executions_cache_task = None
 
 
+async def start_builtin_agent():
+    """Start the built-in agent."""
+    global _builtin_agent, _builtin_agent_task
+
+    # Lazy import to avoid circular dependencies
+    from agent import DazflowAgent
+
+    # Create built-in agent if it doesn't exist
+    registry = get_registry()
+    builtin = registry.get_agent("built-in")
+    if not builtin:
+        builtin, secret = registry.create_agent("built-in")
+        _store_builtin_secret(secret)
+
+    # Get the secret
+    secret = _get_builtin_secret()
+    if not secret:
+        print("[WARNING] Built-in agent secret not found, skipping agent start")
+        return
+
+    # Start built-in agent
+    config = get_config()
+    server_url = f"ws://127.0.0.1:{config.port}"
+
+    _builtin_agent = DazflowAgent(server_url, "built-in", secret)
+
+    # Give the server a moment to finish starting up before agent connects
+    async def start_agent_delayed():
+        await asyncio.sleep(1)
+        await _builtin_agent.run()
+
+    _builtin_agent_task = asyncio.create_task(start_agent_delayed())
+
+
+async def stop_builtin_agent():
+    """Stop the built-in agent."""
+    global _builtin_agent, _builtin_agent_task
+
+    if _builtin_agent:
+        _builtin_agent.stop()
+
+    if _builtin_agent_task:
+        _builtin_agent_task.cancel()
+        try:
+            await _builtin_agent_task
+        except asyncio.CancelledError:
+            pass
+        _builtin_agent_task = None
+
+    _builtin_agent = None
+
+
 # ##################################################################
 # lifespan context manager
 # handles startup and shutdown events
@@ -196,7 +276,9 @@ async def lifespan(_app: FastAPI):
     await start_workers()
     await start_trigger_system()
     await start_executions_cache()
+    await start_builtin_agent()
     yield
+    await stop_builtin_agent()
     await stop_executions_cache()
     await stop_trigger_system()
     await stop_workers()

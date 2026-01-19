@@ -2,14 +2,11 @@
 
 import hashlib
 import json
-import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
-
-from agents import Agent, AgentRegistry, get_registry, set_registry
-from config import ServerConfig, set_config
+from .agents import Agent, AgentRegistry, get_registry, set_registry
+from .config import ServerConfig, set_config
 
 
 # ##################################################################
@@ -404,7 +401,7 @@ def test_get_agent_nonexistent():
 # test global registry functions
 def test_get_registry_creates_instance():
     # Reset global registry
-    import agents as agents_module
+    from . import agents as agents_module
 
     agents_module._registry = None
 
@@ -417,7 +414,7 @@ def test_get_registry_creates_instance():
 
 def test_set_registry_changes_global():
     # Reset global registry
-    import agents as agents_module
+    from . import agents as agents_module
 
     agents_module._registry = None
 

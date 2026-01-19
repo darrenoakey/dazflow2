@@ -5,3 +5,4 @@ __pycache__/
 *.pyc
 .venv/
 agents.json
+builtin_agent_secret
