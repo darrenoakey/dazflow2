@@ -3,6 +3,7 @@ import json
 import shutil
 import time
 from contextlib import asynccontextmanager
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
+from .agents import get_registry
 from .config import get_config
 from .credentials import (
     delete_credential,
@@ -291,6 +293,81 @@ async def test_credential_data_endpoint(request: Request):
 
     result = test_credential_data(cred_type, cred_data)
     return result
+
+
+# ##################################################################
+# agent endpoints
+# manage distributed agents
+
+
+@api_router.get("/agents")
+def list_agents():
+    """List all agents."""
+    registry = get_registry()
+    agents = registry.list_agents()
+    return [asdict(a) for a in agents]
+
+
+@api_router.post("/agents")
+def create_agent(request: dict):
+    """Create a new agent."""
+    name = request.get("name", "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Agent name is required")
+
+    registry = get_registry()
+    if registry.get_agent(name):
+        raise HTTPException(status_code=400, detail=f"Agent '{name}' already exists")
+
+    agent, secret = registry.create_agent(name)
+
+    # Return agent data plus the secret (only available at creation time)
+    result = asdict(agent)
+    result["secret"] = secret
+    return result
+
+
+@api_router.get("/agents/{name}")
+def get_agent(name: str):
+    """Get single agent."""
+    registry = get_registry()
+    agent = registry.get_agent(name)
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"Agent '{name}' not found")
+    return asdict(agent)
+
+
+@api_router.put("/agents/{name}")
+def update_agent(name: str, request: dict):
+    """Update agent."""
+    registry = get_registry()
+    agent = registry.get_agent(name)
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"Agent '{name}' not found")
+
+    # Extract allowed fields from request
+    updates = {}
+    if "enabled" in request:
+        updates["enabled"] = bool(request["enabled"])
+    if "priority" in request:
+        updates["priority"] = int(request["priority"])
+    if "tags" in request:
+        updates["tags"] = list(request["tags"])
+
+    updated = registry.update_agent(name, **updates)
+    return asdict(updated)
+
+
+@api_router.delete("/agents/{name}")
+def delete_agent(name: str):
+    """Delete agent."""
+    registry = get_registry()
+    agent = registry.get_agent(name)
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"Agent '{name}' not found")
+
+    registry.delete_agent(name)
+    return {"status": "deleted"}
 
 
 # ##################################################################

@@ -368,3 +368,294 @@ def test_test_credential(monkeypatch):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] is True
+
+
+# ##################################################################
+# test agent endpoints
+# verifies agent CRUD operations
+
+
+def test_list_agents_empty(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    set_registry(AgentRegistry(str(agents_file)))
+
+    client = TestClient(app)
+    response = client.get("/api/agents")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) == 0
+
+
+def test_list_agents_with_agents(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    registry = AgentRegistry(str(agents_file))
+    set_registry(registry)
+
+    # Create some agents
+    registry.create_agent("agent1")
+    registry.create_agent("agent2")
+
+    client = TestClient(app)
+    response = client.get("/api/agents")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) == 2
+    names = {agent["name"] for agent in data}
+    assert names == {"agent1", "agent2"}
+
+
+def test_create_agent_success(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    set_registry(AgentRegistry(str(agents_file)))
+
+    client = TestClient(app)
+    response = client.post("/api/agents", json={"name": "test-agent"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "test-agent"
+    assert data["enabled"] is True
+    assert data["priority"] == 0
+    assert data["tags"] == []
+    assert data["status"] == "offline"
+    assert "secret" in data
+    assert "secret_hash" in data
+    assert len(data["secret"]) > 0
+
+
+def test_create_agent_no_name(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    set_registry(AgentRegistry(str(agents_file)))
+
+    client = TestClient(app)
+    response = client.post("/api/agents", json={})
+    assert response.status_code == 400
+    assert "name is required" in response.json()["detail"]
+
+
+def test_create_agent_empty_name(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    set_registry(AgentRegistry(str(agents_file)))
+
+    client = TestClient(app)
+    response = client.post("/api/agents", json={"name": "  "})
+    assert response.status_code == 400
+
+
+def test_create_agent_duplicate(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    registry = AgentRegistry(str(agents_file))
+    set_registry(registry)
+
+    # Create agent first time
+    registry.create_agent("duplicate-agent")
+
+    client = TestClient(app)
+    response = client.post("/api/agents", json={"name": "duplicate-agent"})
+    assert response.status_code == 400
+    assert "already exists" in response.json()["detail"]
+
+
+def test_get_agent_success(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    registry = AgentRegistry(str(agents_file))
+    set_registry(registry)
+
+    # Create agent
+    agent, secret = registry.create_agent("get-test-agent")
+
+    client = TestClient(app)
+    response = client.get("/api/agents/get-test-agent")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "get-test-agent"
+    assert data["enabled"] is True
+    assert "secret" not in data  # Secret should not be in GET response
+
+
+def test_get_agent_not_found(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    set_registry(AgentRegistry(str(agents_file)))
+
+    client = TestClient(app)
+    response = client.get("/api/agents/nonexistent")
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"]
+
+
+def test_update_agent_success(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    registry = AgentRegistry(str(agents_file))
+    set_registry(registry)
+
+    # Create agent
+    registry.create_agent("update-test-agent")
+
+    client = TestClient(app)
+    response = client.put("/api/agents/update-test-agent", json={"enabled": False, "priority": 5})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "update-test-agent"
+    assert data["enabled"] is False
+    assert data["priority"] == 5
+
+
+def test_update_agent_not_found(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    set_registry(AgentRegistry(str(agents_file)))
+
+    client = TestClient(app)
+    response = client.put("/api/agents/nonexistent", json={"enabled": False})
+    assert response.status_code == 404
+
+
+def test_update_agent_enabled(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    registry = AgentRegistry(str(agents_file))
+    set_registry(registry)
+
+    # Create agent
+    registry.create_agent("enable-test-agent")
+
+    client = TestClient(app)
+    response = client.put("/api/agents/enable-test-agent", json={"enabled": False})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["enabled"] is False
+
+    # Verify it persisted
+    agent = registry.get_agent("enable-test-agent")
+    assert agent.enabled is False
+
+
+def test_update_agent_priority(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    registry = AgentRegistry(str(agents_file))
+    set_registry(registry)
+
+    # Create agent
+    registry.create_agent("priority-test-agent")
+
+    client = TestClient(app)
+    response = client.put("/api/agents/priority-test-agent", json={"priority": 10})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["priority"] == 10
+
+
+def test_update_agent_tags(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    registry = AgentRegistry(str(agents_file))
+    set_registry(registry)
+
+    # Create agent
+    registry.create_agent("tags-test-agent")
+
+    client = TestClient(app)
+    response = client.put("/api/agents/tags-test-agent", json={"tags": ["gpu", "cuda"]})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["tags"] == ["gpu", "cuda"]
+
+
+def test_delete_agent_success(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    registry = AgentRegistry(str(agents_file))
+    set_registry(registry)
+
+    # Create agent
+    registry.create_agent("delete-test-agent")
+
+    client = TestClient(app)
+    response = client.delete("/api/agents/delete-test-agent")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "deleted"
+
+    # Verify it was deleted
+    assert registry.get_agent("delete-test-agent") is None
+
+
+def test_delete_agent_not_found(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    set_registry(AgentRegistry(str(agents_file)))
+
+    client = TestClient(app)
+    response = client.delete("/api/agents/nonexistent")
+    assert response.status_code == 404
