@@ -1141,6 +1141,182 @@
             background: #4a1a2e;
             color: #f87171;
         }
+        /* Agents Tab Styles */
+        .agents-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .agent-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 12px 16px;
+            background: #2a2a4e;
+            border-radius: 8px;
+            transition: background 0.15s;
+        }
+        .agent-item:hover {
+            background: #3a3a5e;
+        }
+        .agent-item.selected {
+            background: #3a3a5e;
+            border: 1px solid #667eea;
+        }
+        .agent-row-1 {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .agent-status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .agent-status-indicator.online {
+            background: #4ade80;
+        }
+        .agent-status-indicator.offline {
+            background: #888;
+        }
+        .agent-name {
+            font-size: 14px;
+            color: #eee;
+            font-weight: 500;
+        }
+        .agent-enabled-toggle {
+            padding: 4px 8px;
+            background: transparent;
+            border: 1px solid #4a4a6e;
+            border-radius: 4px;
+            color: #888;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .agent-enabled-toggle.enabled {
+            background: #2a4e2a;
+            border-color: #4ade80;
+            color: #4ade80;
+        }
+        .agent-enabled-toggle:hover {
+            background: #3a3a5e;
+        }
+        .agent-priority {
+            font-size: 11px;
+            color: #888;
+            cursor: pointer;
+        }
+        .agent-priority:hover {
+            color: #667eea;
+        }
+        .agent-tags {
+            font-size: 11px;
+            color: #888;
+            cursor: pointer;
+        }
+        .agent-tags:hover {
+            color: #667eea;
+        }
+        .agent-tasks {
+            font-size: 11px;
+            color: #888;
+            margin-left: auto;
+        }
+        .agent-row-2 {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 11px;
+            color: #888;
+            padding-left: 24px;
+        }
+        .agent-ip {
+            color: #888;
+        }
+        .agent-status {
+            color: #888;
+        }
+        .agent-version {
+            color: #888;
+        }
+        .agent-current-task {
+            color: #667eea;
+        }
+        .agent-last-seen {
+            color: #888;
+        }
+        .tags-section {
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid #3a3a5e;
+        }
+        .tags-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .tags-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .tag-item {
+            padding: 4px 12px;
+            background: #2a2a4e;
+            border: 1px solid #4a4a6e;
+            border-radius: 12px;
+            font-size: 11px;
+            color: #ccc;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .tag-item:hover {
+            background: #3a3a5e;
+            border-color: #667eea;
+            color: #667eea;
+        }
+        .agent-secret-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .agent-secret-modal-content {
+            background: #1a1a2e;
+            border: 1px solid #3a3a5e;
+            border-radius: 12px;
+            padding: 24px;
+            width: 500px;
+            max-width: 90%;
+        }
+        .agent-secret-warning {
+            background: #4a3a1e;
+            border: 1px solid #8a6a3e;
+            border-radius: 6px;
+            padding: 12px;
+            margin: 16px 0;
+            font-size: 13px;
+            color: #fbbf24;
+        }
+        .agent-secret-display {
+            background: #2a2a4e;
+            border: 1px solid #4a4a6e;
+            border-radius: 6px;
+            padding: 12px;
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+            margin: 16px 0;
+        }
         .workflows-toolbar {
             display: flex;
             gap: 12px;
@@ -1958,6 +2134,12 @@
             credentialsLoading: false,
             editingCredential: null, // { name, type, data, isNew }
 
+            // Agents state
+            agents: [],
+            agentsLoading: false,
+            editingAgent: null, // { name, isNew, secret }
+            selectedAgentName: null,
+
             // Load credentials from server
             loadCredentials: async () => {
                 set({ credentialsLoading: true });
@@ -2041,6 +2223,78 @@
             },
 
             setEditingCredential: (cred) => set({ editingCredential: cred }),
+
+            // Load agents from server
+            loadAgents: async () => {
+                set({ agentsLoading: true });
+                try {
+                    const response = await fetch('/api/agents');
+                    if (response.ok) {
+                        const agents = await response.json();
+                        set({ agents });
+                    }
+                } catch (e) {
+                    console.error('Failed to load agents:', e);
+                } finally {
+                    set({ agentsLoading: false });
+                }
+            },
+
+            // Create a new agent
+            createAgent: async (name) => {
+                try {
+                    const response = await fetch('/api/agents', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name }),
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        await get().loadAgents();
+                        return data; // Contains agent data + secret
+                    }
+                } catch (e) {
+                    console.error('Failed to create agent:', e);
+                }
+                return null;
+            },
+
+            // Update agent
+            updateAgent: async (name, updates) => {
+                try {
+                    const response = await fetch(`/api/agents/${encodeURIComponent(name)}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(updates),
+                    });
+                    if (response.ok) {
+                        await get().loadAgents();
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Failed to update agent:', e);
+                }
+                return false;
+            },
+
+            // Delete agent
+            deleteAgent: async (name) => {
+                try {
+                    const response = await fetch(`/api/agents/${encodeURIComponent(name)}`, {
+                        method: 'DELETE',
+                    });
+                    if (response.ok) {
+                        await get().loadAgents();
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Failed to delete agent:', e);
+                }
+                return false;
+            },
+
+            setEditingAgent: (agent) => set({ editingAgent: agent }),
+            setSelectedAgentName: (name) => set({ selectedAgentName: name }),
         }));
 
         // Subscribe to store changes and save to localStorage
@@ -4128,6 +4382,235 @@
             );
         }
 
+        // Agents Tab Component
+        function AgentsTab() {
+            const agents = useWorkflowStore((state) => state.agents);
+            const agentsLoading = useWorkflowStore((state) => state.agentsLoading);
+            const editingAgent = useWorkflowStore((state) => state.editingAgent);
+            const selectedAgentName = useWorkflowStore((state) => state.selectedAgentName);
+            const loadAgents = useWorkflowStore((state) => state.loadAgents);
+            const createAgent = useWorkflowStore((state) => state.createAgent);
+            const updateAgent = useWorkflowStore((state) => state.updateAgent);
+            const deleteAgent = useWorkflowStore((state) => state.deleteAgent);
+            const setEditingAgent = useWorkflowStore((state) => state.setEditingAgent);
+            const setSelectedAgentName = useWorkflowStore((state) => state.setSelectedAgentName);
+
+            useEffect(() => {
+                loadAgents();
+            }, []);
+
+            const handleCreateAgent = () => {
+                const name = prompt('Enter agent name:');
+                if (!name) return;
+
+                createAgent(name).then(data => {
+                    if (data && data.secret) {
+                        setEditingAgent({ name: data.name, secret: data.secret, isNew: true });
+                    }
+                });
+            };
+
+            const handleToggleEnabled = async (agent, e) => {
+                e.stopPropagation();
+                await updateAgent(agent.name, { enabled: !agent.enabled });
+            };
+
+            const handleEditPriority = async (agent) => {
+                const newPriority = prompt('Enter priority (number):', agent.priority.toString());
+                if (newPriority === null) return;
+                const priority = parseInt(newPriority, 10);
+                if (isNaN(priority)) return;
+                await updateAgent(agent.name, { priority });
+            };
+
+            const handleEditTags = async (agent) => {
+                const newTags = prompt('Enter tags (comma-separated):', agent.tags.join(', '));
+                if (newTags === null) return;
+                const tags = newTags.split(',').map(t => t.trim()).filter(Boolean);
+                await updateAgent(agent.name, { tags });
+            };
+
+            const handleDeleteAgent = async (agent, e) => {
+                e.stopPropagation();
+                if (!confirm(`Delete agent "${agent.name}"?`)) return;
+                await deleteAgent(agent.name);
+            };
+
+            const handleSelectAgent = (agentName) => {
+                setSelectedAgentName(selectedAgentName === agentName ? null : agentName);
+            };
+
+            // Get all unique tags from all agents
+            const allTags = [...new Set(agents.flatMap(a => a.tags))].sort();
+
+            const handleCreateTag = () => {
+                const tagName = prompt('Enter tag name:');
+                if (!tagName) return;
+                // Tag is created when assigned to an agent
+                if (selectedAgentName) {
+                    const agent = agents.find(a => a.name === selectedAgentName);
+                    if (agent && !agent.tags.includes(tagName)) {
+                        updateAgent(agent.name, { tags: [...agent.tags, tagName] });
+                    }
+                }
+            };
+
+            const handleAssignTag = (tagName) => {
+                if (!selectedAgentName) return;
+                const agent = agents.find(a => a.name === selectedAgentName);
+                if (!agent) return;
+                if (agent.tags.includes(tagName)) {
+                    // Remove tag
+                    updateAgent(agent.name, { tags: agent.tags.filter(t => t !== tagName) });
+                } else {
+                    // Add tag
+                    updateAgent(agent.name, { tags: [...agent.tags, tagName] });
+                }
+            };
+
+            return React.createElement('div', { 'data-testid': 'agents-tab' }, [
+                // Toolbar
+                React.createElement('div', { key: 'toolbar', className: 'workflows-toolbar' }, [
+                    React.createElement('button', {
+                        key: 'create',
+                        className: 'toolbar-btn',
+                        onClick: handleCreateAgent,
+                        'data-testid': 'create-agent-btn',
+                    }, [
+                        React.createElement('span', { key: 'icon', className: 'toolbar-btn-icon', dangerouslySetInnerHTML: { __html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>' }}),
+                        'Create Agent',
+                    ]),
+                ]),
+
+                // Empty state or list
+                agentsLoading
+                    ? React.createElement('div', { key: 'loading' }, 'Loading...')
+                    : agents.length === 0
+                    ? React.createElement('div', { key: 'empty', style: { color: '#888', padding: '20px 0' } },
+                        'No agents configured. Click "Create Agent" to add one.')
+                    : React.createElement('div', { key: 'list', className: 'agents-list', 'data-testid': 'agents-list' },
+                        agents.map(agent =>
+                            React.createElement('div', {
+                                key: agent.name,
+                                className: `agent-item ${selectedAgentName === agent.name ? 'selected' : ''}`,
+                                onClick: () => handleSelectAgent(agent.name),
+                                'data-testid': `agent-item-${agent.name}`,
+                            }, [
+                                // Row 1: status, name, enabled, priority, tags, tasks
+                                React.createElement('div', { key: 'row1', className: 'agent-row-1' }, [
+                                    React.createElement('div', {
+                                        key: 'status',
+                                        className: `agent-status-indicator ${agent.status}`,
+                                    }),
+                                    React.createElement('div', { key: 'name', className: 'agent-name' }, agent.name),
+                                    React.createElement('button', {
+                                        key: 'enabled',
+                                        className: `agent-enabled-toggle ${agent.enabled ? 'enabled' : ''}`,
+                                        onClick: (e) => handleToggleEnabled(agent, e),
+                                        'data-testid': `agent-enabled-${agent.name}`,
+                                    }, agent.enabled ? 'enabled' : 'disabled'),
+                                    React.createElement('div', {
+                                        key: 'priority',
+                                        className: 'agent-priority',
+                                        onDoubleClick: () => handleEditPriority(agent),
+                                        'data-testid': `agent-priority-${agent.name}`,
+                                    }, `pri:${agent.priority}`),
+                                    React.createElement('div', {
+                                        key: 'tags',
+                                        className: 'agent-tags',
+                                        onDoubleClick: () => handleEditTags(agent),
+                                        'data-testid': `agent-tags-${agent.name}`,
+                                    }, agent.tags.length > 0 ? `tags: ${agent.tags.join(', ')}` : 'tags: —'),
+                                    React.createElement('div', { key: 'tasks', className: 'agent-tasks' }, `tasks: ${agent.total_tasks}`),
+                                ]),
+                                // Row 2: ip, status, version, current task or last seen
+                                React.createElement('div', { key: 'row2', className: 'agent-row-2' }, [
+                                    React.createElement('div', { key: 'ip', className: 'agent-ip' }, agent.ip_address || '—'),
+                                    React.createElement('div', { key: 'status', className: 'agent-status' }, agent.status),
+                                    React.createElement('div', { key: 'version', className: 'agent-version' }, agent.version || 'v—'),
+                                    agent.current_task
+                                        ? React.createElement('div', { key: 'current', className: 'agent-current-task' }, `current: ${agent.current_task}`)
+                                        : agent.last_seen && agent.status === 'offline'
+                                        ? React.createElement('div', { key: 'last', className: 'agent-last-seen' }, `last: ${agent.last_seen}`)
+                                        : null,
+                                ]),
+                            ])
+                        )
+                    ),
+
+                // Tags section
+                agents.length > 0 && React.createElement('div', { key: 'tags-section', className: 'tags-section' }, [
+                    React.createElement('div', { key: 'header', className: 'tags-header' }, [
+                        React.createElement('div', { key: 'title', style: { fontSize: '12px', color: '#888' } },
+                            selectedAgentName
+                                ? `Tags (double-click to assign to ${selectedAgentName})`
+                                : 'Tags (select an agent first)'),
+                        React.createElement('button', {
+                            key: 'create',
+                            className: 'toolbar-btn',
+                            onClick: handleCreateTag,
+                            disabled: !selectedAgentName,
+                            'data-testid': 'create-tag-btn',
+                        }, [
+                            React.createElement('span', { key: 'icon', className: 'toolbar-btn-icon', dangerouslySetInnerHTML: { __html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>' }}),
+                            'Create Tag',
+                        ]),
+                    ]),
+                    React.createElement('div', { key: 'list', className: 'tags-list', 'data-testid': 'tags-list' },
+                        allTags.length === 0
+                            ? React.createElement('div', { style: { color: '#888', fontSize: '11px' } }, 'No tags yet')
+                            : allTags.map(tag =>
+                                React.createElement('div', {
+                                    key: tag,
+                                    className: 'tag-item',
+                                    onDoubleClick: () => handleAssignTag(tag),
+                                    'data-testid': `tag-${tag}`,
+                                }, tag)
+                            )
+                    ),
+                ]),
+
+                // Secret modal
+                editingAgent && React.createElement(AgentSecretModal, {
+                    key: 'modal',
+                    agent: editingAgent,
+                    onClose: () => setEditingAgent(null),
+                }),
+            ]);
+        }
+
+        // Agent Secret Modal Component
+        function AgentSecretModal({ agent, onClose }) {
+            const [copied, setCopied] = useState(false);
+
+            const handleCopy = () => {
+                navigator.clipboard.writeText(agent.secret);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            };
+
+            return React.createElement('div', { className: 'agent-secret-modal', onClick: (e) => e.target === e.currentTarget && onClose() },
+                React.createElement('div', { className: 'agent-secret-modal-content' }, [
+                    React.createElement('h2', { key: 'title', style: { margin: '0 0 16px 0' } }, `Agent Created: ${agent.name}`),
+                    React.createElement('div', { key: 'warning', className: 'agent-secret-warning' },
+                        'This secret will only be shown once. Copy it now and store it securely.'),
+                    React.createElement('div', { key: 'secret', className: 'agent-secret-display' }, agent.secret),
+                    React.createElement('div', { key: 'actions', className: 'credential-modal-actions' }, [
+                        React.createElement('button', {
+                            key: 'copy',
+                            className: 'credential-modal-btn save',
+                            onClick: handleCopy,
+                        }, copied ? 'Copied!' : 'Copy to Clipboard'),
+                        React.createElement('button', {
+                            key: 'close',
+                            className: 'credential-modal-btn cancel',
+                            onClick: onClose,
+                        }, 'Close'),
+                    ]),
+                ])
+            );
+        }
+
         // Credentials Tab Component
         function CredentialsTab() {
             const credentials = useWorkflowStore((state) => state.credentials);
@@ -4266,6 +4749,12 @@
                             onClick: () => setDashboardTab('credentials'),
                             'data-testid': 'tab-credentials',
                         }, 'Credentials'),
+                        React.createElement('button', {
+                            key: 'agents',
+                            className: `dashboard-tab ${dashboardTab === 'agents' ? 'active' : ''}`,
+                            onClick: () => setDashboardTab('agents'),
+                            'data-testid': 'tab-agents',
+                        }, 'Agents'),
                     ]),
                 ]),
                 React.createElement('div', { key: 'content', className: 'dashboard-content' },
@@ -4273,7 +4762,9 @@
                         ? React.createElement(WorkflowsTab)
                         : dashboardTab === 'executions'
                         ? React.createElement(ExecutionsTab)
-                        : React.createElement(CredentialsTab)
+                        : dashboardTab === 'credentials'
+                        ? React.createElement(CredentialsTab)
+                        : React.createElement(AgentsTab)
                 ),
             ]);
         }

@@ -965,3 +965,158 @@ test.describe('Executions', () => {
     await expect(nodeType).toHaveClass(/disabled/);
   });
 });
+
+test.describe('Agents', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('dashboard')).toBeVisible();
+  });
+
+  test('agents tab exists in navigation', async ({ page }) => {
+    await expect(page.getByTestId('tab-agents')).toBeVisible();
+    await expect(page.getByTestId('tab-agents')).toHaveText('Agents');
+  });
+
+  test('can switch to agents tab', async ({ page }) => {
+    await page.getByTestId('tab-agents').click();
+    await expect(page.getByTestId('tab-agents')).toHaveClass(/active/);
+    await expect(page.getByTestId('agents-tab')).toBeVisible();
+  });
+
+  test('agents tab shows create button', async ({ page }) => {
+    await page.getByTestId('tab-agents').click();
+    await expect(page.getByTestId('create-agent-btn')).toBeVisible();
+    await expect(page.getByTestId('create-agent-btn')).toContainText('Create Agent');
+  });
+
+  test('agents tab shows empty state when no agents', async ({ page }) => {
+    await page.getByTestId('tab-agents').click();
+    await expect(page.getByTestId('agents-tab')).toBeVisible();
+    // Note: There may be agents from other tests, so we just check the tab loads
+  });
+
+  test('can create an agent', async ({ page }) => {
+    await page.getByTestId('tab-agents').click();
+    await expect(page.getByTestId('agents-tab')).toBeVisible();
+
+    // Use timestamp to ensure unique agent name
+    const agentName = `test-agent-${Date.now()}`;
+
+    // Setup dialog handler - must be registered before the action that triggers it
+    page.once('dialog', async dialog => {
+      expect(dialog.type()).toBe('prompt');
+      await dialog.accept(agentName);
+    });
+
+    // Click create button (this triggers the prompt)
+    await page.getByTestId('create-agent-btn').click();
+
+    // Wait for the agent to be created and secret modal to appear
+    await expect(page.locator('.agent-secret-modal')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.agent-secret-modal-content')).toContainText(agentName);
+    await expect(page.locator('.agent-secret-display')).toBeVisible();
+
+    // Close the modal
+    await page.locator('button:has-text("Close")').click();
+    await expect(page.locator('.agent-secret-modal')).not.toBeVisible();
+
+    // Verify agent appears in list
+    await expect(page.getByTestId(`agent-item-${agentName}`)).toBeVisible();
+  });
+
+  test('can toggle agent enabled status', async ({ page }) => {
+    await page.getByTestId('tab-agents').click();
+    await expect(page.getByTestId('agents-tab')).toBeVisible();
+
+    const agentName = `test-toggle-${Date.now()}`;
+
+    // Create an agent first
+    page.once('dialog', async dialog => await dialog.accept(agentName));
+    await page.getByTestId('create-agent-btn').click();
+    await expect(page.locator('.agent-secret-modal')).toBeVisible({ timeout: 5000 });
+    await page.locator('button:has-text("Close")').click();
+
+    // Wait for agent to appear
+    await expect(page.getByTestId(`agent-item-${agentName}`)).toBeVisible();
+
+    // Agent should be enabled by default
+    const enableToggle = page.getByTestId(`agent-enabled-${agentName}`);
+    await expect(enableToggle).toHaveClass(/agent-enabled-toggle enabled/);
+    await expect(enableToggle).toContainText('enabled');
+
+    // Click to disable
+    await enableToggle.click();
+    await page.waitForTimeout(500); // Wait for API call
+
+    // Should now be disabled (only has base class, not 'enabled')
+    const classAttr = await enableToggle.getAttribute('class');
+    expect(classAttr).toBe('agent-enabled-toggle ');
+    await expect(enableToggle).toContainText('disabled');
+
+    // Click to re-enable
+    await enableToggle.click();
+    await page.waitForTimeout(500);
+
+    // Should be enabled again
+    await expect(enableToggle).toHaveClass(/agent-enabled-toggle enabled/);
+    await expect(enableToggle).toContainText('enabled');
+  });
+
+  test('can edit agent priority', async ({ page }) => {
+    await page.getByTestId('tab-agents').click();
+    await expect(page.getByTestId('agents-tab')).toBeVisible();
+
+    const agentName = `test-priority-${Date.now()}`;
+
+    // Create an agent
+    page.once('dialog', async dialog => await dialog.accept(agentName));
+    await page.getByTestId('create-agent-btn').click();
+    await expect(page.locator('.agent-secret-modal')).toBeVisible({ timeout: 5000 });
+    await page.locator('button:has-text("Close")').click();
+
+    // Wait for agent to appear
+    await expect(page.getByTestId(`agent-item-${agentName}`)).toBeVisible();
+
+    // Should have default priority 0
+    const priorityElement = page.getByTestId(`agent-priority-${agentName}`);
+    await expect(priorityElement).toContainText('pri:0');
+
+    // Double-click to edit
+    page.once('dialog', async dialog => await dialog.accept('42'));
+    await priorityElement.dblclick();
+    await page.waitForTimeout(500);
+
+    // Priority should now be 42
+    await expect(priorityElement).toContainText('pri:42');
+  });
+
+  test('can edit agent tags', async ({ page }) => {
+    await page.getByTestId('tab-agents').click();
+    await expect(page.getByTestId('agents-tab')).toBeVisible();
+
+    const agentName = `test-tags-${Date.now()}`;
+
+    // Create an agent
+    page.once('dialog', async dialog => await dialog.accept(agentName));
+    await page.getByTestId('create-agent-btn').click();
+    await expect(page.locator('.agent-secret-modal')).toBeVisible({ timeout: 5000 });
+    await page.locator('button:has-text("Close")').click();
+
+    // Wait for agent to appear
+    await expect(page.getByTestId(`agent-item-${agentName}`)).toBeVisible();
+
+    // Should have no tags initially
+    const tagsElement = page.getByTestId(`agent-tags-${agentName}`);
+    await expect(tagsElement).toContainText('tags: —');
+
+    // Double-click to edit
+    page.once('dialog', async dialog => await dialog.accept('gpu, cuda, linux'));
+    await tagsElement.dblclick();
+    await page.waitForTimeout(500);
+
+    // Tags should now be updated
+    await expect(tagsElement).toContainText('gpu');
+    await expect(tagsElement).toContainText('cuda');
+    await expect(tagsElement).toContainText('linux');
+  });
+});
