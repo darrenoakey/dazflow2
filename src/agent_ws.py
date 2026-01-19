@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from fastapi import WebSocket, WebSocketDisconnect
 
 from .agents import get_registry
+from .task_queue import get_queue
 
 # Track connected agents
 _connected_agents: dict[str, WebSocket] = {}
@@ -61,6 +62,10 @@ async def handle_agent_connection(websocket: WebSocket, name: str, secret: str):
 
         registry.update_agent(name, status="offline", last_seen=datetime.now(UTC).isoformat().replace("+00:00", "Z"))
 
+        # Requeue any tasks claimed by this agent
+        queue = get_queue()
+        queue.requeue_agent_tasks(name)
+
 
 # ##################################################################
 # handle message from agent
@@ -73,6 +78,30 @@ async def handle_agent_message(name: str, message: dict, websocket: WebSocket):
         registry = get_registry()
         registry.update_agent(name, last_seen=datetime.now(UTC).isoformat().replace("+00:00", "Z"))
         await websocket.send_json({"type": "heartbeat_ack"})
+
+    elif msg_type == "task_claim":
+        # Agent wants to claim a task
+        task_id = message.get("task_id")
+        queue = get_queue()
+        success = queue.claim_task(task_id, name)
+        if success:
+            await websocket.send_json({"type": "task_claimed_ok", "task_id": task_id})
+        else:
+            await websocket.send_json({"type": "task_claimed_fail", "task_id": task_id, "reason": "Task not available"})
+
+    elif msg_type == "task_complete":
+        # Agent completed a task
+        task_id = message.get("task_id")
+        result = message.get("result", {})
+        queue = get_queue()
+        queue.complete_task(task_id, result)
+
+    elif msg_type == "task_failed":
+        # Agent failed a task
+        task_id = message.get("task_id")
+        error = message.get("error", "Unknown error")
+        queue = get_queue()
+        queue.fail_task(task_id, error)
 
     # Other message types will be added in later PRs
 

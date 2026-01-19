@@ -13,6 +13,7 @@ from .agent_ws import (
 )
 from .agents import AgentRegistry, set_registry
 from .config import ServerConfig, set_config
+from .task_queue import Task, TaskQueue, set_queue
 
 
 # ##################################################################
@@ -417,3 +418,306 @@ async def test_multiple_messages_from_agent():
                 # Agent should still be online
                 agent = registry.get_agent("test-agent")
                 assert agent.status == "online"
+
+
+# ##################################################################
+# test agent task claim success
+# agent claims available task successfully
+@pytest.mark.asyncio
+async def test_agent_task_claim_success():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config = ServerConfig(data_dir=temp_dir)
+        set_config(config)
+
+        registry = AgentRegistry()
+        set_registry(registry)
+
+        # Create a fresh queue for this test
+        queue = TaskQueue()
+        set_queue(queue)
+
+        # Create agent
+        agent, secret = registry.create_agent("test-agent")
+        registry.update_agent("test-agent", enabled=True, status="online")
+
+        # Add task to queue
+        from datetime import datetime, timezone
+
+        task = Task(
+            id="task-1",
+            execution_id="exec-1",
+            workflow_name="test-workflow",
+            node_id="node-1",
+            execution_snapshot={"test": "data"},
+            queued_at=datetime.now(timezone.utc).isoformat(),
+        )
+        queue.enqueue(task)
+
+        app = create_test_app()
+
+        with TestClient(app) as client:
+            with client.websocket_connect(f"/ws/agent/test-agent/{secret}") as ws:
+                # Receive connect_ok
+                ws.receive_json()
+
+                # Agent claims task
+                ws.send_json({"type": "task_claim", "task_id": "task-1"})
+
+                # Should receive task_claimed_ok
+                response = ws.receive_json()
+                assert response == {"type": "task_claimed_ok", "task_id": "task-1"}
+
+                # Verify task moved to in_progress
+                assert queue.get_pending_count() == 0
+                assert queue.get_in_progress_count() == 1
+
+                # Verify agent current_task updated
+                agent = registry.get_agent("test-agent")
+                assert agent.current_task == "exec-1"
+
+
+# ##################################################################
+# test agent task claim failure
+# agent fails to claim nonexistent task
+@pytest.mark.asyncio
+async def test_agent_task_claim_failure():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config = ServerConfig(data_dir=temp_dir)
+        set_config(config)
+
+        registry = AgentRegistry()
+        set_registry(registry)
+
+        # Create a fresh queue for this test
+        queue = TaskQueue()
+        set_queue(queue)
+
+        # Create agent
+        agent, secret = registry.create_agent("test-agent")
+
+        app = create_test_app()
+
+        with TestClient(app) as client:
+            with client.websocket_connect(f"/ws/agent/test-agent/{secret}") as ws:
+                # Receive connect_ok
+                ws.receive_json()
+
+                # Agent tries to claim nonexistent task
+                ws.send_json({"type": "task_claim", "task_id": "nonexistent"})
+
+                # Should receive task_claimed_fail
+                response = ws.receive_json()
+                assert response["type"] == "task_claimed_fail"
+                assert response["task_id"] == "nonexistent"
+                assert "reason" in response
+
+
+# ##################################################################
+# test agent task complete
+# agent completes task and callback is called
+@pytest.mark.asyncio
+async def test_agent_task_complete():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config = ServerConfig(data_dir=temp_dir)
+        set_config(config)
+
+        registry = AgentRegistry()
+        set_registry(registry)
+
+        # Create a fresh queue for this test
+        queue = TaskQueue()
+        set_queue(queue)
+
+        # Create agent
+        agent, secret = registry.create_agent("test-agent")
+        registry.update_agent("test-agent", enabled=True, status="online")
+
+        # Add task to queue with callback
+        from datetime import datetime, timezone
+
+        callback_result = None
+
+        def on_complete(result):
+            nonlocal callback_result
+            callback_result = result
+
+        task = Task(
+            id="task-1",
+            execution_id="exec-1",
+            workflow_name="test-workflow",
+            node_id="node-1",
+            execution_snapshot={"test": "data"},
+            queued_at=datetime.now(timezone.utc).isoformat(),
+        )
+        queue.enqueue(task, on_complete=on_complete)
+
+        # Claim the task
+        queue.claim_task("task-1", "test-agent")
+
+        app = create_test_app()
+
+        with TestClient(app) as client:
+            with client.websocket_connect(f"/ws/agent/test-agent/{secret}") as ws:
+                # Receive connect_ok
+                ws.receive_json()
+
+                # Agent completes task
+                result = {"output": "success", "data": 42}
+                ws.send_json({"type": "task_complete", "task_id": "task-1", "result": result})
+
+                # Give time for async processing (messages may not be processed instantly)
+                import asyncio
+
+                await asyncio.sleep(0.1)
+
+                # Verify task removed from in_progress
+                assert queue.get_in_progress_count() == 0
+
+                # Verify callback was called
+                assert callback_result == result
+
+                # Verify agent current_task cleared and total_tasks incremented
+                agent = registry.get_agent("test-agent")
+                assert agent.current_task is None
+                assert agent.total_tasks == 1
+
+
+# ##################################################################
+# test agent task failed
+# agent reports task failure and callback receives error
+@pytest.mark.asyncio
+async def test_agent_task_failed():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config = ServerConfig(data_dir=temp_dir)
+        set_config(config)
+
+        registry = AgentRegistry()
+        set_registry(registry)
+
+        # Create a fresh queue for this test
+        queue = TaskQueue()
+        set_queue(queue)
+
+        # Create agent
+        agent, secret = registry.create_agent("test-agent")
+        registry.update_agent("test-agent", enabled=True, status="online")
+
+        # Add task to queue with callback
+        from datetime import datetime, timezone
+
+        callback_result = None
+
+        def on_complete(result):
+            nonlocal callback_result
+            callback_result = result
+
+        task = Task(
+            id="task-1",
+            execution_id="exec-1",
+            workflow_name="test-workflow",
+            node_id="node-1",
+            execution_snapshot={"test": "data"},
+            queued_at=datetime.now(timezone.utc).isoformat(),
+        )
+        queue.enqueue(task, on_complete=on_complete)
+
+        # Claim the task
+        queue.claim_task("task-1", "test-agent")
+
+        app = create_test_app()
+
+        with TestClient(app) as client:
+            with client.websocket_connect(f"/ws/agent/test-agent/{secret}") as ws:
+                # Receive connect_ok
+                ws.receive_json()
+
+                # Agent reports task failure
+                ws.send_json({"type": "task_failed", "task_id": "task-1", "error": "Something went wrong"})
+
+                # Give time for async processing
+                import asyncio
+
+                await asyncio.sleep(0.1)
+
+                # Verify task removed from in_progress
+                assert queue.get_in_progress_count() == 0
+
+                # Verify callback was called with error
+                assert callback_result == {"error": "Something went wrong"}
+
+                # Verify agent current_task cleared
+                agent = registry.get_agent("test-agent")
+                assert agent.current_task is None
+
+
+# ##################################################################
+# test agent disconnect requeues tasks
+# when agent disconnects, claimed tasks are requeued
+@pytest.mark.asyncio
+async def test_agent_disconnect_requeues_tasks():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config = ServerConfig(data_dir=temp_dir)
+        set_config(config)
+
+        registry = AgentRegistry()
+        set_registry(registry)
+
+        # Create a fresh queue for this test
+        queue = TaskQueue()
+        set_queue(queue)
+
+        # Create agent
+        agent, secret = registry.create_agent("test-agent")
+        registry.update_agent("test-agent", enabled=True, status="online")
+
+        # Add tasks to queue
+        from datetime import datetime, timezone
+
+        task1 = Task(
+            id="task-1",
+            execution_id="exec-1",
+            workflow_name="test-workflow",
+            node_id="node-1",
+            execution_snapshot={"test": "data"},
+            queued_at=datetime.now(timezone.utc).isoformat(),
+        )
+        task2 = Task(
+            id="task-2",
+            execution_id="exec-2",
+            workflow_name="test-workflow",
+            node_id="node-2",
+            execution_snapshot={"test": "data"},
+            queued_at=datetime.now(timezone.utc).isoformat(),
+        )
+        queue.enqueue(task1)
+        queue.enqueue(task2)
+
+        app = create_test_app()
+
+        with TestClient(app) as client:
+            with client.websocket_connect(f"/ws/agent/test-agent/{secret}") as ws:
+                # Receive connect_ok
+                ws.receive_json()
+
+                # Agent claims both tasks
+                ws.send_json({"type": "task_claim", "task_id": "task-1"})
+                ws.receive_json()  # task_claimed_ok
+
+                ws.send_json({"type": "task_claim", "task_id": "task-2"})
+                ws.receive_json()  # task_claimed_ok
+
+                # Verify both in progress
+                assert queue.get_pending_count() == 0
+                assert queue.get_in_progress_count() == 2
+
+            # After disconnect (context manager exit), tasks should be requeued
+            assert queue.get_pending_count() == 2
+            assert queue.get_in_progress_count() == 0
+
+            # Verify tasks were cleared
+            # Note: agent is offline now, so we can't use get_available_task
+            # Just verify the tasks were requeued and claims cleared
+            assert len(queue._pending) == 2
+            for task in queue._pending:
+                assert task.claimed_by is None
+                assert task.claimed_at is None

@@ -123,6 +123,15 @@ class DazflowAgent:
         elif msg_type == "task_available":
             # Task handling will be implemented in later PRs
             print(f"[{self._timestamp()}] Task available: {message.get('task', {}).get('id', 'unknown')}")
+        elif msg_type == "task_claimed_ok":
+            # Task claim was successful
+            task_id = message.get("task_id", "unknown")
+            print(f"[{self._timestamp()}] Successfully claimed task: {task_id}")
+        elif msg_type == "task_claimed_fail":
+            # Task claim failed
+            task_id = message.get("task_id", "unknown")
+            reason = message.get("reason", "unknown")
+            print(f"[{self._timestamp()}] Failed to claim task {task_id}: {reason}")
         elif msg_type == "kill_task":
             # Task killing will be implemented in later PRs
             print(f"[{self._timestamp()}] Kill task: {message.get('task_id', 'unknown')}")

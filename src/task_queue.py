@@ -1,0 +1,162 @@
+"""Task queue for distributing work to agents."""
+
+from dataclasses import dataclass
+from datetime import datetime, timezone
+
+from .agents import get_registry
+
+
+@dataclass
+class Task:
+    """A task to be executed by an agent."""
+
+    id: str
+    execution_id: str
+    workflow_name: str
+    node_id: str
+    execution_snapshot: dict  # Full execution state
+    queued_at: str
+    claimed_by: str | None = None
+    claimed_at: str | None = None
+
+
+class TaskQueue:
+    """Queue for distributing tasks to agents."""
+
+    def __init__(self):
+        self._pending: list[Task] = []
+        self._in_progress: dict[str, Task] = {}  # task_id -> Task
+        self._callbacks: dict[str, callable] = {}  # task_id -> completion callback
+
+    def enqueue(self, task: Task, on_complete: callable = None) -> None:
+        """Add a task to the queue."""
+        self._pending.append(task)
+        if on_complete:
+            self._callbacks[task.id] = on_complete
+        # Notify agents of new task
+        self._notify_agents()
+
+    def get_available_task(self, agent_name: str) -> Task | None:
+        """Get the next available task for an agent.
+
+        Returns None if no suitable task is available.
+        """
+        registry = get_registry()
+        agent = registry.get_agent(agent_name)
+        if not agent or not agent.enabled:
+            return None
+
+        for task in self._pending:
+            if self._can_agent_run_task(agent, task):
+                return task
+        return None
+
+    def claim_task(self, task_id: str, agent_name: str) -> bool:
+        """Attempt to claim a task for an agent.
+
+        Returns True if successfully claimed, False otherwise.
+        """
+        # Find task in pending
+        task = None
+        for t in self._pending:
+            if t.id == task_id:
+                task = t
+                break
+
+        if not task:
+            return False
+
+        # Move to in_progress
+        self._pending.remove(task)
+        task.claimed_by = agent_name
+        task.claimed_at = datetime.now(timezone.utc).isoformat()
+        self._in_progress[task_id] = task
+
+        # Update agent current task
+        registry = get_registry()
+        registry.update_agent(agent_name, current_task=task.execution_id)
+
+        return True
+
+    def complete_task(self, task_id: str, result: dict) -> None:
+        """Mark a task as completed."""
+        task = self._in_progress.pop(task_id, None)
+        if task:
+            # Clear agent current task
+            registry = get_registry()
+            if task.claimed_by:
+                registry.update_agent(task.claimed_by, current_task=None)
+                # Increment task count
+                agent = registry.get_agent(task.claimed_by)
+                if agent:
+                    registry.update_agent(task.claimed_by, total_tasks=agent.total_tasks + 1)
+
+            # Call completion callback
+            callback = self._callbacks.pop(task_id, None)
+            if callback:
+                callback(result)
+
+    def fail_task(self, task_id: str, error: str) -> None:
+        """Mark a task as failed."""
+        task = self._in_progress.pop(task_id, None)
+        if task:
+            # Clear agent current task
+            registry = get_registry()
+            if task.claimed_by:
+                registry.update_agent(task.claimed_by, current_task=None)
+
+            # Call completion callback with error
+            callback = self._callbacks.pop(task_id, None)
+            if callback:
+                callback({"error": error})
+
+    def requeue_agent_tasks(self, agent_name: str) -> None:
+        """Requeue all tasks claimed by an agent (on disconnect)."""
+        tasks_to_requeue = [task for task in self._in_progress.values() if task.claimed_by == agent_name]
+
+        for task in tasks_to_requeue:
+            del self._in_progress[task.id]
+            task.claimed_by = None
+            task.claimed_at = None
+            self._pending.insert(0, task)  # Add to front of queue
+
+    def _can_agent_run_task(self, agent, task: Task) -> bool:
+        """Check if an agent can run a task."""
+        # For now, any enabled online agent can run any task
+        # Agent selection will be added in PR5
+        return agent.enabled and agent.status == "online"
+
+    def _notify_agents(self) -> None:
+        """Notify connected agents of available tasks."""
+        # This will be implemented to send WebSocket notifications
+        pass
+
+    def get_pending_count(self) -> int:
+        """Get count of pending tasks."""
+        return len(self._pending)
+
+    def get_in_progress_count(self) -> int:
+        """Get count of in-progress tasks."""
+        return len(self._in_progress)
+
+
+# Global queue instance
+_queue: TaskQueue | None = None
+
+
+# ##################################################################
+# get global task queue instance
+# creates instance on first call
+def get_queue() -> TaskQueue:
+    global _queue
+    if _queue is None:
+        _queue = TaskQueue()
+    return _queue
+
+
+# ##################################################################
+# set global task queue instance
+# replaces current queue with new one for testing
+def set_queue(queue: TaskQueue) -> None:
+    global _queue
+    _queue = queue
