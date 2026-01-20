@@ -2204,6 +2204,9 @@
             editingAgent: null, // { name, isNew, secret }
             selectedAgentName: null,
 
+            // Tags state
+            tags: [],
+
             // Load credentials from server
             loadCredentials: async () => {
                 set({ credentialsLoading: true });
@@ -2359,6 +2362,37 @@
 
             setEditingAgent: (agent) => set({ editingAgent: agent }),
             setSelectedAgentName: (name) => set({ selectedAgentName: name }),
+
+            // Load tags from server
+            loadTags: async () => {
+                try {
+                    const response = await fetch('/api/tags');
+                    if (response.ok) {
+                        const data = await response.json();
+                        set({ tags: data.tags || [] });
+                    }
+                } catch (e) {
+                    console.error('Failed to load tags:', e);
+                }
+            },
+
+            // Create tag
+            createTag: async (name) => {
+                try {
+                    const response = await fetch('/api/tags', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name }),
+                    });
+                    if (response.ok) {
+                        await get().loadTags(); // Reload tags list
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Failed to create tag:', e);
+                }
+                return false;
+            },
 
             // Concurrency groups state
             concurrencyGroups: [],
@@ -3549,6 +3583,7 @@
             const ambientExecution = useWorkflowStore((state) => state.ambientExecution);
             const isReadOnly = useWorkflowStore((state) => state.isReadOnly);
             const agents = useWorkflowStore((state) => state.agents);
+            const tags = useWorkflowStore((state) => state.tags);
 
             const [localName, setLocalName] = useState(node?.name || '');
             const [nameError, setNameError] = useState(false);
@@ -3632,6 +3667,20 @@
                         agentConfig: { ...currentConfig, agents: newAgents }
                     });
                 }
+            };
+
+            // Required tags configuration handler
+            const handleRequiredTagChange = (tagName) => {
+                const currentConfig = node.data?.agentConfig || { agents: [], requiredTags: [] };
+                const currentTags = currentConfig.requiredTags || [];
+
+                const newTags = currentTags.includes(tagName)
+                    ? currentTags.filter(t => t !== tagName)
+                    : [...currentTags, tagName];
+
+                updateNodeData(nodeId, {
+                    agentConfig: { ...currentConfig, requiredTags: newTags }
+                });
             };
 
             // Pin/unpin the current output
@@ -3915,6 +3964,58 @@
                                             ])
                                         ),
                                     ]),
+                                ]),
+                                // Required Tags
+                                !isReadOnly && React.createElement('div', { key: 'required-tags-group', className: 'property-group' }, [
+                                    React.createElement('label', { key: 'label', className: 'property-label' }, 'Required Tags'),
+                                    React.createElement('div', { key: 'hint', className: 'property-description', style: { marginBottom: '8px', fontSize: '11px', color: '#888' } },
+                                        'Select tags that agents must have to run this node.'
+                                    ),
+                                    React.createElement('div', {
+                                        key: 'tag-list',
+                                        className: 'tag-selection-list',
+                                        style: {
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '4px',
+                                            maxHeight: '200px',
+                                            overflowY: 'auto',
+                                            padding: '8px',
+                                            background: '#2a2a4e',
+                                            border: '1px solid #3a3a5e',
+                                            borderRadius: '6px',
+                                        },
+                                        'data-testid': 'required-tags-section',
+                                    }, tags.length === 0
+                                        ? [React.createElement('div', {
+                                            key: 'no-tags',
+                                            style: { color: '#888', fontSize: '11px', padding: '6px' }
+                                        }, 'No tags available. Create tags in the Agents tab.')]
+                                        : tags.map(tag =>
+                                            React.createElement('label', {
+                                                key: tag,
+                                                style: {
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    padding: '6px',
+                                                    cursor: 'pointer',
+                                                },
+                                            }, [
+                                                React.createElement('input', {
+                                                    key: 'checkbox',
+                                                    type: 'checkbox',
+                                                    checked: (node.data?.agentConfig?.requiredTags || []).includes(tag),
+                                                    onChange: () => handleRequiredTagChange(tag),
+                                                    'data-testid': `required-tag-checkbox-${tag}`,
+                                                }),
+                                                React.createElement('span', {
+                                                    key: 'name',
+                                                    style: { fontSize: '12px', color: '#ccc' }
+                                                }, tag),
+                                            ])
+                                        )
+                                    ),
                                 ]),
                                 // Node-specific properties
                                 ...properties.map((prop) =>
@@ -4624,15 +4725,19 @@
             const agentsLoading = useWorkflowStore((state) => state.agentsLoading);
             const editingAgent = useWorkflowStore((state) => state.editingAgent);
             const selectedAgentName = useWorkflowStore((state) => state.selectedAgentName);
+            const tags = useWorkflowStore((state) => state.tags);
             const loadAgents = useWorkflowStore((state) => state.loadAgents);
+            const loadTags = useWorkflowStore((state) => state.loadTags);
             const createAgent = useWorkflowStore((state) => state.createAgent);
             const updateAgent = useWorkflowStore((state) => state.updateAgent);
             const deleteAgent = useWorkflowStore((state) => state.deleteAgent);
+            const createTag = useWorkflowStore((state) => state.createTag);
             const setEditingAgent = useWorkflowStore((state) => state.setEditingAgent);
             const setSelectedAgentName = useWorkflowStore((state) => state.setSelectedAgentName);
 
             useEffect(() => {
                 loadAgents();
+                loadTags();
             }, []);
 
             const handleCreateAgent = () => {
@@ -4676,17 +4781,19 @@
                 setSelectedAgentName(selectedAgentName === agentName ? null : agentName);
             };
 
-            // Get all unique tags from all agents
-            const allTags = [...new Set(agents.flatMap(a => a.tags))].sort();
+            // Use tags from the store (tags are managed independently via API)
+            const allTags = tags.sort();
 
-            const handleCreateTag = () => {
+            const handleCreateTag = async () => {
                 const tagName = prompt('Enter tag name:');
                 if (!tagName) return;
-                // Tag is created when assigned to an agent
+                // Create tag via API
+                await createTag(tagName);
+                // If an agent is selected, assign the tag to it
                 if (selectedAgentName) {
                     const agent = agents.find(a => a.name === selectedAgentName);
                     if (agent && !agent.tags.includes(tagName)) {
-                        updateAgent(agent.name, { tags: [...agent.tags, tagName] });
+                        await updateAgent(agent.name, { tags: [...agent.tags, tagName] });
                     }
                 }
             };
@@ -4775,17 +4882,16 @@
                     ),
 
                 // Tags section
-                agents.length > 0 && React.createElement('div', { key: 'tags-section', className: 'tags-section' }, [
+                agents.length > 0 && React.createElement('div', { key: 'tags-section', className: 'tags-section', 'data-testid': 'tags-section' }, [
                     React.createElement('div', { key: 'header', className: 'tags-header' }, [
                         React.createElement('div', { key: 'title', style: { fontSize: '12px', color: '#888' } },
                             selectedAgentName
-                                ? `Tags (double-click to assign to ${selectedAgentName})`
-                                : 'Tags (select an agent first)'),
+                                ? `Tags: double-click to assign to ${selectedAgentName}`
+                                : 'Tags: select an agent to assign'),
                         React.createElement('button', {
                             key: 'create',
                             className: 'toolbar-btn',
                             onClick: handleCreateTag,
-                            disabled: !selectedAgentName,
                             'data-testid': 'create-tag-btn',
                         }, [
                             React.createElement('span', { key: 'icon', className: 'toolbar-btn-icon', dangerouslySetInnerHTML: { __html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>' }}),
@@ -4800,7 +4906,7 @@
                                     key: tag,
                                     className: 'tag-item',
                                     onDoubleClick: () => handleAssignTag(tag),
-                                    'data-testid': `tag-${tag}`,
+                                    'data-testid': `tag-item-${tag}`,
                                 }, tag)
                             )
                     ),

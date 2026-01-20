@@ -6,3 +6,4 @@ __pycache__/
 .venv/
 agents.json
 builtin_agent_secret
+tags.json
