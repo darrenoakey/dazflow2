@@ -20,17 +20,16 @@ def run_cmd(cmd: list[str]) -> int:
 # start command
 # starts the fastapi server with uvicorn with hot reload enabled
 def command_start(args: argparse.Namespace) -> int:
-    # Set config before starting server
-    if args.port or args.data_dir:
-        from src.config import ServerConfig, set_config
-        config = ServerConfig(
-            port=args.port if args.port else 5000,
-            data_dir=args.data_dir if args.data_dir else "."
-        )
-        set_config(config)
+    # Determine port and data_dir (defaults match uvicorn startup)
+    port = args.port if args.port else 31415
+    data_dir = args.data_dir if args.data_dir else "."
+
+    # Set environment variables so config picks them up on import
+    os.environ["DAZFLOW_PORT"] = str(port)
+    os.environ["DAZFLOW_DATA_DIR"] = data_dir
 
     os.chdir(PROJECT_ROOT)
-    port_str = str(args.port) if args.port else "31415"
+    port_str = str(port)
     os.execv(
         sys.executable,
         [sys.executable, "-m", "uvicorn",
