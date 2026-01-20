@@ -9,7 +9,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: [['html', { outputFolder: './output/playwright-report' }]],
   use: {
-    baseURL: 'http://localhost:31415',
+    baseURL: 'http://localhost:31416',
     trace: 'on-first-retry',
   },
   projects: [
@@ -19,9 +19,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: './run start',
-    url: 'http://localhost:31415',
-    reuseExistingServer: !process.env.CI,
+    command: './run-test-server.sh',
+    url: 'http://localhost:31416',
+    reuseExistingServer: false,
     timeout: 30000,
   },
 });

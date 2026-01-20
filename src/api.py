@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import shutil
 import sys
 import time
@@ -65,7 +66,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 # Executions cache (refreshed periodically by background task)
 _executions_cache: dict = {"items": [], "has_more": False, "last_updated": 0}
 _executions_cache_task: asyncio.Task | None = None
-EXECUTIONS_CACHE_INTERVAL = 10  # seconds
+EXECUTIONS_CACHE_INTERVAL = int(os.environ.get("DAZFLOW_EXECUTIONS_CACHE_INTERVAL", "10"))  # seconds
 PROJECT_ROOT = Path(__file__).parent.parent
 SAMPLE_WORKFLOW = PROJECT_ROOT / "sample.json"
 
