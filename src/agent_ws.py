@@ -126,6 +126,13 @@ async def handle_agent_message(name: str, message: dict, websocket: WebSocket):
                 updated_creds = agent.credentials + [cred_name]
                 registry.update_agent(name, credentials=updated_creds)
 
+    elif msg_type == "task_progress":
+        # Agent sends log updates for a task
+        task_id = message.get("task_id")
+        logs = message.get("logs", [])
+        queue = get_queue()
+        queue.add_task_logs(task_id, logs)
+
     elif msg_type == "version":
         # Agent reports its version
         agent_version = message.get("version", "unknown")

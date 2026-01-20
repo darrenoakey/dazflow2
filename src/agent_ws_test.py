@@ -878,3 +878,71 @@ async def test_agent_version_cleared_on_disconnect():
             from . import agent_ws
 
             assert "test-agent" not in agent_ws._agent_versions
+
+
+# ##################################################################
+# test agent task_progress message
+# agent sends log progress and server stores it
+@pytest.mark.asyncio
+async def test_agent_task_progress():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config = ServerConfig(data_dir=temp_dir)
+        set_config(config)
+
+        registry = AgentRegistry()
+        set_registry(registry)
+
+        # Create a fresh queue for this test
+        queue = TaskQueue()
+        set_queue(queue)
+
+        # Create agent
+        agent, secret = registry.create_agent("test-agent")
+        registry.update_agent("test-agent", enabled=True, status="online")
+
+        # Add task to queue
+        from datetime import datetime, timezone
+
+        task = Task(
+            id="task-1",
+            execution_id="exec-1",
+            workflow_name="test-workflow",
+            node_id="node-1",
+            execution_snapshot={"test": "data"},
+            queued_at=datetime.now(timezone.utc).isoformat(),
+        )
+        queue.enqueue(task)
+
+        # Claim the task
+        queue.claim_task("task-1", "test-agent")
+
+        app = create_test_app()
+
+        with TestClient(app) as client:
+            with client.websocket_connect(f"/ws/agent/test-agent/{secret}") as ws:
+                # Receive connect_ok
+                ws.receive_json()
+
+                # Agent sends task progress logs
+                ws.send_json(
+                    {
+                        "type": "task_progress",
+                        "task_id": "task-1",
+                        "logs": [
+                            {"line": "Starting execution...", "timestamp": "2024-01-20T10:30:00Z"},
+                            {"line": "Processing item 1...", "timestamp": "2024-01-20T10:30:01Z"},
+                        ],
+                    }
+                )
+
+                # Give time for async processing
+                import asyncio
+
+                await asyncio.sleep(0.1)
+
+                # Verify the message was handled without error
+                # (logs are stored in task which can be verified separately)
+                # Connection should still be alive
+                ws.send_json({"type": "heartbeat"})
+                response = ws.receive_json()
+                assert response["type"] == "heartbeat_ack"

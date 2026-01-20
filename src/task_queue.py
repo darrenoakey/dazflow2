@@ -19,6 +19,7 @@ class Task:
     queued_at: str
     claimed_by: str | None = None
     claimed_at: str | None = None
+    logs: list[dict] | None = None  # Log lines with timestamps
 
 
 class TaskQueue:
@@ -201,6 +202,19 @@ class TaskQueue:
     def get_in_progress_count(self) -> int:
         """Get count of in-progress tasks."""
         return len(self._in_progress)
+
+    def add_task_logs(self, task_id: str, logs: list[dict]) -> None:
+        """Add log lines to a task.
+
+        Args:
+            task_id: Task ID to add logs to
+            logs: List of log entries with 'line' and 'timestamp' fields
+        """
+        task = self._in_progress.get(task_id)
+        if task:
+            if task.logs is None:
+                task.logs = []
+            task.logs.extend(logs)
 
 
 # Global queue instance

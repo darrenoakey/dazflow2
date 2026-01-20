@@ -20,6 +20,98 @@ except ImportError:
     sys.exit(1)
 
 
+class LogBuffer:
+    """Buffers and ships logs to server."""
+
+    def __init__(self, max_lines=100, flush_interval=0.5):
+        """Initialize log buffer.
+
+        Args:
+            max_lines: Maximum lines before auto-flush
+            flush_interval: Seconds between periodic flushes
+        """
+        self._buffer = []
+        self._lock = asyncio.Lock()
+        self._max_lines = max_lines
+        self._flush_interval = flush_interval
+
+    async def add(self, task_id, line):
+        """Add a log line to the buffer.
+
+        Args:
+            task_id: Task ID this log belongs to
+            line: Log line text
+        """
+        async with self._lock:
+            self._buffer.append(
+                {
+                    "task_id": task_id,
+                    "line": line,
+                    "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                }
+            )
+
+    async def add_and_maybe_flush(self, task_id, line, websocket):
+        """Add a log line and flush if buffer is full.
+
+        Args:
+            task_id: Task ID this log belongs to
+            line: Log line text
+            websocket: WebSocket connection to flush to
+        """
+        await self.add(task_id, line)
+        async with self._lock:
+            if len(self._buffer) >= self._max_lines:
+                await self._flush_locked(websocket)
+
+    async def flush(self, websocket):
+        """Send buffered logs to server.
+
+        Args:
+            websocket: WebSocket connection to send to
+        """
+        async with self._lock:
+            await self._flush_locked(websocket)
+
+    async def _flush_locked(self, websocket):
+        """Internal flush - must be called with lock held.
+
+        Args:
+            websocket: WebSocket connection to send to
+        """
+        if not self._buffer:
+            return
+
+        # Group logs by task_id
+        tasks_logs = {}
+        for log_entry in self._buffer:
+            task_id = log_entry["task_id"]
+            if task_id not in tasks_logs:
+                tasks_logs[task_id] = []
+            tasks_logs[task_id].append({"line": log_entry["line"], "timestamp": log_entry["timestamp"]})
+
+        # Send one message per task
+        for task_id, logs in tasks_logs.items():
+            message = {"type": "task_progress", "task_id": task_id, "logs": logs}
+            await websocket.send(json.dumps(message))
+
+        # Clear buffer
+        self._buffer.clear()
+
+    async def run_shipping_loop(self, websocket):
+        """Background task that periodically flushes logs.
+
+        Args:
+            websocket: WebSocket connection to send to
+        """
+        while True:
+            await asyncio.sleep(self._flush_interval)
+            await self.flush(websocket)
+
+
+# ##################################################################
+# dazflow agent
+# connects to server and executes tasks
 class DazflowAgent:
     """Agent that connects to dazflow2 server and executes tasks."""
 
