@@ -3412,6 +3412,7 @@
             const setNodeExecution = useWorkflowStore((state) => state.setNodeExecution);
             const ambientExecution = useWorkflowStore((state) => state.ambientExecution);
             const isReadOnly = useWorkflowStore((state) => state.isReadOnly);
+            const agents = useWorkflowStore((state) => state.agents);
 
             const [localName, setLocalName] = useState(node?.name || '');
             const [nameError, setNameError] = useState(false);
@@ -3473,6 +3474,27 @@
                     }
                 } else if (!trimmedName) {
                     setLocalName(node.name);
+                }
+            };
+
+            // Agent configuration handlers
+            const handleAgentSelectionChange = (agentName) => {
+                const currentConfig = node.data?.agentConfig || { agents: [], requiredTags: [] };
+                const currentAgents = currentConfig.agents || [];
+
+                if (agentName === 'any') {
+                    // "Any agent" selected - clear agents list
+                    updateNodeData(nodeId, {
+                        agentConfig: { ...currentConfig, agents: [] }
+                    });
+                } else {
+                    // Toggle specific agent
+                    const newAgents = currentAgents.includes(agentName)
+                        ? currentAgents.filter(a => a !== agentName)
+                        : [...currentAgents, agentName];
+                    updateNodeData(nodeId, {
+                        agentConfig: { ...currentConfig, agents: newAgents }
+                    });
                 }
             };
 
@@ -3679,6 +3701,84 @@
                                         className: 'property-description',
                                         style: { color: '#e74c3c' },
                                     }, 'Name must be unique'),
+                                ]),
+                                // Agent Configuration
+                                !isReadOnly && React.createElement('div', { key: 'agent-config-group', className: 'property-group' }, [
+                                    React.createElement('label', { key: 'label', className: 'property-label' }, 'Agent Configuration'),
+                                    React.createElement('div', { key: 'hint', className: 'property-description', style: { marginBottom: '8px', fontSize: '11px', color: '#888' } },
+                                        'Select which agents can run this node. "Any agent" allows all agents.'
+                                    ),
+                                    React.createElement('div', {
+                                        key: 'agent-list',
+                                        className: 'agent-selection-list',
+                                        style: {
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '4px',
+                                            maxHeight: '200px',
+                                            overflowY: 'auto',
+                                            padding: '8px',
+                                            background: '#2a2a4e',
+                                            border: '1px solid #3a3a5e',
+                                            borderRadius: '6px',
+                                        },
+                                        'data-testid': 'agent-selection-list',
+                                    }, [
+                                        // "Any agent" option
+                                        React.createElement('label', {
+                                            key: 'any-agent',
+                                            style: {
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                padding: '6px',
+                                                cursor: 'pointer',
+                                                borderBottom: '1px solid #3a3a5e',
+                                            },
+                                        }, [
+                                            React.createElement('input', {
+                                                key: 'checkbox',
+                                                type: 'checkbox',
+                                                checked: !(node.data?.agentConfig?.agents || []).length,
+                                                onChange: () => handleAgentSelectionChange('any'),
+                                                'data-testid': 'agent-checkbox-any',
+                                            }),
+                                            React.createElement('span', { key: 'text', style: { fontSize: '12px', color: '#eee' } }, 'Any agent'),
+                                        ]),
+                                        // Individual agent options
+                                        ...agents.map(agent =>
+                                            React.createElement('label', {
+                                                key: agent.name,
+                                                style: {
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    padding: '6px',
+                                                    cursor: 'pointer',
+                                                },
+                                            }, [
+                                                React.createElement('input', {
+                                                    key: 'checkbox',
+                                                    type: 'checkbox',
+                                                    checked: (node.data?.agentConfig?.agents || []).includes(agent.name),
+                                                    onChange: () => handleAgentSelectionChange(agent.name),
+                                                    'data-testid': `agent-checkbox-${agent.name}`,
+                                                }),
+                                                React.createElement('span', {
+                                                    key: 'name',
+                                                    style: { fontSize: '12px', color: '#ccc' }
+                                                }, agent.name),
+                                                React.createElement('span', {
+                                                    key: 'status',
+                                                    style: {
+                                                        marginLeft: 'auto',
+                                                        fontSize: '10px',
+                                                        color: agent.status === 'online' ? '#5b8def' : '#888',
+                                                    }
+                                                }, agent.status),
+                                            ])
+                                        ),
+                                    ]),
                                 ]),
                                 // Node-specific properties
                                 ...properties.map((prop) =>

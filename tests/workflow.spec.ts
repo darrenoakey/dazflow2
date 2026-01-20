@@ -1120,3 +1120,132 @@ test.describe('Agents', () => {
     await expect(tagsElement).toContainText('linux');
   });
 });
+
+test.describe('Agent Configuration in Node Editor', () => {
+  test.beforeEach(async ({ page }) => {
+    // Clear localStorage and navigate to editor
+    await page.goto('/');
+    await page.evaluate(() => localStorage.removeItem('dazflow2-workflow'));
+    await page.reload();
+    await expect(page.getByTestId('dashboard')).toBeVisible();
+    await expect(page.getByTestId('file-list')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('file-item-sample.json')).toBeVisible({ timeout: 10000 });
+    await page.getByTestId('file-item-sample.json').dblclick();
+    await expect(page.getByTestId('editor')).toBeVisible({ timeout: 10000 });
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Delete');
+  });
+
+  test('agent config section appears in node editor', async ({ page }) => {
+    // Add a node
+    await page.getByTestId('node-type-scheduled').click();
+    const node = page.getByTestId('workflow-node-scheduled');
+
+    // Open node editor
+    await node.locator('.custom-node').dblclick();
+    const dialog = page.locator('.node-editor-dialog');
+    await expect(dialog).toBeVisible();
+
+    // Agent Configuration section should be visible
+    await expect(dialog.locator('.property-label').filter({ hasText: 'Agent Configuration' })).toBeVisible();
+    await expect(page.getByTestId('agent-selection-list')).toBeVisible();
+
+    // "Any agent" should be checked by default
+    await expect(page.getByTestId('agent-checkbox-any')).toBeChecked();
+
+    // Close editor
+    await page.locator('.node-editor-close').click();
+  });
+
+  test('can select specific agents', async ({ page }) => {
+    // First, ensure we have at least one agent
+    await page.getByTestId('back-to-dashboard').click();
+    await expect(page.getByTestId('dashboard')).toBeVisible();
+    await page.getByTestId('tab-agents').click();
+
+    // Create test agent if needed
+    const agentName = `test-select-${Date.now()}`;
+    page.once('dialog', async dialog => await dialog.accept(agentName));
+    await page.getByTestId('create-agent-btn').click();
+    await expect(page.locator('.agent-secret-modal')).toBeVisible({ timeout: 5000 });
+    await page.locator('button:has-text("Close")').click();
+    await expect(page.getByTestId(`agent-item-${agentName}`)).toBeVisible();
+
+    // Go back to editor
+    await page.getByTestId('tab-workflows').click();
+    await page.getByTestId('file-item-sample.json').dblclick();
+    await expect(page.getByTestId('editor')).toBeVisible({ timeout: 10000 });
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Delete');
+
+    // Add a node
+    await page.getByTestId('node-type-scheduled').click();
+    const node = page.getByTestId('workflow-node-scheduled');
+
+    // Open node editor
+    await node.locator('.custom-node').dblclick();
+    const dialog = page.locator('.node-editor-dialog');
+    await expect(dialog).toBeVisible();
+
+    // "Any agent" should be checked by default
+    await expect(page.getByTestId('agent-checkbox-any')).toBeChecked();
+
+    // Uncheck "Any agent" by selecting a specific agent
+    const agentCheckbox = page.getByTestId(`agent-checkbox-${agentName}`);
+    await agentCheckbox.click();
+
+    // "Any agent" should now be unchecked
+    await expect(page.getByTestId('agent-checkbox-any')).not.toBeChecked();
+
+    // The specific agent should be checked
+    await expect(agentCheckbox).toBeChecked();
+
+    // Close and reopen to verify persistence
+    await page.locator('.node-editor-close').click();
+    await node.locator('.custom-node').dblclick();
+    await expect(dialog).toBeVisible();
+
+    // Specific agent should still be checked
+    await expect(page.getByTestId(`agent-checkbox-${agentName}`)).toBeChecked();
+    await expect(page.getByTestId('agent-checkbox-any')).not.toBeChecked();
+
+    await page.locator('.node-editor-close').click();
+  });
+
+  test('selecting Any agent deselects specific agents', async ({ page }) => {
+    // Create test agent
+    await page.getByTestId('back-to-dashboard').click();
+    await page.getByTestId('tab-agents').click();
+    const agentName = `test-any-${Date.now()}`;
+    page.once('dialog', async dialog => await dialog.accept(agentName));
+    await page.getByTestId('create-agent-btn').click();
+    await expect(page.locator('.agent-secret-modal')).toBeVisible({ timeout: 5000 });
+    await page.locator('button:has-text("Close")').click();
+
+    // Go back to editor
+    await page.getByTestId('tab-workflows').click();
+    await page.getByTestId('file-item-sample.json').dblclick();
+    await expect(page.getByTestId('editor')).toBeVisible({ timeout: 10000 });
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Delete');
+
+    // Add a node and open editor
+    await page.getByTestId('node-type-scheduled').click();
+    const node = page.getByTestId('workflow-node-scheduled');
+    await node.locator('.custom-node').dblclick();
+    const dialog = page.locator('.node-editor-dialog');
+    await expect(dialog).toBeVisible();
+
+    // Select specific agent
+    await page.getByTestId(`agent-checkbox-${agentName}`).click();
+    await expect(page.getByTestId(`agent-checkbox-${agentName}`)).toBeChecked();
+    await expect(page.getByTestId('agent-checkbox-any')).not.toBeChecked();
+
+    // Now select "Any agent"
+    await page.getByTestId('agent-checkbox-any').click();
+    await expect(page.getByTestId('agent-checkbox-any')).toBeChecked();
+    await expect(page.getByTestId(`agent-checkbox-${agentName}`)).not.toBeChecked();
+
+    await page.locator('.node-editor-close').click();
+  });
+});

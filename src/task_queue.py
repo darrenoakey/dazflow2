@@ -122,9 +122,21 @@ class TaskQueue:
 
     def _can_agent_run_task(self, agent, task: Task) -> bool:
         """Check if an agent can run a task."""
-        # For now, any enabled online agent can run any task
-        # Agent selection will be added in PR5
-        return agent.enabled and agent.status == "online"
+        if not agent.enabled or agent.status != "online":
+            return False
+
+        # Get agent config from task's execution snapshot
+        node_data = task.execution_snapshot.get("nodes", {}).get(task.node_id, {})
+        agent_config = node_data.get("agentConfig", {})
+
+        # Check agent selection (OR logic - any of the listed agents)
+        agents_list = agent_config.get("agents", [])
+        if agents_list:  # If specific agents are listed
+            if agent.name not in agents_list:
+                return False
+
+        # Tags will be checked in PR6
+        return True
 
     def _notify_agents(self) -> None:
         """Notify connected agents of available tasks."""

@@ -443,3 +443,182 @@ def test_enqueue_with_callback():
         queue.complete_task("task-1", {})
 
         assert called is True
+
+
+# ##################################################################
+# test task runs on any agent by default
+# task without agentConfig can run on any agent
+def test_task_runs_on_any_agent_by_default():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config = ServerConfig(data_dir=temp_dir)
+        set_config(config)
+
+        registry = AgentRegistry()
+        agent1, secret1 = registry.create_agent("agent-1")
+        agent2, secret2 = registry.create_agent("agent-2")
+        registry.update_agent("agent-1", enabled=True, status="online")
+        registry.update_agent("agent-2", enabled=True, status="online")
+        set_registry(registry)
+
+        queue = TaskQueue()
+        # Task with no agentConfig in execution_snapshot
+        task = Task(
+            id="task-1",
+            execution_id="exec-1",
+            workflow_name="test-workflow",
+            node_id="node-1",
+            execution_snapshot={"nodes": {"node-1": {"type": "core/log", "data": {}}}},
+            queued_at=datetime.now(timezone.utc).isoformat(),
+        )
+        queue.enqueue(task)
+
+        # Both agents should be able to run this task
+        available1 = queue.get_available_task("agent-1")
+        assert available1 is not None
+        assert available1.id == "task-1"
+
+        available2 = queue.get_available_task("agent-2")
+        assert available2 is not None
+        assert available2.id == "task-1"
+
+
+# ##################################################################
+# test task runs only on specified agents
+# task with specific agents listed only runs on those agents
+def test_task_runs_only_on_specified_agents():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config = ServerConfig(data_dir=temp_dir)
+        set_config(config)
+
+        registry = AgentRegistry()
+        agent1, secret1 = registry.create_agent("agent-1")
+        agent2, secret2 = registry.create_agent("agent-2")
+        agent3, secret3 = registry.create_agent("agent-3")
+        registry.update_agent("agent-1", enabled=True, status="online")
+        registry.update_agent("agent-2", enabled=True, status="online")
+        registry.update_agent("agent-3", enabled=True, status="online")
+        set_registry(registry)
+
+        queue = TaskQueue()
+        # Task with agentConfig specifying agent-1 and agent-2 only
+        task = Task(
+            id="task-1",
+            execution_id="exec-1",
+            workflow_name="test-workflow",
+            node_id="node-1",
+            execution_snapshot={
+                "nodes": {
+                    "node-1": {
+                        "type": "core/log",
+                        "data": {},
+                        "agentConfig": {"agents": ["agent-1", "agent-2"], "requiredTags": []},
+                    }
+                }
+            },
+            queued_at=datetime.now(timezone.utc).isoformat(),
+        )
+        queue.enqueue(task)
+
+        # agent-1 should be able to run this task
+        available1 = queue.get_available_task("agent-1")
+        assert available1 is not None
+        assert available1.id == "task-1"
+
+        # agent-2 should be able to run this task
+        available2 = queue.get_available_task("agent-2")
+        assert available2 is not None
+        assert available2.id == "task-1"
+
+        # agent-3 should NOT be able to run this task
+        available3 = queue.get_available_task("agent-3")
+        assert available3 is None
+
+
+# ##################################################################
+# test task not run by unspecified agent
+# agent not in agents list cannot run task
+def test_task_not_run_by_unspecified_agent():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config = ServerConfig(data_dir=temp_dir)
+        set_config(config)
+
+        registry = AgentRegistry()
+        agent1, secret1 = registry.create_agent("agent-1")
+        agent2, secret2 = registry.create_agent("agent-2")
+        registry.update_agent("agent-1", enabled=True, status="online")
+        registry.update_agent("agent-2", enabled=True, status="online")
+        set_registry(registry)
+
+        queue = TaskQueue()
+        # Task that can only run on agent-1
+        task = Task(
+            id="task-1",
+            execution_id="exec-1",
+            workflow_name="test-workflow",
+            node_id="node-1",
+            execution_snapshot={
+                "nodes": {
+                    "node-1": {
+                        "type": "core/log",
+                        "data": {},
+                        "agentConfig": {"agents": ["agent-1"]},
+                    }
+                }
+            },
+            queued_at=datetime.now(timezone.utc).isoformat(),
+        )
+        queue.enqueue(task)
+
+        # agent-2 should NOT be able to run this task
+        available = queue.get_available_task("agent-2")
+        assert available is None
+
+
+# ##################################################################
+# test task with multiple allowed agents
+# multiple agents can run task with or logic
+def test_task_with_multiple_allowed_agents():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config = ServerConfig(data_dir=temp_dir)
+        set_config(config)
+
+        registry = AgentRegistry()
+        agent1, secret1 = registry.create_agent("agent-1")
+        agent2, secret2 = registry.create_agent("agent-2")
+        agent3, secret3 = registry.create_agent("agent-3")
+        registry.update_agent("agent-1", enabled=True, status="online")
+        registry.update_agent("agent-2", enabled=True, status="online")
+        registry.update_agent("agent-3", enabled=True, status="online")
+        set_registry(registry)
+
+        queue = TaskQueue()
+        # Task that can run on agent-1 OR agent-3
+        task = Task(
+            id="task-1",
+            execution_id="exec-1",
+            workflow_name="test-workflow",
+            node_id="node-1",
+            execution_snapshot={
+                "nodes": {
+                    "node-1": {
+                        "type": "core/log",
+                        "data": {},
+                        "agentConfig": {"agents": ["agent-1", "agent-3"]},
+                    }
+                }
+            },
+            queued_at=datetime.now(timezone.utc).isoformat(),
+        )
+        queue.enqueue(task)
+
+        # agent-1 can run it
+        available1 = queue.get_available_task("agent-1")
+        assert available1 is not None
+
+        # agent-2 cannot run it
+        available2 = queue.get_available_task("agent-2")
+        assert available2 is None
+
+        # agent-3 can run it
+        available3 = queue.get_available_task("agent-3")
+        assert available3 is not None
