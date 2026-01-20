@@ -4998,9 +4998,8 @@
         function AgentSecretModal({ agent, onClose }) {
             const [copied, setCopied] = useState(false);
 
-            // Build the curl command using current window location
-            const serverUrl = `${window.location.protocol}//${window.location.host}`;
-            const curlCommand = `curl -sL '${serverUrl}/api/agents/${agent.name}/install-script?secret=${agent.secret}' | bash`;
+            // Use the install_command from the API response (has correct server URL)
+            const curlCommand = agent.install_command;
 
             const handleCopy = () => {
                 navigator.clipboard.writeText(curlCommand);

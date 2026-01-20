@@ -396,9 +396,9 @@ def list_agents():
 
 
 @api_router.post("/agents")
-def create_agent(request: dict):
+def create_agent(body: dict, request: Request):
     """Create a new agent."""
-    name = request.get("name", "").strip()
+    name = body.get("name", "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="Agent name is required")
 
@@ -408,9 +408,14 @@ def create_agent(request: dict):
 
     agent, secret = registry.create_agent(name)
 
-    # Return agent data plus the secret (only available at creation time)
+    # Build install URL using request host
+    server_url = f"http://{request.headers.get('host', 'localhost')}"
+    install_url = f"{server_url}/api/agents/{name}/install-script?secret={secret}"
+
+    # Return agent data plus the secret and install command
     result = asdict(agent)
     result["secret"] = secret
+    result["install_command"] = f"curl -sL '{install_url}' | bash"
     return result
 
 
