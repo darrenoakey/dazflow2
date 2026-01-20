@@ -76,3 +76,11 @@ def test_agent_version():
     assert hasattr(DazflowAgent, "VERSION")
     assert isinstance(DazflowAgent.VERSION, str)
     assert len(DazflowAgent.VERSION) > 0
+
+
+# ##################################################################
+# test upgrade exit code constant
+# verifies upgrade exit code is defined
+def test_upgrade_exit_code():
+    assert hasattr(DazflowAgent, "UPGRADE_EXIT_CODE")
+    assert DazflowAgent.UPGRADE_EXIT_CODE == 42

@@ -159,3 +159,58 @@ def test_port_zero():
 def test_high_port_number():
     config = ServerConfig(port=65535)
     assert config.port == 65535
+
+
+# ##################################################################
+# test agent version property
+# verifies agent_version reads from agent.py file
+def test_agent_version_property():
+    config = ServerConfig()
+    version = config.agent_version
+    assert isinstance(version, str)
+    assert len(version) > 0
+    # Should match semantic version pattern (e.g., "1.0.0")
+    assert "." in version
+
+
+# ##################################################################
+# test agent version reads from agent file
+# verifies agent_version extracts VERSION constant from agent.py
+def test_agent_version_reads_from_file():
+    import tempfile
+    from pathlib import Path
+
+    # Create a temporary agent.py with a VERSION constant
+    with tempfile.TemporaryDirectory() as tmpdir:
+        agent_dir = Path(tmpdir) / "agent"
+        agent_dir.mkdir()
+        agent_file = agent_dir / "agent.py"
+        agent_file.write_text('VERSION = "2.5.3"\n')
+
+        # Mock the path to point to our temp file
+        from unittest.mock import patch
+
+        src_dir = Path(tmpdir) / "src"
+        src_dir.mkdir()
+
+        with patch("config.Path") as mock_path:
+            mock_path.return_value.parent.parent = Path(tmpdir)
+
+            config = ServerConfig()
+            version = config.agent_version
+            assert version == "2.5.3"
+
+
+# ##################################################################
+# test agent version fallback
+# verifies agent_version returns default when file not found
+def test_agent_version_fallback():
+    from unittest.mock import patch
+
+    # Mock Path to point to non-existent file
+    with patch("config.Path") as mock_path:
+        mock_path.return_value.parent.parent = Path("/nonexistent/path")
+
+        config = ServerConfig()
+        version = config.agent_version
+        assert version == "1.0.0"  # Default fallback

@@ -27,6 +27,7 @@ class DazflowAgent:
     HEARTBEAT_INTERVAL = 30  # seconds
     RECONNECT_DELAY = 5  # seconds
     MAX_RECONNECT_DELAY = 60  # seconds
+    UPGRADE_EXIT_CODE = 42  # Exit code to signal upgrade needed
 
     def __init__(self, server_url: str, name: str, secret: str):
         """Initialize the agent.
@@ -72,6 +73,9 @@ class DazflowAgent:
                 self.connected = True
                 self._reconnect_delay = self.RECONNECT_DELAY  # Reset delay on success
                 print(f"[{self._timestamp()}] Connected successfully")
+
+                # Send version to server
+                await self.send({"type": "version", "version": self.VERSION})
 
                 # Report credentials to server
                 await self._report_credentials()
@@ -130,6 +134,12 @@ class DazflowAgent:
 
         if msg_type == "heartbeat_ack":
             pass  # Heartbeat acknowledged
+        elif msg_type == "upgrade_required":
+            # Server says we need to upgrade
+            print(f"[{self._timestamp()}] Upgrade required, exiting for update...")
+            self.running = False
+            await self.disconnect()
+            sys.exit(self.UPGRADE_EXIT_CODE)
         elif msg_type == "task_available":
             # Task handling will be implemented in later PRs
             print(f"[{self._timestamp()}] Task available: {message.get('task', {}).get('id', 'unknown')}")

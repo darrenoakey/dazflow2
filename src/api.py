@@ -456,6 +456,87 @@ def delete_agent(name: str):
     return {"status": "deleted"}
 
 
+@api_router.get("/agents/{name}/install-script")
+def get_agent_install_script(name: str, secret: str):
+    """Generate install script for an agent."""
+    registry = get_registry()
+
+    # Verify agent exists and secret is valid
+    if not registry.verify_secret(name, secret):
+        raise HTTPException(status_code=401, detail="Invalid agent name or secret")
+
+    # Get server URL from config
+    config = get_config()
+    server_url = f"http://localhost:{config.port}"
+
+    # Generate install script
+    script = f'''#!/bin/bash
+# Dazflow2 Agent Installer for {name}
+
+AGENT_DIR="$HOME/.dazflow-agent"
+SERVER_URL="{server_url}"
+AGENT_NAME="{name}"
+AGENT_SECRET="{secret}"
+
+echo "Installing Dazflow2 agent '{name}'..."
+
+# Create directory
+mkdir -p "$AGENT_DIR"
+cd "$AGENT_DIR"
+
+# Download agent files
+echo "Downloading agent files..."
+curl -f -o agent.py "$SERVER_URL/api/agent-files/agent.py" || {{ echo "Failed to download agent.py"; exit 1; }}
+curl -f -o agent_updater.py "$SERVER_URL/api/agent-files/agent_updater.py" || {{ echo "Failed to download agent_updater.py"; exit 1; }}
+
+# Create config
+cat > config.json << 'EOF'
+{{"server": "{server_url}", "name": "{name}", "secret": "{secret}"}}
+EOF
+
+# Make executable
+chmod +x agent.py agent_updater.py
+
+echo ""
+echo "Agent installed successfully!"
+echo "Directory: $AGENT_DIR"
+echo ""
+echo "To start the agent, run:"
+echo "  cd $AGENT_DIR"
+echo "  python3 agent_updater.py"
+echo ""
+echo "Or use the config file:"
+echo "  python3 agent_updater.py --config $AGENT_DIR/config.json"
+'''
+
+    return {"script": script}
+
+
+@api_router.get("/agent-files/agent.py")
+def get_agent_file():
+    """Serve agent.py file."""
+    agent_file = PROJECT_ROOT / "agent" / "agent.py"
+    if not agent_file.exists():
+        raise HTTPException(status_code=404, detail="Agent file not found")
+    return FileResponse(agent_file, media_type="text/x-python", filename="agent.py")
+
+
+@api_router.get("/agent-files/agent_updater.py")
+def get_agent_updater_file():
+    """Serve agent_updater.py file."""
+    updater_file = PROJECT_ROOT / "agent" / "agent_updater.py"
+    if not updater_file.exists():
+        raise HTTPException(status_code=404, detail="Agent updater file not found")
+    return FileResponse(updater_file, media_type="text/x-python", filename="agent_updater.py")
+
+
+@api_router.get("/agent-files/version")
+def get_agent_version():
+    """Get current agent version."""
+    config = get_config()
+    return {"version": config.agent_version}
+
+
 # ##################################################################
 # tags endpoints
 # manage capability tags for agents

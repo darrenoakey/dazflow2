@@ -1,6 +1,7 @@
 """Server configuration system."""
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -36,6 +37,17 @@ class ServerConfig:
     def concurrency_groups_file(self) -> str:
         """Path to concurrency_groups.json file."""
         return str(Path(self.data_dir) / "concurrency_groups.json")
+
+    @property
+    def agent_version(self) -> str:
+        """Get current agent version from agent.py file."""
+        agent_file = Path(__file__).parent.parent / "agent" / "agent.py"
+        if agent_file.exists():
+            content = agent_file.read_text()
+            match = re.search(r'VERSION\s*=\s*["\']([^"\']+)["\']', content)
+            if match:
+                return match.group(1)
+        return "1.0.0"  # Default fallback
 
 
 # Global config instance

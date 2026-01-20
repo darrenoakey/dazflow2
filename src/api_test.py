@@ -1156,3 +1156,98 @@ def test_delete_nonexistent_concurrency_group():
         response = client.delete("/api/concurrency-groups/nonexistent")
         assert response.status_code == 404
         assert "not found" in response.json()["detail"]
+
+
+# ##################################################################
+# test agent install script endpoint
+# verifies install script generation with correct parameters
+def test_get_agent_install_script_success(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path), port=5555))
+    registry = AgentRegistry(str(agents_file))
+    set_registry(registry)
+
+    # Create agent
+    agent, secret = registry.create_agent("test-agent")
+
+    client = TestClient(app)
+    response = client.get(f"/api/agents/test-agent/install-script?secret={secret}")
+    assert response.status_code == 200
+    data = response.json()
+    assert "script" in data
+    script = data["script"]
+
+    # Verify script contains necessary elements
+    assert "test-agent" in script
+    assert secret in script
+    assert "agent.py" in script
+    assert "agent_updater.py" in script
+    assert "config.json" in script
+
+
+def test_get_agent_install_script_invalid_secret(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    registry = AgentRegistry(str(agents_file))
+    set_registry(registry)
+
+    # Create agent
+    registry.create_agent("test-agent")
+
+    client = TestClient(app)
+    response = client.get("/api/agents/test-agent/install-script?secret=wrong-secret")
+    assert response.status_code == 401
+    assert "Invalid" in response.json()["detail"]
+
+
+def test_get_agent_install_script_nonexistent_agent(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    set_registry(AgentRegistry(str(agents_file)))
+
+    client = TestClient(app)
+    response = client.get("/api/agents/nonexistent/install-script?secret=any-secret")
+    assert response.status_code == 401
+
+
+# ##################################################################
+# test agent file serving endpoints
+# verifies agent.py and agent_updater.py can be downloaded
+def test_get_agent_file():
+    client = TestClient(app)
+    response = client.get("/api/agent-files/agent.py")
+    assert response.status_code == 200
+    assert "text/x-python" in response.headers["content-type"]
+    # Verify it's the actual agent.py content
+    assert b"DazflowAgent" in response.content
+
+
+def test_get_agent_updater_file():
+    client = TestClient(app)
+    response = client.get("/api/agent-files/agent_updater.py")
+    assert response.status_code == 200
+    assert "text/x-python" in response.headers["content-type"]
+    # Verify it's the actual agent_updater.py content
+    assert b"UPGRADE_EXIT_CODE" in response.content
+
+
+def test_get_agent_version():
+    client = TestClient(app)
+    response = client.get("/api/agent-files/version")
+    assert response.status_code == 200
+    data = response.json()
+    assert "version" in data
+    assert isinstance(data["version"], str)
+    assert len(data["version"]) > 0

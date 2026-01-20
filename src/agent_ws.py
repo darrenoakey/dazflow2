@@ -5,10 +5,13 @@ from datetime import UTC, datetime
 from fastapi import WebSocket, WebSocketDisconnect
 
 from .agents import get_registry
+from .config import get_config
 from .task_queue import get_queue
 
 # Track connected agents
 _connected_agents: dict[str, WebSocket] = {}
+# Track agent versions
+_agent_versions: dict[str, str] = {}
 
 
 # ##################################################################
@@ -59,6 +62,8 @@ async def handle_agent_connection(websocket: WebSocket, name: str, secret: str):
         # Clean up on disconnect
         if name in _connected_agents:
             del _connected_agents[name]
+        if name in _agent_versions:
+            del _agent_versions[name]
 
         registry.update_agent(name, status="offline", last_seen=datetime.now(UTC).isoformat().replace("+00:00", "Z"))
 
@@ -120,6 +125,24 @@ async def handle_agent_message(name: str, message: dict, websocket: WebSocket):
             if agent and cred_name not in agent.credentials:
                 updated_creds = agent.credentials + [cred_name]
                 registry.update_agent(name, credentials=updated_creds)
+
+    elif msg_type == "version":
+        # Agent reports its version
+        agent_version = message.get("version", "unknown")
+        _agent_versions[name] = agent_version
+
+        # Check if upgrade is needed
+        config = get_config()
+        current_version = config.agent_version
+        if agent_version != current_version:
+            # Send upgrade required message
+            await websocket.send_json(
+                {
+                    "type": "upgrade_required",
+                    "current_version": agent_version,
+                    "required_version": current_version,
+                }
+            )
 
     # Other message types will be added in later PRs
 
