@@ -1317,6 +1317,70 @@
             word-break: break-all;
             margin: 16px 0;
         }
+
+        /* Concurrency Groups Styles */
+        .concurrency-groups-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .concurrency-group-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 12px 16px;
+            background: #2a2a4e;
+            border-radius: 8px;
+            transition: background 0.15s;
+        }
+        .concurrency-group-item:hover {
+            background: #3a3a5e;
+        }
+        .concurrency-group-name {
+            font-size: 14px;
+            color: #eee;
+            font-weight: 500;
+            flex: 1;
+        }
+        .concurrency-group-limit {
+            font-size: 12px;
+            color: #888;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: all 0.15s;
+        }
+        .concurrency-group-limit:hover {
+            background: #3a3a5e;
+            color: #667eea;
+        }
+        .concurrency-group-active {
+            font-size: 12px;
+            color: #4ade80;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: #2a4e2a;
+        }
+        .concurrency-group-active.at-limit {
+            color: #f87171;
+            background: #4e2a2a;
+        }
+        .concurrency-group-delete-btn {
+            padding: 4px 12px;
+            background: transparent;
+            border: 1px solid #4a4a6e;
+            border-radius: 4px;
+            color: #888;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .concurrency-group-delete-btn:hover {
+            background: #4e2a2a;
+            border-color: #f87171;
+            color: #f87171;
+        }
+
         .workflows-toolbar {
             display: flex;
             gap: 12px;
@@ -2295,6 +2359,78 @@
 
             setEditingAgent: (agent) => set({ editingAgent: agent }),
             setSelectedAgentName: (name) => set({ selectedAgentName: name }),
+
+            // Concurrency groups state
+            concurrencyGroups: [],
+            concurrencyGroupsLoading: false,
+
+            // Load concurrency groups from server
+            loadConcurrencyGroups: async () => {
+                set({ concurrencyGroupsLoading: true });
+                try {
+                    const response = await fetch('/api/concurrency-groups');
+                    if (response.ok) {
+                        const groups = await response.json();
+                        set({ concurrencyGroups: groups });
+                    }
+                } catch (e) {
+                    console.error('Failed to load concurrency groups:', e);
+                } finally {
+                    set({ concurrencyGroupsLoading: false });
+                }
+            },
+
+            // Create a new concurrency group
+            createConcurrencyGroup: async (name, limit) => {
+                try {
+                    const response = await fetch('/api/concurrency-groups', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, limit }),
+                    });
+                    if (response.ok) {
+                        await get().loadConcurrencyGroups();
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Failed to create concurrency group:', e);
+                }
+                return false;
+            },
+
+            // Update a concurrency group's limit
+            updateConcurrencyGroup: async (name, limit) => {
+                try {
+                    const response = await fetch(`/api/concurrency-groups/${encodeURIComponent(name)}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ limit }),
+                    });
+                    if (response.ok) {
+                        await get().loadConcurrencyGroups();
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Failed to update concurrency group:', e);
+                }
+                return false;
+            },
+
+            // Delete a concurrency group
+            deleteConcurrencyGroup: async (name) => {
+                try {
+                    const response = await fetch(`/api/concurrency-groups/${encodeURIComponent(name)}`, {
+                        method: 'DELETE',
+                    });
+                    if (response.ok) {
+                        await get().loadConcurrencyGroups();
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Failed to delete concurrency group:', e);
+                }
+                return false;
+            },
         }));
 
         // Subscribe to store changes and save to localStorage
@@ -4711,6 +4847,106 @@
             );
         }
 
+        // Concurrency Tab Component
+        function ConcurrencyTab() {
+            const concurrencyGroups = useWorkflowStore((state) => state.concurrencyGroups);
+            const concurrencyGroupsLoading = useWorkflowStore((state) => state.concurrencyGroupsLoading);
+            const loadConcurrencyGroups = useWorkflowStore((state) => state.loadConcurrencyGroups);
+            const createConcurrencyGroup = useWorkflowStore((state) => state.createConcurrencyGroup);
+            const updateConcurrencyGroup = useWorkflowStore((state) => state.updateConcurrencyGroup);
+            const deleteConcurrencyGroup = useWorkflowStore((state) => state.deleteConcurrencyGroup);
+
+            useEffect(() => {
+                loadConcurrencyGroups();
+            }, []);
+
+            const handleCreateGroup = () => {
+                const name = prompt('Enter concurrency group name:');
+                if (!name) return;
+
+                const limitStr = prompt('Enter concurrency limit (positive integer):');
+                if (!limitStr) return;
+
+                const limit = parseInt(limitStr, 10);
+                if (isNaN(limit) || limit < 1) {
+                    alert('Limit must be a positive integer');
+                    return;
+                }
+
+                createConcurrencyGroup(name, limit);
+            };
+
+            const handleUpdateLimit = async (group) => {
+                const limitStr = prompt(`Enter new limit for "${group.name}":`, group.limit.toString());
+                if (!limitStr) return;
+
+                const limit = parseInt(limitStr, 10);
+                if (isNaN(limit) || limit < 1) {
+                    alert('Limit must be a positive integer');
+                    return;
+                }
+
+                await updateConcurrencyGroup(group.name, limit);
+            };
+
+            const handleDeleteGroup = async (group, e) => {
+                e.stopPropagation();
+                if (!confirm(`Delete concurrency group "${group.name}"?`)) return;
+                await deleteConcurrencyGroup(group.name);
+            };
+
+            return React.createElement('div', { 'data-testid': 'concurrency-tab' }, [
+                // Toolbar
+                React.createElement('div', { key: 'toolbar', className: 'workflows-toolbar' }, [
+                    React.createElement('button', {
+                        key: 'create',
+                        className: 'toolbar-btn',
+                        onClick: handleCreateGroup,
+                        'data-testid': 'create-concurrency-group-btn',
+                    }, [
+                        React.createElement('span', { key: 'icon', className: 'toolbar-btn-icon', dangerouslySetInnerHTML: { __html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>' }}),
+                        'Create Group',
+                    ]),
+                ]),
+
+                // Empty state or list
+                concurrencyGroupsLoading
+                    ? React.createElement('div', { key: 'loading' }, 'Loading...')
+                    : concurrencyGroups.length === 0
+                    ? React.createElement('div', { key: 'empty', style: { color: '#888', padding: '20px 0' } },
+                        'No concurrency groups configured. Click "Create Group" to add one.')
+                    : React.createElement('div', { key: 'list', className: 'concurrency-groups-list', 'data-testid': 'concurrency-groups-list' },
+                        concurrencyGroups.map(group =>
+                            React.createElement('div', {
+                                key: group.name,
+                                className: 'concurrency-group-item',
+                                'data-testid': `concurrency-group-item-${group.name}`,
+                            }, [
+                                React.createElement('div', { key: 'name', className: 'concurrency-group-name' }, group.name),
+                                React.createElement('div', {
+                                    key: 'limit',
+                                    className: 'concurrency-group-limit',
+                                    onDoubleClick: () => handleUpdateLimit(group),
+                                    title: 'Double-click to edit',
+                                    'data-testid': `concurrency-group-limit-${group.name}`,
+                                }, `Limit: ${group.limit}`),
+                                React.createElement('div', {
+                                    key: 'active',
+                                    className: `concurrency-group-active ${group.active >= group.limit ? 'at-limit' : ''}`,
+                                    'data-testid': `concurrency-group-active-${group.name}`,
+                                }, `Active: ${group.active}${group.active >= group.limit ? ' (at limit)' : ''}`),
+                                React.createElement('button', {
+                                    key: 'delete',
+                                    className: 'concurrency-group-delete-btn',
+                                    onClick: (e) => handleDeleteGroup(group, e),
+                                    'data-testid': `delete-concurrency-group-${group.name}`,
+                                }, 'Delete'),
+                            ])
+                        )
+                    ),
+            ]);
+        }
+
         // Credentials Tab Component
         function CredentialsTab() {
             const credentials = useWorkflowStore((state) => state.credentials);
@@ -4855,6 +5091,12 @@
                             onClick: () => setDashboardTab('agents'),
                             'data-testid': 'tab-agents',
                         }, 'Agents'),
+                        React.createElement('button', {
+                            key: 'concurrency',
+                            className: `dashboard-tab ${dashboardTab === 'concurrency' ? 'active' : ''}`,
+                            onClick: () => setDashboardTab('concurrency'),
+                            'data-testid': 'tab-concurrency',
+                        }, 'Concurrency'),
                     ]),
                 ]),
                 React.createElement('div', { key: 'content', className: 'dashboard-content' },
@@ -4864,7 +5106,9 @@
                         ? React.createElement(ExecutionsTab)
                         : dashboardTab === 'credentials'
                         ? React.createElement(CredentialsTab)
-                        : React.createElement(AgentsTab)
+                        : dashboardTab === 'agents'
+                        ? React.createElement(AgentsTab)
+                        : React.createElement(ConcurrencyTab)
                 ),
             ]);
         }

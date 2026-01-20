@@ -17,6 +17,8 @@ from starlette.responses import StreamingResponse
 
 from .agent_ws import handle_agent_connection
 from .agents import get_registry
+from .concurrency import get_registry as get_concurrency_registry
+from .concurrency import get_tracker
 from .config import get_config
 from .credentials import (
     delete_credential,
@@ -968,6 +970,83 @@ async def execute(request: ExecuteRequest):
             "executedAt": None,
         }
         return ExecuteResponse(execution=error_execution)
+
+
+# ##################################################################
+# concurrency groups endpoints
+# manage concurrency groups for limiting concurrent task execution
+
+
+@api_router.get("/concurrency-groups")
+def list_concurrency_groups():
+    """List all concurrency groups with active counts."""
+    registry = get_concurrency_registry()
+    tracker = get_tracker()
+
+    groups = registry.list_groups()
+    return [{"name": g.name, "limit": g.limit, "active": tracker.get_count(g.name)} for g in groups]
+
+
+@api_router.post("/concurrency-groups")
+def create_concurrency_group(request: dict):
+    """Create a new concurrency group."""
+    name = request.get("name", "").strip()
+    limit = request.get("limit")
+
+    if not name:
+        raise HTTPException(status_code=400, detail="Group name is required")
+
+    if limit is None or not isinstance(limit, int) or limit < 1:
+        raise HTTPException(status_code=400, detail="Limit must be a positive integer")
+
+    registry = get_concurrency_registry()
+    try:
+        group = registry.create_group(name, limit)
+        tracker = get_tracker()
+        return {"name": group.name, "limit": group.limit, "active": tracker.get_count(group.name)}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@api_router.get("/concurrency-groups/{name}")
+def get_concurrency_group(name: str):
+    """Get a concurrency group by name."""
+    registry = get_concurrency_registry()
+    group = registry.get_group(name)
+
+    if not group:
+        raise HTTPException(status_code=404, detail=f"Group '{name}' not found")
+
+    tracker = get_tracker()
+    return {"name": group.name, "limit": group.limit, "active": tracker.get_count(group.name)}
+
+
+@api_router.put("/concurrency-groups/{name}")
+def update_concurrency_group(name: str, request: dict):
+    """Update a concurrency group's limit."""
+    limit = request.get("limit")
+
+    if limit is None or not isinstance(limit, int) or limit < 1:
+        raise HTTPException(status_code=400, detail="Limit must be a positive integer")
+
+    registry = get_concurrency_registry()
+    try:
+        group = registry.update_group(name, limit)
+        tracker = get_tracker()
+        return {"name": group.name, "limit": group.limit, "active": tracker.get_count(group.name)}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@api_router.delete("/concurrency-groups/{name}")
+def delete_concurrency_group(name: str):
+    """Delete a concurrency group."""
+    registry = get_concurrency_registry()
+    try:
+        registry.delete_group(name)
+        return {"status": "deleted"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 # Include the API router

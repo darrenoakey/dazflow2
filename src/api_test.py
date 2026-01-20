@@ -1,5 +1,6 @@
 import json
 import tempfile
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -906,3 +907,252 @@ def test_list_multiple_tags():
         assert "gpu" in data["tags"]
         assert "cuda" in data["tags"]
         assert "docker" in data["tags"]
+
+
+# ##################################################################
+# test list concurrency groups endpoint
+# verifies listing returns empty array initially
+def test_list_concurrency_groups_empty():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        set_config(ServerConfig(data_dir=temp_dir))
+
+        from src.concurrency import set_registry, set_tracker
+        from src.concurrency import ConcurrencyRegistry, ConcurrencyTracker
+
+        registry = ConcurrencyRegistry(str(Path(temp_dir) / "concurrency_groups.json"))
+        set_registry(registry)
+        set_tracker(ConcurrencyTracker(registry))
+
+        client = TestClient(app)
+        response = client.get("/api/concurrency-groups")
+        assert response.status_code == 200
+        data = response.json()
+        assert data == []
+
+
+# ##################################################################
+# test create concurrency group endpoint
+# verifies creating a new group via API
+def test_create_concurrency_group():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        set_config(ServerConfig(data_dir=temp_dir))
+
+        from src.concurrency import set_registry, set_tracker
+        from src.concurrency import ConcurrencyRegistry, ConcurrencyTracker
+
+        registry = ConcurrencyRegistry(str(Path(temp_dir) / "concurrency_groups.json"))
+        set_registry(registry)
+        set_tracker(ConcurrencyTracker(registry))
+
+        client = TestClient(app)
+        response = client.post("/api/concurrency-groups", json={"name": "heavy-compute", "limit": 5})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "heavy-compute"
+        assert data["limit"] == 5
+        assert data["active"] == 0
+
+
+# ##################################################################
+# test create concurrency group with missing name
+# verifies validation error for missing name
+def test_create_concurrency_group_missing_name():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        set_config(ServerConfig(data_dir=temp_dir))
+
+        from src.concurrency import set_registry, set_tracker
+        from src.concurrency import ConcurrencyRegistry, ConcurrencyTracker
+
+        registry = ConcurrencyRegistry(str(Path(temp_dir) / "concurrency_groups.json"))
+        set_registry(registry)
+        set_tracker(ConcurrencyTracker(registry))
+
+        client = TestClient(app)
+        response = client.post("/api/concurrency-groups", json={"limit": 5})
+        assert response.status_code == 400
+        assert "name is required" in response.json()["detail"]
+
+
+# ##################################################################
+# test create concurrency group with invalid limit
+# verifies validation error for invalid limit
+def test_create_concurrency_group_invalid_limit():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        set_config(ServerConfig(data_dir=temp_dir))
+
+        from src.concurrency import set_registry, set_tracker
+        from src.concurrency import ConcurrencyRegistry, ConcurrencyTracker
+
+        registry = ConcurrencyRegistry(str(Path(temp_dir) / "concurrency_groups.json"))
+        set_registry(registry)
+        set_tracker(ConcurrencyTracker(registry))
+
+        client = TestClient(app)
+        response = client.post("/api/concurrency-groups", json={"name": "test", "limit": 0})
+        assert response.status_code == 400
+        assert "positive integer" in response.json()["detail"]
+
+
+# ##################################################################
+# test list concurrency groups with active counts
+# verifies listing includes active task counts
+def test_list_concurrency_groups_with_active_counts():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        set_config(ServerConfig(data_dir=temp_dir))
+
+        from src.concurrency import set_registry, set_tracker
+        from src.concurrency import ConcurrencyRegistry, ConcurrencyTracker
+
+        registry = ConcurrencyRegistry(str(Path(temp_dir) / "concurrency_groups.json"))
+        tracker = ConcurrencyTracker(registry)
+        set_registry(registry)
+        set_tracker(tracker)
+
+        client = TestClient(app)
+        client.post("/api/concurrency-groups", json={"name": "heavy-compute", "limit": 5})
+
+        # Simulate active task
+        tracker.increment("heavy-compute")
+
+        response = client.get("/api/concurrency-groups")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["name"] == "heavy-compute"
+        assert data[0]["limit"] == 5
+        assert data[0]["active"] == 1
+
+
+# ##################################################################
+# test get concurrency group endpoint
+# verifies getting a specific group
+def test_get_concurrency_group():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        set_config(ServerConfig(data_dir=temp_dir))
+
+        from src.concurrency import set_registry, set_tracker
+        from src.concurrency import ConcurrencyRegistry, ConcurrencyTracker
+
+        registry = ConcurrencyRegistry(str(Path(temp_dir) / "concurrency_groups.json"))
+        set_registry(registry)
+        set_tracker(ConcurrencyTracker(registry))
+
+        client = TestClient(app)
+        client.post("/api/concurrency-groups", json={"name": "heavy-compute", "limit": 5})
+
+        response = client.get("/api/concurrency-groups/heavy-compute")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "heavy-compute"
+        assert data["limit"] == 5
+        assert data["active"] == 0
+
+
+# ##################################################################
+# test get nonexistent concurrency group
+# verifies 404 for nonexistent group
+def test_get_nonexistent_concurrency_group():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        set_config(ServerConfig(data_dir=temp_dir))
+
+        from src.concurrency import set_registry, set_tracker
+        from src.concurrency import ConcurrencyRegistry, ConcurrencyTracker
+
+        registry = ConcurrencyRegistry(str(Path(temp_dir) / "concurrency_groups.json"))
+        set_registry(registry)
+        set_tracker(ConcurrencyTracker(registry))
+
+        client = TestClient(app)
+        response = client.get("/api/concurrency-groups/nonexistent")
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"]
+
+
+# ##################################################################
+# test update concurrency group endpoint
+# verifies updating a group's limit
+def test_update_concurrency_group():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        set_config(ServerConfig(data_dir=temp_dir))
+
+        from src.concurrency import set_registry, set_tracker
+        from src.concurrency import ConcurrencyRegistry, ConcurrencyTracker
+
+        registry = ConcurrencyRegistry(str(Path(temp_dir) / "concurrency_groups.json"))
+        set_registry(registry)
+        set_tracker(ConcurrencyTracker(registry))
+
+        client = TestClient(app)
+        client.post("/api/concurrency-groups", json={"name": "heavy-compute", "limit": 5})
+
+        response = client.put("/api/concurrency-groups/heavy-compute", json={"limit": 10})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "heavy-compute"
+        assert data["limit"] == 10
+
+
+# ##################################################################
+# test update nonexistent concurrency group
+# verifies 404 for updating nonexistent group
+def test_update_nonexistent_concurrency_group():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        set_config(ServerConfig(data_dir=temp_dir))
+
+        from src.concurrency import set_registry, set_tracker
+        from src.concurrency import ConcurrencyRegistry, ConcurrencyTracker
+
+        registry = ConcurrencyRegistry(str(Path(temp_dir) / "concurrency_groups.json"))
+        set_registry(registry)
+        set_tracker(ConcurrencyTracker(registry))
+
+        client = TestClient(app)
+        response = client.put("/api/concurrency-groups/nonexistent", json={"limit": 10})
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"]
+
+
+# ##################################################################
+# test delete concurrency group endpoint
+# verifies deleting a group
+def test_delete_concurrency_group():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        set_config(ServerConfig(data_dir=temp_dir))
+
+        from src.concurrency import set_registry, set_tracker
+        from src.concurrency import ConcurrencyRegistry, ConcurrencyTracker
+
+        registry = ConcurrencyRegistry(str(Path(temp_dir) / "concurrency_groups.json"))
+        set_registry(registry)
+        set_tracker(ConcurrencyTracker(registry))
+
+        client = TestClient(app)
+        client.post("/api/concurrency-groups", json={"name": "heavy-compute", "limit": 5})
+
+        response = client.delete("/api/concurrency-groups/heavy-compute")
+        assert response.status_code == 200
+        assert response.json()["status"] == "deleted"
+
+        # Verify it's gone
+        response = client.get("/api/concurrency-groups")
+        assert len(response.json()) == 0
+
+
+# ##################################################################
+# test delete nonexistent concurrency group
+# verifies 404 for deleting nonexistent group
+def test_delete_nonexistent_concurrency_group():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        set_config(ServerConfig(data_dir=temp_dir))
+
+        from src.concurrency import set_registry, set_tracker
+        from src.concurrency import ConcurrencyRegistry, ConcurrencyTracker
+
+        registry = ConcurrencyRegistry(str(Path(temp_dir) / "concurrency_groups.json"))
+        set_registry(registry)
+        set_tracker(ConcurrencyTracker(registry))
+
+        client = TestClient(app)
+        response = client.delete("/api/concurrency-groups/nonexistent")
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"]

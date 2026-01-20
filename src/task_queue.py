@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from .agents import get_registry
+from .concurrency import get_tracker
 
 
 @dataclass
@@ -76,12 +77,28 @@ class TaskQueue:
         registry = get_registry()
         registry.update_agent(agent_name, current_task=task.execution_id)
 
+        # Increment concurrency group count
+        node_data = task.execution_snapshot.get("nodes", {}).get(task.node_id, {})
+        agent_config = node_data.get("agentConfig", {})
+        concurrency_group = agent_config.get("concurrencyGroup")
+        if concurrency_group:
+            tracker = get_tracker()
+            tracker.increment(concurrency_group)
+
         return True
 
     def complete_task(self, task_id: str, result: dict) -> None:
         """Mark a task as completed."""
         task = self._in_progress.pop(task_id, None)
         if task:
+            # Decrement concurrency group count
+            node_data = task.execution_snapshot.get("nodes", {}).get(task.node_id, {})
+            agent_config = node_data.get("agentConfig", {})
+            concurrency_group = agent_config.get("concurrencyGroup")
+            if concurrency_group:
+                tracker = get_tracker()
+                tracker.decrement(concurrency_group)
+
             # Clear agent current task
             registry = get_registry()
             if task.claimed_by:
@@ -100,6 +117,14 @@ class TaskQueue:
         """Mark a task as failed."""
         task = self._in_progress.pop(task_id, None)
         if task:
+            # Decrement concurrency group count
+            node_data = task.execution_snapshot.get("nodes", {}).get(task.node_id, {})
+            agent_config = node_data.get("agentConfig", {})
+            concurrency_group = agent_config.get("concurrencyGroup")
+            if concurrency_group:
+                tracker = get_tracker()
+                tracker.decrement(concurrency_group)
+
             # Clear agent current task
             registry = get_registry()
             if task.claimed_by:
@@ -115,6 +140,14 @@ class TaskQueue:
         tasks_to_requeue = [task for task in self._in_progress.values() if task.claimed_by == agent_name]
 
         for task in tasks_to_requeue:
+            # Decrement concurrency group count
+            node_data = task.execution_snapshot.get("nodes", {}).get(task.node_id, {})
+            agent_config = node_data.get("agentConfig", {})
+            concurrency_group = agent_config.get("concurrencyGroup")
+            if concurrency_group:
+                tracker = get_tracker()
+                tracker.decrement(concurrency_group)
+
             del self._in_progress[task.id]
             task.claimed_by = None
             task.claimed_at = None
@@ -145,6 +178,13 @@ class TaskQueue:
         required_credential = node_data.get("credentials")
         if required_credential:
             if required_credential not in agent.credentials:
+                return False
+
+        # Check concurrency group limits
+        concurrency_group = agent_config.get("concurrencyGroup")
+        if concurrency_group:
+            tracker = get_tracker()
+            if not tracker.can_start(concurrency_group):
                 return False
 
         return True
