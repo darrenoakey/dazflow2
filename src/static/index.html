@@ -4812,7 +4812,7 @@
 
                 createAgent(name).then(data => {
                     if (data && data.secret) {
-                        setEditingAgent({ name: data.name, secret: data.secret, isNew: true });
+                        setEditingAgent({ name: data.name, secret: data.secret, install_command: data.install_command, isNew: true });
                     }
                 });
             };
