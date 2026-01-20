@@ -458,23 +458,26 @@ def delete_agent(name: str):
 
 
 @api_router.get("/agents/{name}/install-script")
-def get_agent_install_script(name: str, secret: str):
-    """Generate install script for an agent."""
+def get_agent_install_script(name: str, secret: str, request: Request):
+    """Generate install script for an agent. Returns plain text for curl | bash."""
+    from starlette.responses import PlainTextResponse
+
     registry = get_registry()
 
     # Verify agent exists and secret is valid
     if not registry.verify_secret(name, secret):
         raise HTTPException(status_code=401, detail="Invalid agent name or secret")
 
-    # Get server URL from config
-    config = get_config()
-    server_url = f"http://localhost:{config.port}"
+    # Get server URL from request (use the host the request came from)
+    server_url = f"http://{request.headers.get('host', 'localhost')}"
 
     # Generate install script
     script = f'''#!/bin/bash
 # Dazflow2 Agent Installer for {name}
 
-AGENT_DIR="$HOME/.dazflow-agent"
+set -e
+
+AGENT_DIR="$HOME/.dazflow-agent/{name}"
 SERVER_URL="{server_url}"
 AGENT_NAME="{name}"
 AGENT_SECRET="{secret}"
@@ -487,30 +490,33 @@ cd "$AGENT_DIR"
 
 # Download agent files
 echo "Downloading agent files..."
-curl -f -o agent.py "$SERVER_URL/api/agent-files/agent.py" || {{ echo "Failed to download agent.py"; exit 1; }}
-curl -f -o agent_updater.py "$SERVER_URL/api/agent-files/agent_updater.py" || {{ echo "Failed to download agent_updater.py"; exit 1; }}
+curl -sf -o agent.py "$SERVER_URL/api/agent-files/agent.py" || {{ echo "Failed to download agent.py"; exit 1; }}
+curl -sf -o agent_updater.py "$SERVER_URL/api/agent-files/agent_updater.py" || {{ echo "Failed to download agent_updater.py"; exit 1; }}
 
 # Create config
-cat > config.json << 'EOF'
+cat > config.json << 'CONFIGEOF'
 {{"server": "{server_url}", "name": "{name}", "secret": "{secret}"}}
-EOF
+CONFIGEOF
 
 # Make executable
 chmod +x agent.py agent_updater.py
 
 echo ""
+echo "=========================================="
 echo "Agent installed successfully!"
+echo "=========================================="
+echo ""
 echo "Directory: $AGENT_DIR"
 echo ""
-echo "To start the agent, run:"
-echo "  cd $AGENT_DIR"
-echo "  python3 agent_updater.py"
+echo "To start the agent NOW (foreground):"
+echo "  cd $AGENT_DIR && python3 agent_updater.py"
 echo ""
-echo "Or use the config file:"
-echo "  python3 agent_updater.py --config $AGENT_DIR/config.json"
+echo "To start the agent in the BACKGROUND:"
+echo "  cd $AGENT_DIR && nohup python3 agent_updater.py > agent.log 2>&1 &"
+echo ""
 '''
 
-    return {"script": script}
+    return PlainTextResponse(script, media_type="text/plain")
 
 
 @api_router.get("/agent-files/agent.py")

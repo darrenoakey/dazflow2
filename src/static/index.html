@@ -1224,6 +1224,21 @@
             color: #888;
             margin-left: auto;
         }
+        .agent-delete-btn {
+            background: transparent;
+            border: none;
+            color: #666;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 2px 8px;
+            margin-left: 8px;
+            border-radius: 4px;
+            line-height: 1;
+        }
+        .agent-delete-btn:hover {
+            background: #4a2a2a;
+            color: #f87171;
+        }
         .agent-row-2 {
             display: flex;
             align-items: center;
@@ -4916,6 +4931,13 @@
                                         'data-testid': `agent-tags-${agent.name}`,
                                     }, agent.tags.length > 0 ? `tags: ${agent.tags.join(', ')}` : 'tags: —'),
                                     React.createElement('div', { key: 'tasks', className: 'agent-tasks' }, `tasks: ${agent.total_tasks}`),
+                                    agent.name !== 'built-in' && React.createElement('button', {
+                                        key: 'delete',
+                                        className: 'agent-delete-btn',
+                                        onClick: (e) => handleDeleteAgent(agent, e),
+                                        title: 'Delete agent',
+                                        'data-testid': `agent-delete-${agent.name}`,
+                                    }, '×'),
                                 ]),
                                 // Row 2: ip, status, version, current task or last seen
                                 React.createElement('div', { key: 'row2', className: 'agent-row-2' }, [
@@ -4976,8 +4998,12 @@
         function AgentSecretModal({ agent, onClose }) {
             const [copied, setCopied] = useState(false);
 
+            // Build the curl command using current window location
+            const serverUrl = `${window.location.protocol}//${window.location.host}`;
+            const curlCommand = `curl -sL '${serverUrl}/api/agents/${agent.name}/install-script?secret=${agent.secret}' | bash`;
+
             const handleCopy = () => {
-                navigator.clipboard.writeText(agent.secret);
+                navigator.clipboard.writeText(curlCommand);
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);
             };
@@ -4985,15 +5011,17 @@
             return React.createElement('div', { className: 'agent-secret-modal', onClick: (e) => e.target === e.currentTarget && onClose() },
                 React.createElement('div', { className: 'agent-secret-modal-content' }, [
                     React.createElement('h2', { key: 'title', style: { margin: '0 0 16px 0' } }, `Agent Created: ${agent.name}`),
-                    React.createElement('div', { key: 'warning', className: 'agent-secret-warning' },
-                        'This secret will only be shown once. Copy it now and store it securely.'),
-                    React.createElement('div', { key: 'secret', className: 'agent-secret-display' }, agent.secret),
+                    React.createElement('div', { key: 'instructions', style: { marginBottom: '16px', color: '#aaa', fontSize: '13px' } },
+                        'Run this command on the machine where you want to install the agent:'),
+                    React.createElement('div', { key: 'command', className: 'agent-secret-display', style: { fontSize: '12px', wordBreak: 'break-all' } }, curlCommand),
+                    React.createElement('div', { key: 'warning', className: 'agent-secret-warning', style: { marginTop: '12px' } },
+                        'This command contains a secret and will only be shown once. Copy it now.'),
                     React.createElement('div', { key: 'actions', className: 'credential-modal-actions' }, [
                         React.createElement('button', {
                             key: 'copy',
                             className: 'credential-modal-btn save',
                             onClick: handleCopy,
-                        }, copied ? 'Copied!' : 'Copy to Clipboard'),
+                        }, copied ? 'Copied!' : 'Copy Command'),
                         React.createElement('button', {
                             key: 'close',
                             className: 'credential-modal-btn cancel',
