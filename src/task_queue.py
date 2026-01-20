@@ -109,6 +109,10 @@ class TaskQueue:
                 if agent:
                     registry.update_agent(task.claimed_by, total_tasks=agent.total_tasks + 1)
 
+            # Include logs in result if available
+            if task.logs:
+                result = {**result, "logs": task.logs}
+
             # Call completion callback
             callback = self._callbacks.pop(task_id, None)
             if callback:

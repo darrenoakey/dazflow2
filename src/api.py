@@ -968,6 +968,37 @@ async def get_execution(execution_id: str):
 
 
 # ##################################################################
+# get execution logs endpoint
+# returns logs array for a specific execution
+@api_router.get("/executions/{execution_id}/logs")
+async def get_execution_logs(execution_id: str):
+    """Get logs for a specific execution."""
+    indexes_dir = _get_indexes_dir()
+    work_dir = _get_work_dir()
+    # Search for the execution in index files
+    if not indexes_dir.exists():
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    for index_file in indexes_dir.glob("*.jsonl"):
+        try:
+            for line in index_file.read_text().strip().split("\n"):
+                if line:
+                    entry = json.loads(line)
+                    if entry.get("id") == execution_id:
+                        # Found the entry - load the full file
+                        file_path = work_dir / entry["file"]
+                        if file_path.exists():
+                            data = json.loads(file_path.read_text())
+                            logs = data.get("logs", [])
+                            return {"logs": logs}
+                        raise HTTPException(status_code=404, detail="Execution file not found")
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    raise HTTPException(status_code=404, detail="Execution not found")
+
+
+# ##################################################################
 # heartbeat generator
 # yields server-sent events with the server start time so clients
 # can detect when the server has restarted and reload the page

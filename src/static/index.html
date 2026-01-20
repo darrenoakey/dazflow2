@@ -1614,6 +1614,57 @@
         .readonly-banner-close:hover {
             background: #6a5a3e;
         }
+        .execution-logs-section {
+            background: #1a1a2e;
+            border-top: 1px solid #3a3a5e;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .execution-logs-header {
+            padding: 8px 16px;
+            background: #2a2a4e;
+            border-bottom: 1px solid #3a3a5e;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .execution-logs-header:hover {
+            background: #3a3a5e;
+        }
+        .execution-logs-toggle {
+            font-size: 10px;
+            transition: transform 0.2s;
+        }
+        .execution-logs-toggle.expanded {
+            transform: rotate(90deg);
+        }
+        .execution-logs-content {
+            padding: 12px 16px;
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+            font-size: 11px;
+        }
+        .execution-log-entry {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 4px;
+            line-height: 1.5;
+        }
+        .execution-log-timestamp {
+            color: #888;
+            white-space: nowrap;
+        }
+        .execution-log-line {
+            color: #ccc;
+            flex: 1;
+            word-wrap: break-word;
+        }
+        .execution-logs-empty {
+            color: #888;
+            font-style: italic;
+            padding: 12px 16px;
+        }
         .sidebar-actions {
             display: flex;
             gap: 8px;
@@ -5579,6 +5630,69 @@
             );
         }
 
+        // ExecutionLogs Component
+        function ExecutionLogs({ executionId }) {
+            const [logs, setLogs] = useState([]);
+            const [expanded, setExpanded] = useState(false);
+            const [loading, setLoading] = useState(false);
+
+            useEffect(() => {
+                if (executionId && expanded && logs.length === 0 && !loading) {
+                    setLoading(true);
+                    fetch(`/api/executions/${encodeURIComponent(executionId)}/logs`)
+                        .then(res => res.json())
+                        .then(data => {
+                            setLogs(data.logs || []);
+                            setLoading(false);
+                        })
+                        .catch(err => {
+                            console.error('Failed to load logs:', err);
+                            setLoading(false);
+                        });
+                }
+            }, [executionId, expanded, logs.length, loading]);
+
+            return React.createElement('div', { className: 'execution-logs-section' }, [
+                React.createElement('div', {
+                    key: 'header',
+                    className: 'execution-logs-header',
+                    onClick: () => setExpanded(!expanded),
+                }, [
+                    React.createElement('span', {
+                        key: 'toggle',
+                        className: `execution-logs-toggle ${expanded ? 'expanded' : ''}`,
+                    }, '▶'),
+                    React.createElement('span', { key: 'title' }, 'Execution Logs'),
+                    logs.length > 0 && React.createElement('span', {
+                        key: 'count',
+                        style: { color: '#888', fontSize: '11px' },
+                    }, `(${logs.length})`),
+                ]),
+                expanded && React.createElement('div', {
+                    key: 'content',
+                    className: 'execution-logs-content',
+                }, loading ? 'Loading logs...' : (
+                    logs.length > 0
+                        ? logs.map((log, i) => React.createElement('div', {
+                            key: i,
+                            className: 'execution-log-entry',
+                        }, [
+                            React.createElement('span', {
+                                key: 'timestamp',
+                                className: 'execution-log-timestamp',
+                            }, new Date(log.timestamp).toLocaleTimeString()),
+                            React.createElement('span', {
+                                key: 'line',
+                                className: 'execution-log-line',
+                            }, log.line),
+                        ]))
+                        : React.createElement('div', {
+                            className: 'execution-logs-empty',
+                        }, 'No logs available for this execution')
+                )),
+            ]);
+        }
+
         // Editor Component
         function Editor() {
             const addNode = useWorkflowStore((state) => state.addNode);
@@ -5657,6 +5771,10 @@
                         'data-testid': 'readonly-back-btn',
                     }, '← Back to Executions'),
                 ]),
+                isReadOnly && executionViewerData && React.createElement(ExecutionLogs, {
+                    key: 'execution-logs',
+                    executionId: executionViewerData.id,
+                }),
                 React.createElement('div', { key: 'main', className: 'editor', 'data-testid': 'editor' }, [
                     React.createElement(Sidebar, { key: 'sidebar', onAddNode: handleAddNode }),
                     React.createElement(Canvas, { key: 'canvas', onAddNode: handleAddNode }),

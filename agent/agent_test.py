@@ -306,9 +306,7 @@ async def test_log_buffer_concurrent_adds():
             await buffer.add(task_id, f"Log {i}")
 
     # Add logs concurrently
-    await asyncio.gather(
-        add_logs("task-1", 10), add_logs("task-2", 10), add_logs("task-3", 10)
-    )
+    await asyncio.gather(add_logs("task-1", 10), add_logs("task-2", 10), add_logs("task-3", 10))
 
     # Should have all 30 logs
     assert len(buffer._buffer) == 30

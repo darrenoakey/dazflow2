@@ -126,6 +126,7 @@ def queue_workflow(
         "error": None,
         "error_node_id": None,
         "error_details": None,
+        "logs": [],  # Log entries from agent execution
     }
 
     queue_file.write_text(json.dumps(queue_item, indent=2))
