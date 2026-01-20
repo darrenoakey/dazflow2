@@ -24,6 +24,7 @@ class Agent:
     total_tasks: int = 0
     current_task: str | None = None  # execution_id if working
     secret_hash: str = ""  # For authentication
+    credentials: list[str] = field(default_factory=list)  # Credential names this agent has
 
 
 class AgentRegistry:
@@ -93,6 +94,7 @@ class AgentRegistry:
             "version",
             "total_tasks",
             "current_task",
+            "credentials",
         }
 
         for key, value in kwargs.items():

@@ -13,6 +13,12 @@ except ImportError:
     print("ERROR: websockets package required. Install with: pip install websockets")
     sys.exit(1)
 
+try:
+    import keyring
+except ImportError:
+    print("ERROR: keyring package required. Install with: pip install keyring")
+    sys.exit(1)
+
 
 class DazflowAgent:
     """Agent that connects to dazflow2 server and executes tasks."""
@@ -66,6 +72,10 @@ class DazflowAgent:
                 self.connected = True
                 self._reconnect_delay = self.RECONNECT_DELAY  # Reset delay on success
                 print(f"[{self._timestamp()}] Connected successfully")
+
+                # Report credentials to server
+                await self._report_credentials()
+
                 return True
             else:
                 print(f"[{self._timestamp()}] Connection rejected: {data}")
@@ -137,6 +147,9 @@ class DazflowAgent:
             print(f"[{self._timestamp()}] Kill task: {message.get('task_id', 'unknown')}")
         elif msg_type == "config_update":
             print(f"[{self._timestamp()}] Config updated")
+        elif msg_type == "credential_push":
+            # Server is pushing a credential to us
+            await self._handle_credential_push(message)
         else:
             print(f"[{self._timestamp()}] Unknown message type: {msg_type}")
 
@@ -177,6 +190,62 @@ class DazflowAgent:
     def _timestamp(self) -> str:
         """Get current timestamp string."""
         return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+    def _get_keyring_service(self) -> str:
+        """Get the keyring service name for this agent."""
+        return f"dazflow-agent-{self.name}"
+
+    def _list_credentials(self) -> list[str]:
+        """List credentials stored in this agent's keyring."""
+        try:
+            service = self._get_keyring_service()
+            index_json = keyring.get_password(service, "credential_index")
+            if index_json:
+                return json.loads(index_json)
+        except Exception:
+            pass
+        return []
+
+    def _save_credential_index(self, names: list[str]) -> None:
+        """Save the credential index."""
+        service = self._get_keyring_service()
+        keyring.set_password(service, "credential_index", json.dumps(names))
+
+    async def _report_credentials(self) -> None:
+        """Report credentials to server after connecting."""
+        credentials = self._list_credentials()
+        await self.send({"type": "credentials_report", "credentials": credentials})
+
+    async def _handle_credential_push(self, message: dict) -> None:
+        """Handle a credential being pushed from the server."""
+        cred_name = message.get("name")
+        credential = message.get("credential")
+
+        if not cred_name or not credential:
+            print(f"[{self._timestamp()}] Invalid credential_push message")
+            return
+
+        try:
+            # Store credential in keyring
+            service = self._get_keyring_service()
+            key = f"credential:{cred_name}"
+            keyring.set_password(service, key, json.dumps(credential))
+
+            # Update index
+            index = self._list_credentials()
+            if cred_name not in index:
+                index.append(cred_name)
+                self._save_credential_index(index)
+
+            print(f"[{self._timestamp()}] Stored credential: {cred_name}")
+
+            # Send acknowledgment
+            await self.send({"type": "credential_ack", "name": cred_name, "status": "success"})
+
+        except Exception as e:
+            print(f"[{self._timestamp()}] Failed to store credential {cred_name}: {e}")
+            # Send failure acknowledgment
+            await self.send({"type": "credential_ack", "name": cred_name, "status": "failed", "error": str(e)})
 
 
 def main():

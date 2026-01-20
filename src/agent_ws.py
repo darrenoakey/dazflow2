@@ -103,6 +103,24 @@ async def handle_agent_message(name: str, message: dict, websocket: WebSocket):
         queue = get_queue()
         queue.fail_task(task_id, error)
 
+    elif msg_type == "credentials_report":
+        # Agent reports what credentials it has
+        credentials = message.get("credentials", [])
+        registry = get_registry()
+        registry.update_agent(name, credentials=credentials)
+
+    elif msg_type == "credential_ack":
+        # Agent acknowledges receiving a credential
+        cred_name = message.get("name")
+        status = message.get("status")
+        if status == "success":
+            # Add credential to agent's list
+            registry = get_registry()
+            agent = registry.get_agent(name)
+            if agent and cred_name not in agent.credentials:
+                updated_creds = agent.credentials + [cred_name]
+                registry.update_agent(name, credentials=updated_creds)
+
     # Other message types will be added in later PRs
 
 
@@ -129,3 +147,15 @@ async def send_to_agent(name: str, message: dict) -> bool:
         await websocket.send_json(message)
         return True
     return False
+
+
+# ##################################################################
+# push credential to agent
+# sends credential data to connected agent via websocket
+async def push_credential_to_agent(agent_name: str, credential_name: str, credential_data: dict) -> bool:
+    if not is_agent_connected(agent_name):
+        return False
+
+    message = {"type": "credential_push", "name": credential_name, "credential": credential_data}
+
+    return await send_to_agent(agent_name, message)

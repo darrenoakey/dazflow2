@@ -141,6 +141,12 @@ class TaskQueue:
             if tag not in agent.tags:
                 return False
 
+        # Check required credentials (agent must have the credential)
+        required_credential = node_data.get("credentials")
+        if required_credential:
+            if required_credential not in agent.credentials:
+                return False
+
         return True
 
     def _notify_agents(self) -> None:

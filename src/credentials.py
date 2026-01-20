@@ -224,3 +224,31 @@ def test_credential_data(credential_type: str, data: dict) -> dict:
         return {"status": bool(result)}
     except Exception as e:
         return {"status": False, "message": str(e)}
+
+
+async def push_credential_to_agents(credential_name: str, agent_names: list[str], credential_data: dict) -> bool:
+    """Push a credential to multiple agents.
+
+    Only pushes to agents that are currently online.
+
+    Args:
+        credential_name: Name of the credential
+        agent_names: List of agent names to push to
+        credential_data: The credential data (type and data dict)
+
+    Returns:
+        True if successful (pushed to all online agents), False otherwise
+    """
+    # Import here to avoid circular dependency
+    from .agent_ws import is_agent_connected, push_credential_to_agent
+
+    success = True
+
+    for agent_name in agent_names:
+        # Only push to online agents
+        if is_agent_connected(agent_name):
+            result = await push_credential_to_agent(agent_name, credential_name, credential_data)
+            if not result:
+                success = False
+
+    return success
