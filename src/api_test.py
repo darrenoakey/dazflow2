@@ -1,4 +1,5 @@
 import json
+import tempfile
 
 from fastapi.testclient import TestClient
 
@@ -8,6 +9,7 @@ from src.api import (
     init_work_directories,
     save_workflow_stats,
 )
+from src.config import ServerConfig, set_config
 
 
 # ##################################################################
@@ -785,3 +787,122 @@ def test_builtin_agent_can_be_disabled(tmp_path):
     # Verify it persisted
     builtin = registry.get_agent("built-in")
     assert builtin.enabled is False
+
+
+# ##################################################################
+# test list tags empty
+# returns empty list when no tags exist
+def test_list_tags_empty():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        set_config(ServerConfig(data_dir=temp_dir))
+
+        client = TestClient(app)
+        response = client.get("/api/tags")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["tags"] == []
+
+
+# ##################################################################
+# test create tag
+# creates new tag via API
+def test_create_tag_api():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        set_config(ServerConfig(data_dir=temp_dir))
+
+        client = TestClient(app)
+        response = client.post("/api/tags", json={"name": "gpu"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "gpu"
+        assert data["created"] is True
+
+        # Verify it was created
+        response = client.get("/api/tags")
+        assert response.status_code == 200
+        data = response.json()
+        assert "gpu" in data["tags"]
+
+
+# ##################################################################
+# test create duplicate tag
+# returns error when creating duplicate tag
+def test_create_duplicate_tag_api():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        set_config(ServerConfig(data_dir=temp_dir))
+
+        client = TestClient(app)
+        client.post("/api/tags", json={"name": "gpu"})
+        response = client.post("/api/tags", json={"name": "gpu"})
+        assert response.status_code == 400
+        assert "already exists" in response.json()["detail"]
+
+
+# ##################################################################
+# test create tag without name
+# returns error when name is missing
+def test_create_tag_without_name():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        set_config(ServerConfig(data_dir=temp_dir))
+
+        client = TestClient(app)
+        response = client.post("/api/tags", json={})
+        assert response.status_code == 400
+        assert "required" in response.json()["detail"]
+
+
+# ##################################################################
+# test delete tag
+# deletes tag via API
+def test_delete_tag_api():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        set_config(ServerConfig(data_dir=temp_dir))
+
+        client = TestClient(app)
+        client.post("/api/tags", json={"name": "gpu"})
+
+        response = client.delete("/api/tags/gpu")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "gpu"
+        assert data["deleted"] is True
+
+        # Verify it was deleted
+        response = client.get("/api/tags")
+        assert response.status_code == 200
+        data = response.json()
+        assert "gpu" not in data["tags"]
+
+
+# ##################################################################
+# test delete nonexistent tag
+# returns error when deleting nonexistent tag
+def test_delete_nonexistent_tag_api():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        set_config(ServerConfig(data_dir=temp_dir))
+
+        client = TestClient(app)
+        response = client.delete("/api/tags/nonexistent")
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"]
+
+
+# ##################################################################
+# test list multiple tags
+# returns all created tags
+def test_list_multiple_tags():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        set_config(ServerConfig(data_dir=temp_dir))
+
+        client = TestClient(app)
+        client.post("/api/tags", json={"name": "gpu"})
+        client.post("/api/tags", json={"name": "cuda"})
+        client.post("/api/tags", json={"name": "docker"})
+
+        response = client.get("/api/tags")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["tags"]) == 3
+        assert "gpu" in data["tags"]
+        assert "cuda" in data["tags"]
+        assert "docker" in data["tags"]

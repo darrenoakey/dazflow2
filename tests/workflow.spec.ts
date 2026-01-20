@@ -1119,6 +1119,103 @@ test.describe('Agents', () => {
     await expect(tagsElement).toContainText('cuda');
     await expect(tagsElement).toContainText('linux');
   });
+
+  test('tags list displays at bottom of agents tab', async ({ page }) => {
+    await page.getByTestId('tab-agents').click();
+    await expect(page.getByTestId('agents-tab')).toBeVisible();
+
+    // Check for tags section
+    await expect(page.getByTestId('tags-section')).toBeVisible();
+    await expect(page.getByTestId('tags-section')).toContainText('Tags:');
+    await expect(page.getByTestId('create-tag-btn')).toBeVisible();
+  });
+
+  test('can create a tag', async ({ page }) => {
+    await page.getByTestId('tab-agents').click();
+    await expect(page.getByTestId('agents-tab')).toBeVisible();
+
+    const tagName = `test-tag-${Date.now()}`;
+
+    // Setup dialog handler for tag creation
+    page.once('dialog', async dialog => {
+      expect(dialog.type()).toBe('prompt');
+      await dialog.accept(tagName);
+    });
+
+    // Click create tag button
+    await page.getByTestId('create-tag-btn').click();
+    await page.waitForTimeout(500);
+
+    // Verify tag appears in the list
+    await expect(page.getByTestId(`tag-item-${tagName}`)).toBeVisible();
+  });
+
+  test('can assign tag to agent by double-clicking', async ({ page }) => {
+    await page.getByTestId('tab-agents').click();
+    await expect(page.getByTestId('agents-tab')).toBeVisible();
+
+    // Create an agent
+    const agentName = `test-agent-${Date.now()}`;
+    page.once('dialog', async dialog => await dialog.accept(agentName));
+    await page.getByTestId('create-agent-btn').click();
+    await expect(page.locator('.agent-secret-modal')).toBeVisible({ timeout: 5000 });
+    await page.locator('button:has-text("Close")').click();
+    await expect(page.getByTestId(`agent-item-${agentName}`)).toBeVisible();
+
+    // Create a tag
+    const tagName = `test-tag-${Date.now()}`;
+    page.once('dialog', async dialog => await dialog.accept(tagName));
+    await page.getByTestId('create-tag-btn').click();
+    await page.waitForTimeout(500);
+    await expect(page.getByTestId(`tag-item-${tagName}`)).toBeVisible();
+
+    // Select the agent by clicking on it
+    await page.getByTestId(`agent-item-${agentName}`).click();
+    await page.waitForTimeout(200);
+
+    // Double-click the tag to assign it
+    await page.getByTestId(`tag-item-${tagName}`).dblclick();
+    await page.waitForTimeout(500);
+
+    // Verify tag appears on agent
+    const tagsElement = page.getByTestId(`agent-tags-${agentName}`);
+    await expect(tagsElement).toContainText(tagName);
+  });
+
+  test('double-clicking tag again removes it from agent', async ({ page }) => {
+    await page.getByTestId('tab-agents').click();
+    await expect(page.getByTestId('agents-tab')).toBeVisible();
+
+    // Create an agent
+    const agentName = `test-agent-${Date.now()}`;
+    page.once('dialog', async dialog => await dialog.accept(agentName));
+    await page.getByTestId('create-agent-btn').click();
+    await expect(page.locator('.agent-secret-modal')).toBeVisible({ timeout: 5000 });
+    await page.locator('button:has-text("Close")').click();
+    await expect(page.getByTestId(`agent-item-${agentName}`)).toBeVisible();
+
+    // Create a tag
+    const tagName = `test-tag-${Date.now()}`;
+    page.once('dialog', async dialog => await dialog.accept(tagName));
+    await page.getByTestId('create-tag-btn').click();
+    await page.waitForTimeout(500);
+
+    // Select agent and assign tag
+    await page.getByTestId(`agent-item-${agentName}`).click();
+    await page.getByTestId(`tag-item-${tagName}`).dblclick();
+    await page.waitForTimeout(500);
+
+    // Verify tag is assigned
+    const tagsElement = page.getByTestId(`agent-tags-${agentName}`);
+    await expect(tagsElement).toContainText(tagName);
+
+    // Double-click again to remove
+    await page.getByTestId(`tag-item-${tagName}`).dblclick();
+    await page.waitForTimeout(500);
+
+    // Verify tag is removed (should show "—" for no tags)
+    await expect(tagsElement).not.toContainText(tagName);
+  });
 });
 
 test.describe('Agent Configuration in Node Editor', () => {
@@ -1245,6 +1342,73 @@ test.describe('Agent Configuration in Node Editor', () => {
     await page.getByTestId('agent-checkbox-any').click();
     await expect(page.getByTestId('agent-checkbox-any')).toBeChecked();
     await expect(page.getByTestId(`agent-checkbox-${agentName}`)).not.toBeChecked();
+
+    await page.locator('.node-editor-close').click();
+  });
+
+  test('required tags section appears in node editor', async ({ page }) => {
+    // Add a node
+    await page.getByTestId('node-type-scheduled').click();
+    const node = page.getByTestId('workflow-node-scheduled');
+
+    // Open node editor
+    await node.locator('.custom-node').dblclick();
+    const dialog = page.locator('.node-editor-dialog');
+    await expect(dialog).toBeVisible();
+
+    // Required Tags section should be visible
+    await expect(dialog.locator('.property-label').filter({ hasText: 'Required Tags' })).toBeVisible();
+    await expect(page.getByTestId('required-tags-section')).toBeVisible();
+
+    // Close editor
+    await page.locator('.node-editor-close').click();
+  });
+
+  test('can select required tags for a node', async ({ page }) => {
+    // First create some tags
+    await page.getByTestId('back-to-dashboard').click();
+    await page.getByTestId('tab-agents').click();
+
+    const tag1 = `tag-${Date.now()}-1`;
+    const tag2 = `tag-${Date.now()}-2`;
+
+    page.once('dialog', async dialog => await dialog.accept(tag1));
+    await page.getByTestId('create-tag-btn').click();
+    await page.waitForTimeout(500);
+
+    page.once('dialog', async dialog => await dialog.accept(tag2));
+    await page.getByTestId('create-tag-btn').click();
+    await page.waitForTimeout(500);
+
+    // Go back to editor
+    await page.getByTestId('tab-workflows').click();
+    await page.getByTestId('file-item-sample.json').dblclick();
+    await expect(page.getByTestId('editor')).toBeVisible({ timeout: 10000 });
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Delete');
+
+    // Add a node and open editor
+    await page.getByTestId('node-type-scheduled').click();
+    const node = page.getByTestId('workflow-node-scheduled');
+    await node.locator('.custom-node').dblclick();
+    const dialog = page.locator('.node-editor-dialog');
+    await expect(dialog).toBeVisible();
+
+    // Select required tags
+    await page.getByTestId(`required-tag-checkbox-${tag1}`).click();
+    await expect(page.getByTestId(`required-tag-checkbox-${tag1}`)).toBeChecked();
+
+    await page.getByTestId(`required-tag-checkbox-${tag2}`).click();
+    await expect(page.getByTestId(`required-tag-checkbox-${tag2}`)).toBeChecked();
+
+    // Close and reopen to verify persistence
+    await page.locator('.node-editor-close').click();
+    await node.locator('.custom-node').dblclick();
+    await expect(dialog).toBeVisible();
+
+    // Required tags should still be checked
+    await expect(page.getByTestId(`required-tag-checkbox-${tag1}`)).toBeChecked();
+    await expect(page.getByTestId(`required-tag-checkbox-${tag2}`)).toBeChecked();
 
     await page.locator('.node-editor-close').click();
   });

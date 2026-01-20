@@ -135,7 +135,12 @@ class TaskQueue:
             if agent.name not in agents_list:
                 return False
 
-        # Tags will be checked in PR6
+        # Check required tags (AND logic - must have ALL tags)
+        required_tags = agent_config.get("requiredTags", [])
+        for tag in required_tags:
+            if tag not in agent.tags:
+                return False
+
         return True
 
     def _notify_agents(self) -> None:

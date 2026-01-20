@@ -34,6 +34,7 @@ from .module_loader import (
     get_node_types_for_api,
     load_all_modules,
 )
+from .tags import create_tag, delete_tag, list_tags
 from .triggers import (
     get_enabled_workflows,
     init_trigger_system,
@@ -451,6 +452,41 @@ def delete_agent(name: str):
 
     registry.delete_agent(name)
     return {"status": "deleted"}
+
+
+# ##################################################################
+# tags endpoints
+# manage capability tags for agents
+
+
+@api_router.get("/tags")
+def list_tags_endpoint():
+    """List all tags."""
+    return {"tags": list_tags()}
+
+
+@api_router.post("/tags")
+def create_tag_endpoint(request: dict):
+    """Create a new tag."""
+    name = request.get("name", "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Tag name is required")
+
+    success = create_tag(name)
+    if not success:
+        raise HTTPException(status_code=400, detail=f"Tag '{name}' already exists")
+
+    return {"name": name, "created": True}
+
+
+@api_router.delete("/tags/{name}")
+def delete_tag_endpoint(name: str):
+    """Delete a tag."""
+    success = delete_tag(name)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Tag '{name}' not found")
+
+    return {"name": name, "deleted": True}
 
 
 # ##################################################################
