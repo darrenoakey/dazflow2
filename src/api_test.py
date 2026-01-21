@@ -1,7 +1,9 @@
+import asyncio
 import json
 import tempfile
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from src.api import (
@@ -488,6 +490,52 @@ def test_create_agent_duplicate(tmp_path):
     response = client.post("/api/agents", json={"name": "duplicate-agent"})
     assert response.status_code == 400
     assert "already exists" in response.json()["detail"]
+
+
+def test_create_agent_resolves_localhost_to_real_ip(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    set_registry(AgentRegistry(str(agents_file)))
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/agents",
+        json={"name": "test-agent"},
+        headers={"Host": "localhost:5000"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    # install_command should NOT contain localhost
+    assert "localhost" not in data["install_command"]
+    assert "127.0.0.1" not in data["install_command"]
+    # Should contain a real IP (has digits and dots pattern)
+    assert "curl" in data["install_command"]
+
+
+def test_create_agent_resolves_127_0_0_1_to_real_ip(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    set_registry(AgentRegistry(str(agents_file)))
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/agents",
+        json={"name": "test-agent"},
+        headers={"Host": "127.0.0.1:5000"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    # install_command should NOT contain localhost/127.0.0.1
+    assert "localhost" not in data["install_command"]
+    assert "127.0.0.1" not in data["install_command"]
 
 
 def test_get_agent_success(tmp_path):
@@ -1177,9 +1225,8 @@ def test_get_agent_install_script_success(tmp_path):
     client = TestClient(app)
     response = client.get(f"/api/agents/test-agent/install-script?secret={secret}")
     assert response.status_code == 200
-    data = response.json()
-    assert "script" in data
-    script = data["script"]
+    assert "text/plain" in response.headers["content-type"]
+    script = response.text
 
     # Verify script contains necessary elements
     assert "test-agent" in script
@@ -1187,6 +1234,11 @@ def test_get_agent_install_script_success(tmp_path):
     assert "agent.py" in script
     assert "agent_updater.py" in script
     assert "config.json" in script
+    # Verify venv setup and auto-start
+    assert "python3 -m venv .venv" in script
+    assert "pip install" in script
+    assert "websockets" in script
+    assert "exec .venv/bin/python agent_updater.py" in script
 
 
 def test_get_agent_install_script_invalid_secret(tmp_path):
@@ -1222,6 +1274,56 @@ def test_get_agent_install_script_nonexistent_agent(tmp_path):
     assert response.status_code == 401
 
 
+def test_get_agent_install_script_resolves_localhost_to_real_ip(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    registry = AgentRegistry(str(agents_file))
+    set_registry(registry)
+
+    # Create agent
+    _, secret = registry.create_agent("test-agent")
+
+    client = TestClient(app)
+    response = client.get(
+        f"/api/agents/test-agent/install-script?secret={secret}",
+        headers={"Host": "localhost:5000"},
+    )
+    assert response.status_code == 200
+    script = response.text
+    # Script should NOT contain localhost
+    assert "localhost" not in script
+    assert "127.0.0.1" not in script
+
+
+def test_get_agent_install_script_resolves_127_0_0_1_to_real_ip(tmp_path):
+    from src.config import ServerConfig, set_config
+    from src.agents import AgentRegistry, set_registry
+
+    # Setup isolated environment
+    agents_file = tmp_path / "agents.json"
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+    registry = AgentRegistry(str(agents_file))
+    set_registry(registry)
+
+    # Create agent
+    _, secret = registry.create_agent("test-agent")
+
+    client = TestClient(app)
+    response = client.get(
+        f"/api/agents/test-agent/install-script?secret={secret}",
+        headers={"Host": "127.0.0.1"},
+    )
+    assert response.status_code == 200
+    script = response.text
+    # Script should NOT contain localhost/127.0.0.1
+    assert "localhost" not in script
+    assert "127.0.0.1" not in script
+
+
 # ##################################################################
 # test agent file serving endpoints
 # verifies agent.py and agent_updater.py can be downloaded
@@ -1250,4 +1352,327 @@ def test_get_agent_version():
     data = response.json()
     assert "version" in data
     assert isinstance(data["version"], str)
-    assert len(data["version"]) > 0
+    # Version is now a 12-char hash
+    assert len(data["version"]) == 12
+
+
+def test_get_agent_code_package():
+    import zipfile
+    import io
+
+    client = TestClient(app)
+    response = client.get("/api/agent-files/code.zip")
+    assert response.status_code == 200
+    assert "application/zip" in response.headers["content-type"]
+
+    # Verify it's a valid zip file
+    buffer = io.BytesIO(response.content)
+    with zipfile.ZipFile(buffer, "r") as zf:
+        names = zf.namelist()
+        # Should contain VERSION and some .py files
+        assert "VERSION" in names
+        py_files = [n for n in names if n.endswith(".py")]
+        assert len(py_files) > 0
+
+
+def test_get_agent_code_manifest():
+    client = TestClient(app)
+    response = client.get("/api/agent-files/manifest")
+    assert response.status_code == 200
+    data = response.json()
+    assert "version" in data
+    assert "files" in data
+    assert "file_count" in data
+    assert data["file_count"] == len(data["files"])
+    assert data["file_count"] > 0
+
+
+# ##################################################################
+# test client error logging endpoint
+# verifies client errors can be logged to the server
+def test_log_client_error():
+    client = TestClient(app)
+    response = client.post(
+        "/api/client-error",
+        json={
+            "message": "Test error from client",
+            "stack": "Error: Test error\n    at test.js:1:1",
+            "url": "http://localhost:5000/",
+            "userAgent": "TestClient/1.0",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["logged"] is True
+
+
+def test_log_client_error_minimal():
+    """Test that only message is required."""
+    client = TestClient(app)
+    response = client.post(
+        "/api/client-error",
+        json={"message": "Minimal error"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["logged"] is True
+
+
+# ##################################################################
+# test /api/execute endpoint with queue-based execution
+# verifies all execution goes through the task queue
+
+
+async def _process_queue_tasks(queue, workflow, execution, max_tasks=10, timeout=5.0):
+    """Process tasks from the queue (simulates an agent)."""
+    import time
+
+    from src.executor import execute_node
+
+    tasks_processed = 0
+    start = time.time()
+
+    while tasks_processed < max_tasks and (time.time() - start) < timeout:
+        if not queue._pending:
+            await asyncio.sleep(0.01)
+            continue
+
+        task = queue._pending[0]
+        task_id = task.id
+
+        # Claim the task
+        queue.claim_task(task_id, "test-agent")
+
+        # Execute the node
+        node_id = task.node_id
+        try:
+            new_execution = execute_node(node_id, workflow, execution)
+            execution = new_execution  # Update for next iteration
+            queue.complete_task(task_id, {"success": True, "execution": new_execution})
+        except Exception as e:
+            queue.fail_task(task_id, str(e))
+
+        tasks_processed += 1
+
+    return tasks_processed
+
+
+@pytest.mark.asyncio
+async def test_execute_node_via_queue(tmp_path):
+    """Test that /api/execute routes through the task queue."""
+    import httpx
+
+    from src.agents import AgentRegistry, set_registry
+    from src.config import ServerConfig, set_config
+    from src.task_queue import TaskQueue, set_queue
+    from src.worker import init_worker_system
+
+    # Set up isolated environment
+    queue_dir = tmp_path / "queue"
+    stats_dir = tmp_path / "stats"
+    init_worker_system(queue_dir, stats_dir)
+
+    config = ServerConfig(data_dir=str(tmp_path))
+    set_config(config)
+
+    registry = AgentRegistry()
+    registry.create_agent("test-agent")
+    registry.update_agent("test-agent", enabled=True, status="online")
+    set_registry(registry)
+
+    queue = TaskQueue()
+    set_queue(queue)
+
+    workflow = {
+        "nodes": [{"id": "n1", "typeId": "scheduled", "name": "sched1", "data": {}}],
+        "connections": [],
+    }
+
+    # Run API call and task processor concurrently
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        api_call = client.post(
+            "/api/execute",
+            json={"node_id": "n1", "workflow": workflow, "execution": {}},
+        )
+        processor = _process_queue_tasks(queue, workflow, {})
+
+        response, _ = await asyncio.gather(api_call, processor)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "execution" in data
+    assert "n1" in data["execution"]
+
+
+@pytest.mark.asyncio
+async def test_execute_node_routes_to_correct_agent(tmp_path):
+    """Test that nodes with agentConfig are routed to the correct agent."""
+    import httpx
+
+    from src.agents import AgentRegistry, set_registry
+    from src.config import ServerConfig, set_config
+    from src.task_queue import TaskQueue, set_queue
+    from src.worker import init_worker_system
+
+    # Set up isolated environment
+    queue_dir = tmp_path / "queue"
+    stats_dir = tmp_path / "stats"
+    init_worker_system(queue_dir, stats_dir)
+
+    config = ServerConfig(data_dir=str(tmp_path))
+    set_config(config)
+
+    # Create two agents: test-agent and mac-mini
+    registry = AgentRegistry()
+    registry.create_agent("test-agent")
+    registry.update_agent("test-agent", enabled=True, status="online")
+    registry.create_agent("mac-mini")
+    registry.update_agent("mac-mini", enabled=True, status="online")
+    set_registry(registry)
+
+    queue = TaskQueue()
+    set_queue(queue)
+
+    # Workflow with trigger -> action node configured for mac-mini only
+    # The trigger node (n1) is auto-completed, but n2 should route to mac-mini
+    workflow = {
+        "nodes": [
+            {
+                "id": "n1",
+                "typeId": "scheduled",
+                "name": "sched1",
+                "data": {},
+            },
+            {
+                "id": "n2",
+                "typeId": "set",
+                "name": "set1",
+                "data": {"fields": [], "agentConfig": {"agents": ["mac-mini"], "requiredTags": []}},
+            },
+        ],
+        "connections": [{"sourceNodeId": "n1", "targetNodeId": "n2"}],
+    }
+
+    # Custom processor that only processes tasks for mac-mini
+    async def process_mac_mini_tasks(queue, workflow, execution):
+        import time
+
+        from src.executor import execute_node
+
+        start = time.time()
+        while (time.time() - start) < 5.0:
+            if not queue._pending:
+                await asyncio.sleep(0.01)
+                continue
+
+            task = queue._pending[0]
+
+            # Get available task for mac-mini (should work)
+            available = queue.get_available_task("mac-mini")
+            if available:
+                queue.claim_task(task.id, "mac-mini")
+                new_execution = execute_node(task.node_id, workflow, execution)
+                queue.complete_task(task.id, {"success": True, "execution": new_execution})
+                return "mac-mini"
+
+            # test-agent should NOT be able to claim this task
+            available_test = queue.get_available_task("test-agent")
+            assert available_test is None, "test-agent should not be able to claim mac-mini task"
+
+            await asyncio.sleep(0.01)
+        return None
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        api_call = client.post(
+            "/api/execute",
+            json={"node_id": "n2", "workflow": workflow, "execution": {}},
+        )
+        processor = process_mac_mini_tasks(queue, workflow, {})
+
+        response, claimed_by = await asyncio.gather(api_call, processor)
+
+    assert response.status_code == 200
+    assert claimed_by == "mac-mini"
+    data = response.json()
+    assert "execution" in data
+    # n1 is auto-completed (trigger node), n2 goes through queue to mac-mini
+    assert "n1" in data["execution"]
+    assert "n2" in data["execution"]
+
+
+@pytest.mark.asyncio
+async def test_execute_multi_node_workflow_step_by_step(tmp_path):
+    """Test that multi-node workflow executes one step at a time through queue."""
+    import httpx
+
+    from src.agents import AgentRegistry, set_registry
+    from src.config import ServerConfig, set_config
+    from src.task_queue import TaskQueue, set_queue
+    from src.worker import init_worker_system
+
+    # Set up isolated environment
+    queue_dir = tmp_path / "queue"
+    stats_dir = tmp_path / "stats"
+    init_worker_system(queue_dir, stats_dir)
+
+    config = ServerConfig(data_dir=str(tmp_path))
+    set_config(config)
+
+    registry = AgentRegistry()
+    registry.create_agent("test-agent")
+    registry.update_agent("test-agent", enabled=True, status="online")
+    set_registry(registry)
+
+    queue = TaskQueue()
+    set_queue(queue)
+
+    # Workflow: n1 -> n2 (two steps, should go through queue twice)
+    workflow = {
+        "nodes": [
+            {"id": "n1", "typeId": "scheduled", "name": "sched1", "data": {}},
+            {"id": "n2", "typeId": "set", "name": "set1", "data": {"fields": []}},
+        ],
+        "connections": [{"sourceNodeId": "n1", "targetNodeId": "n2"}],
+    }
+
+    # Track which nodes are processed
+    nodes_processed = []
+
+    async def process_and_track(queue, workflow):
+        import time
+
+        from src.executor import execute_node
+
+        execution = {}
+        start = time.time()
+
+        # Only n2 goes through queue (n1 is trigger, auto-completed)
+        while len(nodes_processed) < 1 and (time.time() - start) < 10.0:
+            if not queue._pending:
+                await asyncio.sleep(0.01)
+                continue
+
+            task = queue._pending[0]
+            queue.claim_task(task.id, "test-agent")
+            nodes_processed.append(task.node_id)
+
+            new_execution = execute_node(task.node_id, workflow, execution)
+            execution = new_execution
+            queue.complete_task(task.id, {"success": True, "execution": new_execution})
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        api_call = client.post(
+            "/api/execute",
+            json={"node_id": "n2", "workflow": workflow, "execution": {}},
+        )
+        processor = process_and_track(queue, workflow)
+
+        response, _ = await asyncio.gather(api_call, processor)
+
+    assert response.status_code == 200
+    # Only n2 should go through queue (n1 is auto-completed as trigger node)
+    assert nodes_processed == ["n2"]
+    data = response.json()
+    # Both nodes should be in execution (n1 auto-completed, n2 via queue)
+    assert "n1" in data["execution"]
+    assert "n2" in data["execution"]

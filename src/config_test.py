@@ -163,54 +163,20 @@ def test_high_port_number():
 
 # ##################################################################
 # test agent version property
-# verifies agent_version reads from agent.py file
+# verifies agent_version returns code hash
 def test_agent_version_property():
     config = ServerConfig()
     version = config.agent_version
     assert isinstance(version, str)
-    assert len(version) > 0
-    # Should match semantic version pattern (e.g., "1.0.0")
-    assert "." in version
+    # Should be a 12-character hash
+    assert len(version) == 12
 
 
 # ##################################################################
-# test agent version reads from agent file
-# verifies agent_version extracts VERSION constant from agent.py
-def test_agent_version_reads_from_file():
-    import tempfile
-    from pathlib import Path
-
-    # Create a temporary agent.py with a VERSION constant
-    with tempfile.TemporaryDirectory() as tmpdir:
-        agent_dir = Path(tmpdir) / "agent"
-        agent_dir.mkdir()
-        agent_file = agent_dir / "agent.py"
-        agent_file.write_text('VERSION = "2.5.3"\n')
-
-        # Mock the path to point to our temp file
-        from unittest.mock import patch
-
-        src_dir = Path(tmpdir) / "src"
-        src_dir.mkdir()
-
-        with patch("config.Path") as mock_path:
-            mock_path.return_value.parent.parent = Path(tmpdir)
-
-            config = ServerConfig()
-            version = config.agent_version
-            assert version == "2.5.3"
-
-
-# ##################################################################
-# test agent version fallback
-# verifies agent_version returns default when file not found
-def test_agent_version_fallback():
-    from unittest.mock import patch
-
-    # Mock Path to point to non-existent file
-    with patch("config.Path") as mock_path:
-        mock_path.return_value.parent.parent = Path("/nonexistent/path")
-
-        config = ServerConfig()
-        version = config.agent_version
-        assert version == "1.0.0"  # Default fallback
+# test agent version is deterministic
+# verifies agent_version returns same value on repeated calls
+def test_agent_version_is_deterministic():
+    config = ServerConfig()
+    v1 = config.agent_version
+    v2 = config.agent_version
+    assert v1 == v2

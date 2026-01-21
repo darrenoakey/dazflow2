@@ -1,8 +1,15 @@
 """Tests for background workflow execution worker system."""
 
+import asyncio
 import json
 import time
 
+import pytest
+
+from src.agents import AgentRegistry, set_registry
+from src.config import ServerConfig, set_config
+from src.executor import execute_node
+from src.task_queue import set_queue, TaskQueue
 from src.worker import (
     append_to_index,
     claim_queue_item,
@@ -285,56 +292,133 @@ def test_is_workflow_complete_done():
 
 
 # ##################################################################
+# Helper to process tasks from queue (simulates agent execution)
+async def process_queued_task(queue: TaskQueue, workflow: dict, execution: dict, timeout: float = 5.0):
+    """Process one task from the queue by executing it directly."""
+    # Wait for a task to be available
+    start = time.time()
+    while not queue._pending and (time.time() - start) < timeout:
+        await asyncio.sleep(0.01)
+
+    if not queue._pending:
+        return
+
+    task = queue._pending[0]
+    task_id = task.id
+
+    # Claim the task
+    queue.claim_task(task_id, "test-agent")
+
+    # Execute the node
+    node_id = task.node_id
+    try:
+        new_execution = execute_node(node_id, workflow, execution)
+        queue.complete_task(
+            task_id,
+            {"success": True, "execution": new_execution},
+        )
+    except Exception as e:
+        queue.fail_task(task_id, str(e))
+
+
+# ##################################################################
 # test execute_one_step
 # verifies single step execution
-def test_execute_one_step(tmp_path):
+@pytest.mark.asyncio
+async def test_execute_one_step(tmp_path):
     queue_dir = tmp_path / "queue"
     stats_dir = tmp_path / "stats"
     init_worker_system(queue_dir, stats_dir)
 
+    # Set up config and registry with test agent
+    config = ServerConfig(data_dir=str(tmp_path))
+    set_config(config)
+    registry = AgentRegistry()
+    registry.create_agent("test-agent")
+    registry.update_agent("test-agent", enabled=True, status="online")
+    set_registry(registry)
+
+    # Set up a fresh queue for this test
+    queue = TaskQueue()
+    set_queue(queue)
+
+    workflow = {
+        "nodes": [{"id": "n1", "typeId": "scheduled", "name": "sched1", "data": {}}],
+        "connections": [],
+    }
+
     queue_item = {
-        "workflow": {
-            "nodes": [{"id": "n1", "typeId": "scheduled", "name": "sched1", "data": {}}],
-            "connections": [],
-        },
+        "id": "test-exec-1",
+        "workflow": workflow,
         "execution": {},
         "status": "running",
         "current_step": 0,
     }
 
-    updated = execute_one_step(queue_item)
+    # Run execute_one_step and task processing concurrently
+    results = await asyncio.gather(
+        execute_one_step(queue_item),
+        process_queued_task(queue, workflow, {}),
+    )
+    updated = results[0]
 
     assert "n1" in updated["execution"]
     assert updated["status"] == "completed"
     assert updated["current_step"] == 1
 
 
-def test_execute_one_step_multi_node(tmp_path):
+@pytest.mark.asyncio
+async def test_execute_one_step_multi_node(tmp_path):
     queue_dir = tmp_path / "queue"
     stats_dir = tmp_path / "stats"
     init_worker_system(queue_dir, stats_dir)
 
+    # Set up config and registry with test agent
+    config = ServerConfig(data_dir=str(tmp_path))
+    set_config(config)
+    registry = AgentRegistry()
+    registry.create_agent("test-agent")
+    registry.update_agent("test-agent", enabled=True, status="online")
+    set_registry(registry)
+
+    # Set up a fresh queue for this test
+    queue = TaskQueue()
+    set_queue(queue)
+
+    workflow = {
+        "nodes": [
+            {"id": "n1", "typeId": "scheduled", "name": "sched1", "data": {}},
+            {"id": "n2", "typeId": "set", "name": "set1", "data": {"fields": []}},
+        ],
+        "connections": [{"sourceNodeId": "n1", "targetNodeId": "n2"}],
+    }
+
     queue_item = {
-        "workflow": {
-            "nodes": [
-                {"id": "n1", "typeId": "scheduled", "name": "sched1", "data": {}},
-                {"id": "n2", "typeId": "set", "name": "set1", "data": {"fields": []}},
-            ],
-            "connections": [{"sourceNodeId": "n1", "targetNodeId": "n2"}],
-        },
+        "id": "test-exec-2",
+        "workflow": workflow,
         "execution": {},
         "status": "running",
         "current_step": 0,
     }
 
     # First step
-    updated = execute_one_step(queue_item)
+    results1 = await asyncio.gather(
+        execute_one_step(queue_item),
+        process_queued_task(queue, workflow, {}),
+    )
+    updated = results1[0]
+
     assert "n1" in updated["execution"]
     assert "n2" not in updated["execution"]
     assert updated["status"] == "running"
 
     # Second step
-    updated = execute_one_step(updated)
-    assert "n1" in updated["execution"]
-    assert "n2" in updated["execution"]
-    assert updated["status"] == "completed"
+    results2 = await asyncio.gather(
+        execute_one_step(updated),
+        process_queued_task(queue, workflow, updated["execution"]),
+    )
+    final = results2[0]
+
+    assert "n1" in final["execution"]
+    assert "n2" in final["execution"]
+    assert final["status"] == "completed"

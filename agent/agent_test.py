@@ -60,6 +60,14 @@ def test_agent_get_ws_url_bare():
 
 
 # ##################################################################
+# test websocket url generation with spaces in name
+# verifies name is url-encoded
+def test_agent_get_ws_url_with_spaces():
+    agent = DazflowAgent("http://localhost:5000", "mac mini", "secret")
+    assert agent._get_ws_url() == "ws://localhost:5000/ws/agent/mac%20mini/secret"
+
+
+# ##################################################################
 # test timestamp format
 # verifies timestamp includes date and time in utc
 def test_agent_timestamp_format():

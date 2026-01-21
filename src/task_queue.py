@@ -30,6 +30,15 @@ class TaskQueue:
         self._in_progress: dict[str, Task] = {}  # task_id -> Task
         self._callbacks: dict[str, callable] = {}  # task_id -> completion callback
 
+    def _get_node_data(self, task: Task) -> dict:
+        """Get the node data from a task's execution snapshot."""
+        workflow = task.execution_snapshot.get("workflow", {})
+        nodes = workflow.get("nodes", [])
+        for node in nodes:
+            if node.get("id") == task.node_id:
+                return node.get("data", {})
+        return {}
+
     def enqueue(self, task: Task, on_complete: callable = None) -> None:
         """Add a task to the queue."""
         self._pending.append(task)
@@ -79,7 +88,7 @@ class TaskQueue:
         registry.update_agent(agent_name, current_task=task.execution_id)
 
         # Increment concurrency group count
-        node_data = task.execution_snapshot.get("nodes", {}).get(task.node_id, {})
+        node_data = self._get_node_data(task)
         agent_config = node_data.get("agentConfig", {})
         concurrency_group = agent_config.get("concurrencyGroup")
         if concurrency_group:
@@ -93,7 +102,7 @@ class TaskQueue:
         task = self._in_progress.pop(task_id, None)
         if task:
             # Decrement concurrency group count
-            node_data = task.execution_snapshot.get("nodes", {}).get(task.node_id, {})
+            node_data = self._get_node_data(task)
             agent_config = node_data.get("agentConfig", {})
             concurrency_group = agent_config.get("concurrencyGroup")
             if concurrency_group:
@@ -123,7 +132,7 @@ class TaskQueue:
         task = self._in_progress.pop(task_id, None)
         if task:
             # Decrement concurrency group count
-            node_data = task.execution_snapshot.get("nodes", {}).get(task.node_id, {})
+            node_data = self._get_node_data(task)
             agent_config = node_data.get("agentConfig", {})
             concurrency_group = agent_config.get("concurrencyGroup")
             if concurrency_group:
@@ -132,13 +141,14 @@ class TaskQueue:
 
             # Clear agent current task
             registry = get_registry()
-            if task.claimed_by:
-                registry.update_agent(task.claimed_by, current_task=None)
+            agent_name = task.claimed_by
+            if agent_name:
+                registry.update_agent(agent_name, current_task=None)
 
-            # Call completion callback with error
+            # Call completion callback with error (include agent name for debugging)
             callback = self._callbacks.pop(task_id, None)
             if callback:
-                callback({"error": error})
+                callback({"error": error, "agent": agent_name, "node_id": task.node_id})
 
     def requeue_agent_tasks(self, agent_name: str) -> None:
         """Requeue all tasks claimed by an agent (on disconnect)."""
@@ -146,7 +156,7 @@ class TaskQueue:
 
         for task in tasks_to_requeue:
             # Decrement concurrency group count
-            node_data = task.execution_snapshot.get("nodes", {}).get(task.node_id, {})
+            node_data = self._get_node_data(task)
             agent_config = node_data.get("agentConfig", {})
             concurrency_group = agent_config.get("concurrencyGroup")
             if concurrency_group:
@@ -163,8 +173,8 @@ class TaskQueue:
         if not agent.enabled or agent.status != "online":
             return False
 
-        # Get agent config from task's execution snapshot
-        node_data = task.execution_snapshot.get("nodes", {}).get(task.node_id, {})
+        # Get node data from task's execution snapshot
+        node_data = self._get_node_data(task)
         agent_config = node_data.get("agentConfig", {})
 
         # Check agent selection (OR logic - any of the listed agents)
@@ -196,8 +206,32 @@ class TaskQueue:
 
     def _notify_agents(self) -> None:
         """Notify connected agents of available tasks."""
-        # This will be implemented to send WebSocket notifications
-        pass
+        import asyncio
+
+        from .agent_ws import get_connected_agents, send_to_agent
+
+        async def _send_notifications():
+            for agent_name in get_connected_agents():
+                task = self.get_available_task(agent_name)
+                if task:
+                    await send_to_agent(
+                        agent_name,
+                        {
+                            "type": "task_available",
+                            "task_id": task.id,
+                            "workflow_name": task.workflow_name,
+                            "node_id": task.node_id,
+                            "execution_snapshot": task.execution_snapshot,
+                        },
+                    )
+
+        # Run async notification in background
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(_send_notifications())
+        except RuntimeError:
+            # No running loop - skip notification
+            pass
 
     def get_pending_count(self) -> int:
         """Get count of pending tasks."""

@@ -1738,6 +1738,81 @@
             color: #666;
             font-size: 14px;
         }
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-width: 400px;
+        }
+        .toast {
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            animation: toast-in 0.2s ease-out;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        .toast.error {
+            background: #4a1a1a;
+            border: 1px solid #6a2a2a;
+            color: #faa;
+        }
+        .toast.success {
+            background: #1a4a1a;
+            border: 1px solid #2a6a2a;
+            color: #afa;
+        }
+        .toast.warning {
+            background: #4a3a1a;
+            border: 1px solid #6a5a2a;
+            color: #fda;
+        }
+        .toast.info {
+            background: #1a2a4a;
+            border: 1px solid #2a4a6a;
+            color: #adf;
+        }
+        .toast-icon {
+            flex-shrink: 0;
+            width: 18px;
+            height: 18px;
+        }
+        .toast-content {
+            flex: 1;
+            min-width: 0;
+        }
+        .toast-title {
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        .toast-message {
+            opacity: 0.9;
+            word-break: break-word;
+        }
+        .toast-close {
+            flex-shrink: 0;
+            background: none;
+            border: none;
+            color: inherit;
+            cursor: pointer;
+            padding: 2px;
+            opacity: 0.6;
+            transition: opacity 0.15s;
+        }
+        .toast-close:hover {
+            opacity: 1;
+        }
+        @keyframes toast-in {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
     </style>
     <link href="https://esm.sh/@xyflow/react@12/dist/style.css" rel="stylesheet">
 </head>
@@ -1936,6 +2011,68 @@
         // Load initial state from localStorage
         const initialState = loadFromStorage();
 
+        // Toast notification store
+        let toastId = 0;
+        const useToastStore = create((set, get) => ({
+            toasts: [],
+            addToast: (toast) => {
+                const id = ++toastId;
+                const newToast = { id, ...toast };
+                set(state => ({ toasts: [...state.toasts, newToast] }));
+                // Auto-dismiss after duration (default 5s for errors, 3s for others)
+                const duration = toast.duration || (toast.type === 'error' ? 5000 : 3000);
+                setTimeout(() => {
+                    set(state => ({ toasts: state.toasts.filter(t => t.id !== id) }));
+                }, duration);
+                return id;
+            },
+            removeToast: (id) => {
+                set(state => ({ toasts: state.toasts.filter(t => t.id !== id) }));
+            },
+            // Convenience methods
+            error: (title, message) => get().addToast({ type: 'error', title, message }),
+            success: (title, message) => get().addToast({ type: 'success', title, message }),
+            warning: (title, message) => get().addToast({ type: 'warning', title, message }),
+            info: (title, message) => get().addToast({ type: 'info', title, message }),
+        }));
+
+        // Log error to server
+        async function logErrorToServer(message, stack) {
+            try {
+                await fetch('/api/client-error', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: message,
+                        stack: stack || null,
+                        url: window.location.href,
+                        userAgent: navigator.userAgent
+                    })
+                });
+            } catch (e) {
+                // Don't fail if logging fails
+                console.warn('Failed to log error to server:', e);
+            }
+        }
+
+        // Global error handler for unhandled promise rejections
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('Unhandled promise rejection:', event.reason);
+            const message = String(event.reason?.message || event.reason || 'Unknown error');
+            const stack = event.reason?.stack || null;
+            useToastStore.getState().error('Error', message);
+            logErrorToServer(message, stack);
+        });
+
+        // Global error handler for uncaught errors
+        window.addEventListener('error', (event) => {
+            console.error('Uncaught error:', event.error);
+            const message = String(event.error?.message || event.message || 'Unknown error');
+            const stack = event.error?.stack || null;
+            useToastStore.getState().error('Error', message);
+            logErrorToServer(message, stack);
+        });
+
         // Zustand store for workflow state
         const useWorkflowStore = create((set, get) => ({
             nodes: initialState?.nodes || [],
@@ -1956,6 +2093,8 @@
                 const path = window.location.pathname;
                 if (path === '/executions') return 'executions';
                 if (path === '/credentials') return 'credentials';
+                if (path === '/agents') return 'agents';
+                if (path === '/concurrency') return 'concurrency';
                 return 'workflows';
             })(),
             dashboardItems: [],
@@ -1986,6 +2125,7 @@
                     }
                 } catch (e) {
                     console.error('Failed to load workflows:', e);
+                    useToastStore.getState().error('Failed to load workflows', e.message || String(e));
                 } finally {
                     set({ dashboardLoading: false });
                 }
@@ -2009,9 +2149,12 @@
                             currentWorkflowPath: path,
                             currentView: 'editor',
                         });
+                    } else {
+                        useToastStore.getState().error('Failed to load workflow', `Server returned ${response.status}`);
                     }
                 } catch (e) {
                     console.error('Failed to load workflow:', e);
+                    useToastStore.getState().error('Failed to load workflow', e.message || String(e));
                 }
             },
 
@@ -2025,9 +2168,13 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ workflow }),
                     });
+                    if (!response.ok) {
+                        useToastStore.getState().error('Failed to save workflow', `Server returned ${response.status}`);
+                    }
                     return response.ok;
                 } catch (e) {
                     console.error('Failed to save workflow:', e);
+                    useToastStore.getState().error('Failed to save workflow', e.message || String(e));
                     return false;
                 }
             },
@@ -2074,6 +2221,7 @@
                     }
                 } catch (e) {
                     console.error('Failed to load executions:', e);
+                    useToastStore.getState().error('Failed to load executions', e.message || String(e));
                 } finally {
                     set({ executionsLoading: false });
                 }
@@ -2098,9 +2246,12 @@
                             isReadOnly: true,
                             currentWorkflowPath: data.workflow_path,
                         });
+                    } else {
+                        useToastStore.getState().error('Failed to load execution', `Server returned ${response.status}`);
                     }
                 } catch (e) {
                     console.error('Failed to load execution:', e);
+                    useToastStore.getState().error('Failed to load execution', e.message || String(e));
                 }
             },
 
@@ -5814,6 +5965,53 @@
             ]);
         }
 
+        // Toast icons
+        const ToastIcons = {
+            error: React.createElement('svg', { className: 'toast-icon', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2 },
+                React.createElement('circle', { cx: 12, cy: 12, r: 10 }),
+                React.createElement('line', { x1: 15, y1: 9, x2: 9, y2: 15 }),
+                React.createElement('line', { x1: 9, y1: 9, x2: 15, y2: 15 })
+            ),
+            success: React.createElement('svg', { className: 'toast-icon', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2 },
+                React.createElement('circle', { cx: 12, cy: 12, r: 10 }),
+                React.createElement('polyline', { points: '9 12 11 14 15 10' })
+            ),
+            warning: React.createElement('svg', { className: 'toast-icon', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2 },
+                React.createElement('path', { d: 'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z' }),
+                React.createElement('line', { x1: 12, y1: 9, x2: 12, y2: 13 }),
+                React.createElement('line', { x1: 12, y1: 17, x2: 12.01, y2: 17 })
+            ),
+            info: React.createElement('svg', { className: 'toast-icon', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2 },
+                React.createElement('circle', { cx: 12, cy: 12, r: 10 }),
+                React.createElement('line', { x1: 12, y1: 16, x2: 12, y2: 12 }),
+                React.createElement('line', { x1: 12, y1: 8, x2: 12.01, y2: 8 })
+            ),
+        };
+
+        // Toast Container Component
+        function ToastContainer() {
+            const toasts = useToastStore((state) => state.toasts);
+            const removeToast = useToastStore((state) => state.removeToast);
+
+            if (toasts.length === 0) return null;
+
+            return React.createElement('div', { className: 'toast-container' },
+                toasts.map(toast =>
+                    React.createElement('div', { key: toast.id, className: `toast ${toast.type}` },
+                        ToastIcons[toast.type] || ToastIcons.info,
+                        React.createElement('div', { className: 'toast-content' },
+                            toast.title && React.createElement('div', { className: 'toast-title' }, toast.title),
+                            toast.message && React.createElement('div', { className: 'toast-message' }, toast.message)
+                        ),
+                        React.createElement('button', {
+                            className: 'toast-close',
+                            onClick: () => removeToast(toast.id),
+                        }, '\u00D7')
+                    )
+                )
+            );
+        }
+
         // App Component
         function App() {
             const currentView = useWorkflowStore((state) => state.currentView);
@@ -5839,7 +6037,11 @@
                         loadExecution(id);
                     } else {
                         // Back to dashboard
-                        const newTab = pathname === '/executions' ? 'executions' : 'workflows';
+                        let newTab = 'workflows';
+                        if (pathname === '/executions') newTab = 'executions';
+                        else if (pathname === '/credentials') newTab = 'credentials';
+                        else if (pathname === '/agents') newTab = 'agents';
+                        else if (pathname === '/concurrency') newTab = 'concurrency';
                         useWorkflowStore.setState({
                             currentView: 'dashboard',
                             dashboardTab: newTab,
@@ -5865,10 +6067,12 @@
                 return () => window.removeEventListener('popstate', handleNavigation);
             }, [initialLoad, loadWorkflow, loadExecution, loadDashboardItems]);
 
-            if (currentView === 'dashboard') {
-                return React.createElement(Dashboard);
-            }
-            return React.createElement(Editor);
+            return React.createElement(React.Fragment, null,
+                currentView === 'dashboard'
+                    ? React.createElement(Dashboard)
+                    : React.createElement(Editor),
+                React.createElement(ToastContainer)
+            );
         }
 
         // Load modules and mount app

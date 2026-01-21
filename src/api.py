@@ -395,6 +395,53 @@ def list_agents():
     return [asdict(a) for a in agents]
 
 
+def _get_real_ip() -> str:
+    """Get the real network IP address of this machine."""
+    import socket
+
+    # Try to connect to an external address to find our real IP
+    # This doesn't actually send any data, just determines the route
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except Exception:
+        pass
+
+    # Fallback: try to get from hostname
+    try:
+        hostname = socket.gethostname()
+        return socket.gethostbyname(hostname)
+    except Exception:
+        pass
+
+    raise HTTPException(
+        status_code=500,
+        detail="Cannot determine server IP address. Access via the server's public hostname.",
+    )
+
+
+def _resolve_host_for_install_url(host: str) -> str:
+    """Resolve host for install URL, replacing localhost with real IP."""
+    if not host:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot generate install command: Host header is missing",
+        )
+
+    # Parse host and port
+    parts = host.split(":")
+    hostname = parts[0].lower()
+    port = parts[1] if len(parts) > 1 else None
+
+    # If localhost, replace with real IP
+    if hostname in ("localhost", "127.0.0.1"):
+        real_ip = _get_real_ip()
+        return f"{real_ip}:{port}" if port else real_ip
+
+    return host
+
+
 @api_router.post("/agents")
 def create_agent(body: dict, request: Request):
     """Create a new agent."""
@@ -408,9 +455,13 @@ def create_agent(body: dict, request: Request):
 
     agent, secret = registry.create_agent(name)
 
-    # Build install URL using request host
-    server_url = f"http://{request.headers.get('host', 'localhost')}"
-    install_url = f"{server_url}/api/agents/{name}/install-script?secret={secret}"
+    # Build install URL using request host (resolve localhost to real IP)
+    from urllib.parse import quote
+
+    host = _resolve_host_for_install_url(request.headers.get("host", ""))
+    server_url = f"http://{host}"
+    encoded_name = quote(name, safe="")
+    install_url = f"{server_url}/api/agents/{encoded_name}/install-script?secret={secret}"
 
     # Return agent data plus the secret and install command
     result = asdict(agent)
@@ -473,8 +524,9 @@ def get_agent_install_script(name: str, secret: str, request: Request):
     if not registry.verify_secret(name, secret):
         raise HTTPException(status_code=401, detail="Invalid agent name or secret")
 
-    # Get server URL from request (use the host the request came from)
-    server_url = f"http://{request.headers.get('host', 'localhost')}"
+    # Get server URL from request (resolve localhost to real IP)
+    host = _resolve_host_for_install_url(request.headers.get("host", ""))
+    server_url = f"http://{host}"
 
     # Generate install script
     script = f'''#!/bin/bash
@@ -506,19 +558,23 @@ CONFIGEOF
 # Make executable
 chmod +x agent.py agent_updater.py
 
+# Create virtual environment and install dependencies
+echo "Setting up Python virtual environment..."
+python3 -m venv .venv
+source .venv/bin/activate
+echo "Installing dependencies..."
+pip install --quiet websockets keyring
+
 echo ""
 echo "=========================================="
 echo "Agent installed successfully!"
 echo "=========================================="
 echo ""
-echo "Directory: $AGENT_DIR"
+echo "Starting agent..."
 echo ""
-echo "To start the agent NOW (foreground):"
-echo "  cd $AGENT_DIR && python3 agent_updater.py"
-echo ""
-echo "To start the agent in the BACKGROUND:"
-echo "  cd $AGENT_DIR && nohup python3 agent_updater.py > agent.log 2>&1 &"
-echo ""
+
+# Run the agent (stays in foreground so curl | bash keeps it running)
+exec .venv/bin/python agent_updater.py
 '''
 
     return PlainTextResponse(script, media_type="text/plain")
@@ -547,6 +603,29 @@ def get_agent_version():
     """Get current agent version."""
     config = get_config()
     return {"version": config.agent_version}
+
+
+@api_router.get("/agent-files/code.zip")
+def get_agent_code_package():
+    """Download the full code package for agent execution."""
+    from starlette.responses import Response
+
+    from .code_package import create_code_package
+
+    package = create_code_package()
+    return Response(
+        content=package,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=code.zip"},
+    )
+
+
+@api_router.get("/agent-files/manifest")
+def get_agent_code_manifest():
+    """Get manifest of code package contents."""
+    from .code_package import get_package_manifest
+
+    return get_package_manifest()
 
 
 # ##################################################################
@@ -1025,6 +1104,31 @@ async def heartbeat_generator():
 
 
 # ##################################################################
+# client error logging endpoint
+# logs errors from frontend clients
+class ClientErrorRequest(BaseModel):
+    message: str
+    stack: str | None = None
+    url: str | None = None
+    userAgent: str | None = None
+
+
+@api_router.post("/client-error")
+async def log_client_error(request: ClientErrorRequest):
+    """Log an error from a frontend client."""
+    import logging
+
+    logger = logging.getLogger("dazflow2.client")
+    logger.error(
+        f"Client error: {request.message}\n"
+        f"  URL: {request.url}\n"
+        f"  User-Agent: {request.userAgent}\n"
+        f"  Stack: {request.stack or 'N/A'}"
+    )
+    return {"logged": True}
+
+
+# ##################################################################
 # health check
 # simple endpoint to verify the server is running
 @app.get("/health")
@@ -1071,14 +1175,57 @@ class ExecuteResponse(BaseModel):
 
 @api_router.post("/execute", response_model=ExecuteResponse)
 async def execute(request: ExecuteRequest):
-    """Execute a node and return updated execution state."""
+    """Execute a node (and upstream dependencies) via the task queue.
+
+    Each step is queued individually and routed to the appropriate agent
+    based on the node's agentConfig. This ensures nodes configured to run
+    on specific agents actually run on those agents.
+    """
+    from .worker import execute_one_step, find_ready_node
+
     try:
-        updated_execution = execute_node(
-            node_id=request.node_id,
-            workflow=request.workflow,
-            execution=request.execution,
-        )
-        return ExecuteResponse(execution=updated_execution)
+        # Create an in-memory queue item for this execution
+        item = {
+            "id": f"interactive-{request.node_id}",
+            "workflow_path": "interactive",
+            "workflow": request.workflow,
+            "execution": dict(request.execution),  # Copy to avoid mutation
+            "status": "running",
+            "current_step": 0,
+            "target_node_id": request.node_id,  # Stop when this node is executed
+        }
+
+        # Execute steps until target node is done or error
+        while item["status"] == "running":
+            # Check if target node is already executed
+            if request.node_id in item["execution"]:
+                item["status"] = "completed"
+                break
+
+            # Find next node that needs to execute to reach target
+            ready_node = find_ready_node(item["workflow"], item["execution"], target_node_id=request.node_id)
+            if ready_node is None:
+                # No ready nodes - check if target was somehow missed
+                if request.node_id in item["execution"]:
+                    item["status"] = "completed"
+                else:
+                    item["status"] = "error"
+                    item["error"] = "No executable nodes found"
+                break
+
+            # Execute one step through the task queue
+            item = await execute_one_step(item)
+
+            # Stop if we just executed the target node
+            if request.node_id in item["execution"]:
+                if item["status"] == "running":
+                    item["status"] = "completed"
+                break
+
+        if item["status"] == "error":
+            raise RuntimeError(item.get("error", "Execution failed"))
+
+        return ExecuteResponse(execution=item["execution"])
     except Exception as e:
         # Return the error in execution result so frontend can display it
         import traceback

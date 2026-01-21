@@ -5,7 +5,15 @@ import argparse
 import asyncio
 import json
 import sys
+import traceback
 from datetime import datetime, timezone
+from pathlib import Path
+from urllib.parse import quote
+
+# Add agent directory to path for importing downloaded code
+AGENT_DIR = Path(__file__).parent
+if str(AGENT_DIR) not in sys.path:
+    sys.path.insert(0, str(AGENT_DIR))
 
 try:
     import websockets
@@ -110,12 +118,22 @@ class LogBuffer:
 
 
 # ##################################################################
+# get agent version from VERSION file
+def _get_agent_version() -> str:
+    """Read version from VERSION file in agent directory."""
+    version_file = AGENT_DIR / "VERSION"
+    if version_file.exists():
+        return version_file.read_text().strip()
+    return "unknown"
+
+
+# ##################################################################
 # dazflow agent
 # connects to server and executes tasks
 class DazflowAgent:
     """Agent that connects to dazflow2 server and executes tasks."""
 
-    VERSION = "1.0.0"
+    VERSION = _get_agent_version()
     HEARTBEAT_INTERVAL = 30  # seconds
     RECONNECT_DELAY = 5  # seconds
     MAX_RECONNECT_DELAY = 60  # seconds
@@ -136,6 +154,8 @@ class DazflowAgent:
         self.running = True
         self.connected = False
         self._reconnect_delay = self.RECONNECT_DELAY
+        self._pending_tasks: dict[str, dict] = {}  # task_id -> task details (awaiting claim)
+        self._current_task: str | None = None  # Currently executing task
 
     def _get_ws_url(self) -> str:
         """Get the full WebSocket URL."""
@@ -147,7 +167,9 @@ class DazflowAgent:
             url = "wss://" + url[8:]
         elif not url.startswith("ws://") and not url.startswith("wss://"):
             url = "ws://" + url
-        return f"{url}/ws/agent/{self.name}/{self.secret}"
+        # URL-encode name to handle spaces and special characters
+        encoded_name = quote(self.name, safe="")
+        return f"{url}/ws/agent/{encoded_name}/{self.secret}"
 
     async def connect(self):
         """Connect to the server."""
@@ -233,17 +255,34 @@ class DazflowAgent:
             await self.disconnect()
             sys.exit(self.UPGRADE_EXIT_CODE)
         elif msg_type == "task_available":
-            # Task handling will be implemented in later PRs
-            print(f"[{self._timestamp()}] Task available: {message.get('task', {}).get('id', 'unknown')}")
+            # Claim the task if we're not already working
+            task_id = message.get("task_id")
+            if task_id and not self._current_task:
+                print(f"[{self._timestamp()}] Task available: {task_id}, claiming...")
+                # Store task details for when claim succeeds
+                self._pending_tasks[task_id] = {
+                    "execution_snapshot": message.get("execution_snapshot", {}),
+                    "workflow_name": message.get("workflow_name", "unknown"),
+                    "node_id": message.get("node_id"),
+                }
+                await self.send({"type": "task_claim", "task_id": task_id})
+            else:
+                print(f"[{self._timestamp()}] Task available but busy with {self._current_task}")
         elif msg_type == "task_claimed_ok":
-            # Task claim was successful
-            task_id = message.get("task_id", "unknown")
+            # Task claim was successful - execute it
+            task_id = message.get("task_id")
             print(f"[{self._timestamp()}] Successfully claimed task: {task_id}")
+            if task_id in self._pending_tasks:
+                task_details = self._pending_tasks.pop(task_id)
+                self._current_task = task_id
+                # Execute in background to not block message handling
+                asyncio.create_task(self._execute_task(task_id, task_details))
         elif msg_type == "task_claimed_fail":
-            # Task claim failed
+            # Task claim failed - remove from pending
             task_id = message.get("task_id", "unknown")
             reason = message.get("reason", "unknown")
             print(f"[{self._timestamp()}] Failed to claim task {task_id}: {reason}")
+            self._pending_tasks.pop(task_id, None)
         elif msg_type == "kill_task":
             # Task killing will be implemented in later PRs
             print(f"[{self._timestamp()}] Kill task: {message.get('task_id', 'unknown')}")
@@ -317,6 +356,64 @@ class DazflowAgent:
         """Report credentials to server after connecting."""
         credentials = self._list_credentials()
         await self.send({"type": "credentials_report", "credentials": credentials})
+
+    async def _execute_task(self, task_id: str, task_details: dict) -> None:
+        """Execute a claimed task."""
+        try:
+            print(f"[{self._timestamp()}] Executing task {task_id}...")
+
+            execution_snapshot = task_details.get("execution_snapshot", {})
+            workflow = execution_snapshot.get("workflow", {})
+            execution = execution_snapshot.get("execution", {})
+            node_id = execution_snapshot.get("node_id")
+
+            if not node_id:
+                raise ValueError("No node_id in execution snapshot")
+
+            # Import executor from downloaded code
+            try:
+                from src.executor import execute_node
+            except ImportError as e:
+                raise RuntimeError(f"Failed to import executor (code not downloaded?): {e}") from e
+
+            # Execute the node
+            print(f"[{self._timestamp()}] Running node {node_id}...")
+            new_execution = execute_node(node_id, workflow, execution)
+
+            # Get the result for this node
+            node_result = new_execution.get(node_id, {})
+
+            print(f"[{self._timestamp()}] Task {task_id} completed successfully")
+
+            # Report success
+            await self.send(
+                {
+                    "type": "task_complete",
+                    "task_id": task_id,
+                    "result": {
+                        "success": True,
+                        "execution": new_execution,
+                        "node_output": node_result.get("output"),
+                    },
+                }
+            )
+
+        except Exception as e:
+            error_msg = f"{type(e).__name__}: {e}"
+            print(f"[{self._timestamp()}] Task {task_id} failed: {error_msg}")
+            print(traceback.format_exc())
+
+            # Report failure
+            await self.send(
+                {
+                    "type": "task_failed",
+                    "task_id": task_id,
+                    "error": error_msg,
+                }
+            )
+
+        finally:
+            self._current_task = None
 
     async def _handle_credential_push(self, message: dict) -> None:
         """Handle a credential being pushed from the server."""

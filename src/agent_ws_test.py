@@ -460,6 +460,11 @@ async def test_agent_task_claim_success():
                 # Receive connect_ok
                 ws.receive_json()
 
+                # Receive task_available (sent on connect since there's a pending task)
+                task_avail = ws.receive_json()
+                assert task_avail["type"] == "task_available"
+                assert task_avail["task_id"] == "task-1"
+
                 # Agent claims task
                 ws.send_json({"type": "task_claim", "task_id": "task-1"})
 
@@ -642,8 +647,10 @@ async def test_agent_task_failed():
                 # Verify task removed from in_progress
                 assert queue.get_in_progress_count() == 0
 
-                # Verify callback was called with error
-                assert callback_result == {"error": "Something went wrong"}
+                # Verify callback was called with error (includes agent name and node_id)
+                assert callback_result["error"] == "Something went wrong"
+                assert callback_result["agent"] == "test-agent"
+                assert callback_result["node_id"] == "node-1"
 
                 # Verify agent current_task cleared
                 agent = registry.get_agent("test-agent")
@@ -811,6 +818,10 @@ async def test_agent_version_same_no_upgrade():
 
         registry = AgentRegistry()
         set_registry(registry)
+
+        # Create fresh queue (no pending tasks)
+        queue = TaskQueue()
+        set_queue(queue)
 
         # Create agent
         agent, secret = registry.create_agent("test-agent")

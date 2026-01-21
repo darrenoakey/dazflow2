@@ -1,7 +1,6 @@
 """Server configuration system."""
 
 import os
-import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -40,14 +39,13 @@ class ServerConfig:
 
     @property
     def agent_version(self) -> str:
-        """Get current agent version from agent.py file."""
-        agent_file = Path(__file__).parent.parent / "agent" / "agent.py"
-        if agent_file.exists():
-            content = agent_file.read_text()
-            match = re.search(r'VERSION\s*=\s*["\']([^"\']+)["\']', content)
-            if match:
-                return match.group(1)
-        return "1.0.0"  # Default fallback
+        """Get current agent version based on code hash.
+
+        This changes whenever any code file changes, triggering agent updates.
+        """
+        from src.code_version import get_cached_code_version
+
+        return get_cached_code_version()
 
 
 # Global config instance

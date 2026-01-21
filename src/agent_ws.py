@@ -51,6 +51,20 @@ async def handle_agent_connection(websocket: WebSocket, name: str, secret: str):
     # Send connect acknowledgment
     await websocket.send_json({"type": "connect_ok"})
 
+    # Check for pending tasks and notify (tasks may have been queued before agent connected)
+    queue = get_queue()
+    task = queue.get_available_task(name)
+    if task:
+        await websocket.send_json(
+            {
+                "type": "task_available",
+                "task_id": task.id,
+                "workflow_name": task.workflow_name,
+                "node_id": task.node_id,
+                "execution_snapshot": task.execution_snapshot,
+            }
+        )
+
     try:
         # Handle messages until disconnect
         while True:
@@ -83,6 +97,20 @@ async def handle_agent_message(name: str, message: dict, websocket: WebSocket):
         registry = get_registry()
         registry.update_agent(name, last_seen=datetime.now(UTC).isoformat().replace("+00:00", "Z"))
         await websocket.send_json({"type": "heartbeat_ack"})
+
+        # Check for pending tasks and notify if available (in case initial notification was missed)
+        queue = get_queue()
+        task = queue.get_available_task(name)
+        if task:
+            await websocket.send_json(
+                {
+                    "type": "task_available",
+                    "task_id": task.id,
+                    "workflow_name": task.workflow_name,
+                    "node_id": task.node_id,
+                    "execution_snapshot": task.execution_snapshot,
+                }
+            )
 
     elif msg_type == "task_claim":
         # Agent wants to claim a task
@@ -138,18 +166,26 @@ async def handle_agent_message(name: str, message: dict, websocket: WebSocket):
         agent_version = message.get("version", "unknown")
         _agent_versions[name] = agent_version
 
-        # Check if upgrade is needed
-        config = get_config()
-        current_version = config.agent_version
-        if agent_version != current_version:
-            # Send upgrade required message
-            await websocket.send_json(
-                {
-                    "type": "upgrade_required",
-                    "current_version": agent_version,
-                    "required_version": current_version,
-                }
-            )
+        # Check if upgrade is needed (skip for built-in agent which runs in-process)
+        # Also skip for legacy agents with old version format to prevent upgrade loops
+        if name != "built-in":
+            # Legacy agents report "1.0.0" or "unknown" - skip upgrade check
+            # They need manual reinstallation to get the new version system
+            legacy_versions = {"1.0.0", "unknown"}
+            if agent_version in legacy_versions:
+                print(f"[agent_ws] Agent '{name}' has legacy version '{agent_version}', skipping upgrade check")
+            else:
+                config = get_config()
+                current_version = config.agent_version
+                if agent_version != current_version:
+                    # Send upgrade required message
+                    await websocket.send_json(
+                        {
+                            "type": "upgrade_required",
+                            "current_version": agent_version,
+                            "required_version": current_version,
+                        }
+                    )
 
     # Other message types will be added in later PRs
 

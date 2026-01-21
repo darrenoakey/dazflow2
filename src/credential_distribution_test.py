@@ -214,10 +214,14 @@ def test_task_matching_requires_credential():
             workflow_name="test-workflow",
             node_id="node-1",
             execution_snapshot={
-                "nodes": {
-                    "node-1": {
-                        "credentials": "postgres-db"  # Task requires this credential
-                    }
+                "workflow": {
+                    "nodes": [
+                        {
+                            "id": "node-1",
+                            "typeId": "core/log",
+                            "data": {"credentials": "postgres-db"},  # Task requires this credential
+                        }
+                    ]
                 }
             },
             queued_at=datetime.now(timezone.utc).isoformat(),
@@ -255,10 +259,14 @@ def test_task_matching_with_credential():
             workflow_name="test-workflow",
             node_id="node-1",
             execution_snapshot={
-                "nodes": {
-                    "node-1": {
-                        "credentials": "postgres-db"  # Task requires this credential
-                    }
+                "workflow": {
+                    "nodes": [
+                        {
+                            "id": "node-1",
+                            "typeId": "core/log",
+                            "data": {"credentials": "postgres-db"},  # Task requires this credential
+                        }
+                    ]
                 }
             },
             queued_at=datetime.now(timezone.utc).isoformat(),
@@ -296,7 +304,9 @@ def test_task_matching_no_credential_required():
             execution_id="exec-1",
             workflow_name="test-workflow",
             node_id="node-1",
-            execution_snapshot={"nodes": {"node-1": {}}},  # No credentials field
+            execution_snapshot={
+                "workflow": {"nodes": [{"id": "node-1", "typeId": "core/log", "data": {}}]}
+            },  # No credentials field
             queued_at=datetime.now(timezone.utc).isoformat(),
         )
         queue.enqueue(task)
@@ -311,12 +321,18 @@ def test_task_matching_no_credential_required():
 # test push credential to multiple agents
 @pytest.mark.asyncio
 async def test_push_credential_to_multiple_agents(inmemory_keyring):
+    from src.task_queue import TaskQueue, set_queue
+
     with tempfile.TemporaryDirectory() as temp_dir:
         config = ServerConfig(data_dir=temp_dir)
         set_config(config)
 
         registry = AgentRegistry()
         set_registry(registry)
+
+        # Create fresh queue (no pending tasks)
+        queue = TaskQueue()
+        set_queue(queue)
 
         # Create two agents
         agent1, secret1 = registry.create_agent("agent-1")
@@ -368,12 +384,18 @@ async def test_push_credential_to_multiple_agents(inmemory_keyring):
 # test push credential only to online agents
 @pytest.mark.asyncio
 async def test_push_credential_only_online_agents(inmemory_keyring):
+    from src.task_queue import TaskQueue, set_queue
+
     with tempfile.TemporaryDirectory() as temp_dir:
         config = ServerConfig(data_dir=temp_dir)
         set_config(config)
 
         registry = AgentRegistry()
         set_registry(registry)
+
+        # Create fresh queue (no pending tasks)
+        queue = TaskQueue()
+        set_queue(queue)
 
         # Create two agents - one online, one offline
         agent1, secret1 = registry.create_agent("online-agent")

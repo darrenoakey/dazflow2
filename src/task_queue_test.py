@@ -240,7 +240,12 @@ def test_task_queue_fail_task():
         queue.fail_task("task-1", "Something went wrong")
 
         assert queue.get_in_progress_count() == 0
-        assert callback_result == {"error": "Something went wrong"}
+        # fail_task now includes agent and node_id for debugging
+        assert callback_result == {
+            "error": "Something went wrong",
+            "agent": "agent-1",
+            "node_id": "node-1",
+        }
 
         # Verify agent current_task cleared
         updated_agent = registry.get_agent("agent-1")
@@ -467,7 +472,7 @@ def test_task_runs_on_any_agent_by_default():
             execution_id="exec-1",
             workflow_name="test-workflow",
             node_id="node-1",
-            execution_snapshot={"nodes": {"node-1": {"type": "core/log", "data": {}}}},
+            execution_snapshot={"workflow": {"nodes": [{"id": "node-1", "typeId": "core/log", "data": {}}]}},
             queued_at=datetime.now(timezone.utc).isoformat(),
         )
         queue.enqueue(task)
@@ -507,12 +512,14 @@ def test_task_runs_only_on_specified_agents():
             workflow_name="test-workflow",
             node_id="node-1",
             execution_snapshot={
-                "nodes": {
-                    "node-1": {
-                        "type": "core/log",
-                        "data": {},
-                        "agentConfig": {"agents": ["agent-1", "agent-2"], "requiredTags": []},
-                    }
+                "workflow": {
+                    "nodes": [
+                        {
+                            "id": "node-1",
+                            "typeId": "core/log",
+                            "data": {"agentConfig": {"agents": ["agent-1", "agent-2"], "requiredTags": []}},
+                        }
+                    ]
                 }
             },
             queued_at=datetime.now(timezone.utc).isoformat(),
@@ -557,12 +564,14 @@ def test_task_not_run_by_unspecified_agent():
             workflow_name="test-workflow",
             node_id="node-1",
             execution_snapshot={
-                "nodes": {
-                    "node-1": {
-                        "type": "core/log",
-                        "data": {},
-                        "agentConfig": {"agents": ["agent-1"]},
-                    }
+                "workflow": {
+                    "nodes": [
+                        {
+                            "id": "node-1",
+                            "typeId": "core/log",
+                            "data": {"agentConfig": {"agents": ["agent-1"]}},
+                        }
+                    ]
                 }
             },
             queued_at=datetime.now(timezone.utc).isoformat(),
@@ -599,12 +608,14 @@ def test_task_with_multiple_allowed_agents():
             workflow_name="test-workflow",
             node_id="node-1",
             execution_snapshot={
-                "nodes": {
-                    "node-1": {
-                        "type": "core/log",
-                        "data": {},
-                        "agentConfig": {"agents": ["agent-1", "agent-3"]},
-                    }
+                "workflow": {
+                    "nodes": [
+                        {
+                            "id": "node-1",
+                            "typeId": "core/log",
+                            "data": {"agentConfig": {"agents": ["agent-1", "agent-3"]}},
+                        }
+                    ]
                 }
             },
             queued_at=datetime.now(timezone.utc).isoformat(),

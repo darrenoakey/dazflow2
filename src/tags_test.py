@@ -122,12 +122,14 @@ def test_task_requires_tag_agent_has():
             workflow_name="test-workflow",
             node_id="node-1",
             execution_snapshot={
-                "nodes": {
-                    "node-1": {
-                        "type": "core/log",
-                        "data": {},
-                        "agentConfig": {"agents": [], "requiredTags": ["gpu"]},
-                    }
+                "workflow": {
+                    "nodes": [
+                        {
+                            "id": "node-1",
+                            "typeId": "core/log",
+                            "data": {"agentConfig": {"agents": [], "requiredTags": ["gpu"]}},
+                        }
+                    ]
                 }
             },
             queued_at=datetime.now(timezone.utc).isoformat(),
@@ -159,12 +161,14 @@ def test_task_requires_tag_agent_missing():
             workflow_name="test-workflow",
             node_id="node-1",
             execution_snapshot={
-                "nodes": {
-                    "node-1": {
-                        "type": "core/log",
-                        "data": {},
-                        "agentConfig": {"agents": [], "requiredTags": ["gpu"]},
-                    }
+                "workflow": {
+                    "nodes": [
+                        {
+                            "id": "node-1",
+                            "typeId": "core/log",
+                            "data": {"agentConfig": {"agents": [], "requiredTags": ["gpu"]}},
+                        }
+                    ]
                 }
             },
             queued_at=datetime.now(timezone.utc).isoformat(),
@@ -195,12 +199,14 @@ def test_task_requires_multiple_tags_all_present():
             workflow_name="test-workflow",
             node_id="node-1",
             execution_snapshot={
-                "nodes": {
-                    "node-1": {
-                        "type": "core/log",
-                        "data": {},
-                        "agentConfig": {"agents": [], "requiredTags": ["gpu", "cuda"]},
-                    }
+                "workflow": {
+                    "nodes": [
+                        {
+                            "id": "node-1",
+                            "typeId": "core/log",
+                            "data": {"agentConfig": {"agents": [], "requiredTags": ["gpu", "cuda"]}},
+                        }
+                    ]
                 }
             },
             queued_at=datetime.now(timezone.utc).isoformat(),
@@ -232,12 +238,14 @@ def test_task_requires_multiple_tags_one_missing():
             workflow_name="test-workflow",
             node_id="node-1",
             execution_snapshot={
-                "nodes": {
-                    "node-1": {
-                        "type": "core/log",
-                        "data": {},
-                        "agentConfig": {"agents": [], "requiredTags": ["gpu", "cuda"]},
-                    }
+                "workflow": {
+                    "nodes": [
+                        {
+                            "id": "node-1",
+                            "typeId": "core/log",
+                            "data": {"agentConfig": {"agents": [], "requiredTags": ["gpu", "cuda"]}},
+                        }
+                    ]
                 }
             },
             queued_at=datetime.now(timezone.utc).isoformat(),
@@ -268,12 +276,14 @@ def test_task_with_no_required_tags():
             workflow_name="test-workflow",
             node_id="node-1",
             execution_snapshot={
-                "nodes": {
-                    "node-1": {
-                        "type": "core/log",
-                        "data": {},
-                        "agentConfig": {"agents": [], "requiredTags": []},
-                    }
+                "workflow": {
+                    "nodes": [
+                        {
+                            "id": "node-1",
+                            "typeId": "core/log",
+                            "data": {"agentConfig": {"agents": [], "requiredTags": []}},
+                        }
+                    ]
                 }
             },
             queued_at=datetime.now(timezone.utc).isoformat(),
@@ -307,12 +317,14 @@ def test_task_with_specific_agent_and_required_tags():
             workflow_name="test-workflow",
             node_id="node-1",
             execution_snapshot={
-                "nodes": {
-                    "node-1": {
-                        "type": "core/log",
-                        "data": {},
-                        "agentConfig": {"agents": ["agent-1"], "requiredTags": ["gpu"]},
-                    }
+                "workflow": {
+                    "nodes": [
+                        {
+                            "id": "node-1",
+                            "typeId": "core/log",
+                            "data": {"agentConfig": {"agents": ["agent-1"], "requiredTags": ["gpu"]}},
+                        }
+                    ]
                 }
             },
             queued_at=datetime.now(timezone.utc).isoformat(),
@@ -349,12 +361,14 @@ def test_agent_with_extra_tags_can_run_task():
             workflow_name="test-workflow",
             node_id="node-1",
             execution_snapshot={
-                "nodes": {
-                    "node-1": {
-                        "type": "core/log",
-                        "data": {},
-                        "agentConfig": {"agents": [], "requiredTags": ["gpu"]},
-                    }
+                "workflow": {
+                    "nodes": [
+                        {
+                            "id": "node-1",
+                            "typeId": "core/log",
+                            "data": {"agentConfig": {"agents": [], "requiredTags": ["gpu"]}},
+                        }
+                    ]
                 }
             },
             queued_at=datetime.now(timezone.utc).isoformat(),

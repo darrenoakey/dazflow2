@@ -2,16 +2,19 @@
 Background workflow execution worker system.
 Manages a pool of workers that process queued workflows step-by-step.
 Uses atomic file operations for concurrency safety.
+
+All node execution goes through the TaskQueue - agents (including the built-in
+agent) pick up tasks they can handle and execute them.
 """
 
 import asyncio
 import json
 import time
-import traceback
-from datetime import datetime
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
-from .executor import execute_node
+from .task_queue import Task, get_queue
 
 # Configuration
 MAX_WORKERS = 10
@@ -47,6 +50,42 @@ def init_worker_system(queue_dir: Path, stats_dir: Path):
     INPROGRESS_DIR.mkdir(parents=True, exist_ok=True)
     EXECUTIONS_DIR.mkdir(parents=True, exist_ok=True)
     INDEXES_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Recover any orphaned inprogress items (from crash/restart)
+    recover_inprogress_items()
+
+
+def recover_inprogress_items():
+    """Move all inprogress items back to queue for re-processing.
+
+    Called on startup to recover from crashes. Any item in inprogress
+    means a worker was processing it when the server died.
+    """
+    if not INPROGRESS_DIR or not QUEUE_DIR:
+        return
+
+    recovered = 0
+    for inprogress_file in INPROGRESS_DIR.glob("*.json"):
+        queue_file = QUEUE_DIR / inprogress_file.name
+        try:
+            # Reset item state for re-processing
+            item = json.loads(inprogress_file.read_text())
+            item["status"] = "queued"
+            item["started_at"] = None
+            item["current_step"] = 0
+            item["execution"] = {}  # Reset execution to start fresh
+            item["error"] = None
+            item["error_node_id"] = None
+
+            # Write to queue first, then delete from inprogress
+            queue_file.write_text(json.dumps(item, indent=2))
+            inprogress_file.unlink()
+            recovered += 1
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"Failed to recover {inprogress_file}: {e}")
+
+    if recovered:
+        print(f"Recovered {recovered} orphaned workflow(s) from inprogress to queue")
 
 
 def get_queued_items() -> list[dict]:
@@ -275,10 +314,52 @@ def complete_execution(item: dict):
         stats_path.write_text(json.dumps(stats))
 
 
-def find_ready_node(workflow: dict, execution: dict) -> str | None:
-    """Find a node that hasn't run and has all inputs satisfied."""
+def get_upstream_subgraph(workflow: dict, target_node_id: str) -> set[str]:
+    """Get all node IDs that are upstream of (or equal to) the target node.
+
+    This includes the target node itself and all its transitive dependencies.
+    """
+    connections = workflow.get("connections", [])
+
+    # Build reverse dependency map: node_id -> list of upstream node_ids
+    upstream_map: dict[str, list[str]] = {}
+    for conn in connections:
+        target_id = conn.get("targetNodeId")
+        source_id = conn.get("sourceNodeId")
+        if target_id and source_id:
+            if target_id not in upstream_map:
+                upstream_map[target_id] = []
+            upstream_map[target_id].append(source_id)
+
+    # BFS/DFS to find all upstream nodes
+    result = {target_node_id}
+    to_visit = [target_node_id]
+    while to_visit:
+        node_id = to_visit.pop()
+        for upstream_id in upstream_map.get(node_id, []):
+            if upstream_id not in result:
+                result.add(upstream_id)
+                to_visit.append(upstream_id)
+
+    return result
+
+
+def find_ready_node(workflow: dict, execution: dict, target_node_id: str | None = None) -> str | None:
+    """Find a node that hasn't run and has all inputs satisfied.
+
+    Args:
+        workflow: Workflow definition
+        execution: Current execution state
+        target_node_id: If provided, only consider nodes in the subgraph
+                       leading to this target (for single-node execution)
+    """
     nodes = workflow.get("nodes", [])
     connections = workflow.get("connections", [])
+
+    # If target specified, only consider nodes in that subgraph
+    allowed_nodes = None
+    if target_node_id:
+        allowed_nodes = get_upstream_subgraph(workflow, target_node_id)
 
     # Build dependency map: node_id -> list of upstream node_ids
     dependencies: dict[str, list[str]] = {n["id"]: [] for n in nodes}
@@ -291,10 +372,14 @@ def find_ready_node(workflow: dict, execution: dict) -> str | None:
     # Find node that:
     # 1. Hasn't been executed yet
     # 2. Has all upstream nodes executed (or has no upstream nodes)
+    # 3. Is in allowed_nodes (if target specified)
     for node in nodes:
         node_id = node["id"]
         if node_id in execution:
             continue  # Already executed
+
+        if allowed_nodes is not None and node_id not in allowed_nodes:
+            continue  # Not in path to target
 
         # Check if all dependencies are satisfied
         upstream = dependencies.get(node_id, [])
@@ -310,8 +395,34 @@ def is_workflow_complete(workflow: dict, execution: dict) -> bool:
     return all(n["id"] in execution for n in nodes)
 
 
-def execute_one_step(item: dict) -> dict:
-    """Execute one step of a workflow. Returns updated item."""
+def is_trigger_node(workflow: dict, node_id: str) -> bool:
+    """Check if a node is a trigger node (has no upstream connections).
+
+    Trigger nodes (like scheduled, webhook) don't execute code - they just
+    fire events. When found as "ready", they should be auto-completed with
+    default output instead of being sent to an agent.
+    """
+    connections = workflow.get("connections", [])
+    for conn in connections:
+        if conn.get("targetNodeId") == node_id:
+            return False  # Has incoming connection, not a trigger
+    return True
+
+
+def get_node_by_id(workflow: dict, node_id: str) -> dict | None:
+    """Get a node by its ID from the workflow."""
+    for node in workflow.get("nodes", []):
+        if node.get("id") == node_id:
+            return node
+    return None
+
+
+async def execute_one_step(item: dict) -> dict:
+    """Execute one step of a workflow via TaskQueue. Returns updated item.
+
+    Enqueues the next ready node to the TaskQueue and waits for an agent
+    to claim and execute it.
+    """
     workflow = item["workflow"]
     execution = item["execution"]
 
@@ -330,21 +441,90 @@ def execute_one_step(item: dict) -> dict:
             item["completed_at"] = time.time()
         return item
 
-    # Execute the node
-    try:
-        new_execution = execute_node(ready_node_id, workflow, execution)
-        item["execution"] = new_execution
+    # Check if this is a trigger node (no upstream connections)
+    # Trigger nodes don't execute code - auto-complete them with default output
+    if is_trigger_node(workflow, ready_node_id):
+        node = get_node_by_id(workflow, ready_node_id)
+        node_name = node.get("name", ready_node_id) if node else ready_node_id
+        now = datetime.now(timezone.utc)
+
+        # Generate default trigger output (similar to how trigger system does it)
+        trigger_output = [{node_name: {"time": now.isoformat()}}]
+
+        execution[ready_node_id] = {
+            "input": [],
+            "nodeOutput": trigger_output,
+            "output": trigger_output,
+            "executedAt": now.isoformat(),
+        }
+        item["execution"] = execution
         item["current_step"] += 1
 
-        # Check if now complete
-        if is_workflow_complete(workflow, new_execution):
+        # Check if workflow is now complete
+        if is_workflow_complete(workflow, execution):
             item["status"] = "completed"
             item["completed_at"] = time.time()
-    except Exception as e:
+
+        return item
+
+    # Create task for the node
+    task_id = str(uuid.uuid4())
+    task = Task(
+        id=task_id,
+        execution_id=item["id"],
+        workflow_name=item.get("workflow_path", "unknown"),
+        node_id=ready_node_id,
+        execution_snapshot={
+            "workflow": workflow,
+            "execution": execution,
+            "node_id": ready_node_id,
+        },
+        queued_at=datetime.now(timezone.utc).isoformat(),
+    )
+
+    # Create an event to wait for task completion
+    completion_event = asyncio.Event()
+    task_result: dict = {}
+
+    def on_complete(result: dict):
+        nonlocal task_result
+        task_result = result
+        completion_event.set()
+
+    # Enqueue the task
+    queue = get_queue()
+    queue.enqueue(task, on_complete=on_complete)
+
+    # Wait for task completion (with timeout)
+    try:
+        await asyncio.wait_for(completion_event.wait(), timeout=300)  # 5 min timeout
+
+        # Task completed - update execution with result
+        if task_result.get("success"):
+            new_execution = task_result.get("execution", execution)
+            item["execution"] = new_execution
+            item["current_step"] += 1
+
+            # Check if now complete
+            if is_workflow_complete(workflow, new_execution):
+                item["status"] = "completed"
+                item["completed_at"] = time.time()
+        else:
+            # Task failed - include agent name if available
+            error_msg = task_result.get("error", "Task execution failed")
+            agent_name = task_result.get("agent")
+            if agent_name:
+                error_msg = f"[agent: {agent_name}] {error_msg}"
+            item["status"] = "error"
+            item["error"] = error_msg
+            item["error_node_id"] = ready_node_id
+            item["error_agent"] = agent_name
+            item["completed_at"] = time.time()
+
+    except asyncio.TimeoutError:
         item["status"] = "error"
-        item["error"] = str(e)
+        item["error"] = f"Task timeout: node {ready_node_id} took too long"
         item["error_node_id"] = ready_node_id
-        item["error_details"] = traceback.format_exc()
         item["completed_at"] = time.time()
 
     return item
@@ -361,7 +541,7 @@ async def worker_loop(_worker_id: int):
         if work_item:
             # Process the item step by step until complete or error
             while work_item["status"] == "running" and not _shutdown:
-                work_item = execute_one_step(work_item)
+                work_item = await execute_one_step(work_item)
 
                 if work_item["status"] == "running":
                     # Save progress after each step
