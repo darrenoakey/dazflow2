@@ -44,3 +44,24 @@ If Playwright tests fail at any checkpoint:
 - FIX the issue before continuing
 - Do NOT commit with failing tests
 - Do NOT skip or disable tests
+
+## Architecture Notes
+
+### Trigger vs Non-Trigger Nodes
+
+**CRITICAL:** A node is a "trigger node" only if it has BOTH:
+1. No upstream connections (no incoming edges)
+2. A `register` function in its node type definition (in `modules/*/nodes.py`)
+
+Trigger nodes (like `scheduled`) are auto-completed with default output `{"time": ...}`.
+Non-trigger nodes (like `set`, `transform`) MUST actually execute even with no upstream.
+
+The check is in `src/worker.py:is_trigger_node()`. If nodes aren't executing, check this function.
+
+### Node Type Registration
+
+Each node type is defined in two places:
+- **Backend:** `modules/*/nodes.py` - `execute` function + `NODE_TYPES` dict
+- **Frontend:** `modules/*/nodes_ui.js` - UI definition with `getProperties()`
+
+The `register` key in NODE_TYPES indicates a trigger node that sets up scheduling.
