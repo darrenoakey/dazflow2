@@ -1,5 +1,6 @@
 """System node types for OS-level interactions."""
 
+import os
 import subprocess
 import sys
 from typing import Any
@@ -197,6 +198,53 @@ def execute_notification(node_data: dict, _input_data: Any, _credential_data: di
         return [{"error": f"Notifications not supported on platform: {sys.platform}"}]
 
 
+def execute_run_command(node_data: dict, _input_data: Any, _credential_data: dict | None = None) -> list:
+    """Execute a shell command with optional working directory and timeout.
+
+    Properties:
+        command: The command to execute (required)
+        workingDirectory: Directory to run the command in (optional)
+        timeout: Timeout in seconds (default: 300)
+    """
+    command = node_data.get("command", "")
+    working_dir = node_data.get("workingDirectory", "") or None
+    if working_dir:
+        working_dir = os.path.expanduser(working_dir)
+
+    # Parse timeout - default to 300 seconds (5 minutes)
+    try:
+        timeout = int(node_data.get("timeout", 300))
+    except (ValueError, TypeError):
+        timeout = 300
+
+    if not command:
+        return [{"error": "Command is required", "exitCode": -1, "success": False}]
+
+    try:
+        result = subprocess.run(
+            command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            cwd=working_dir,
+            timeout=timeout,
+        )
+        return [
+            {
+                "exitCode": result.returncode,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "success": result.returncode == 0,
+            }
+        ]
+    except subprocess.TimeoutExpired:
+        return [{"error": f"Command timed out after {timeout} seconds", "exitCode": -1, "success": False}]
+    except FileNotFoundError as e:
+        return [{"error": f"Working directory not found: {e}", "exitCode": -1, "success": False}]
+    except Exception as e:
+        return [{"error": str(e), "exitCode": -1, "success": False}]
+
+
 NODE_TYPES = {
     "dialog": {
         "execute": execute_dialog,
@@ -208,6 +256,10 @@ NODE_TYPES = {
     },
     "notification": {
         "execute": execute_notification,
+        "kind": "array",
+    },
+    "run_command": {
+        "execute": execute_run_command,
         "kind": "array",
     },
 }

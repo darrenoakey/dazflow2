@@ -585,8 +585,8 @@ test.describe('Workflow Editor', () => {
     await intervalInput.fill('10');
     await intervalInput.blur();
 
-    // Find and update unit dropdown
-    const unitSelect = dialog.locator('select');
+    // Find and update unit dropdown (second select, after mode select)
+    const unitSelect = dialog.locator('select').nth(1);
     await unitSelect.selectOption('hours');
 
     // Close editor

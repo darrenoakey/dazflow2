@@ -14,6 +14,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .nodes import get_node_type
 from .task_queue import Task, get_queue
 
 # Configuration
@@ -396,16 +397,29 @@ def is_workflow_complete(workflow: dict, execution: dict) -> bool:
 
 
 def is_trigger_node(workflow: dict, node_id: str) -> bool:
-    """Check if a node is a trigger node (has no upstream connections).
+    """Check if a node is a trigger node (has no upstream connections AND has a register function).
 
-    Trigger nodes (like scheduled, webhook) don't execute code - they just
-    fire events. When found as "ready", they should be auto-completed with
-    default output instead of being sent to an agent.
+    Trigger nodes (like scheduled, webhook) have a register function that sets up
+    their triggering mechanism. When found as "ready", they should be auto-completed
+    with default output instead of being sent to an agent.
+
+    Non-trigger nodes (like set, transform) that have no upstream connections should
+    still be executed normally.
     """
     connections = workflow.get("connections", [])
     for conn in connections:
         if conn.get("targetNodeId") == node_id:
             return False  # Has incoming connection, not a trigger
+
+    # Check if the node type has a register function
+    node = get_node_by_id(workflow, node_id)
+    if not node:
+        return False
+
+    node_type = get_node_type(node.get("typeId", ""))
+    if not node_type or not node_type.get("register"):
+        return False  # No register function, not a trigger node
+
     return True
 
 

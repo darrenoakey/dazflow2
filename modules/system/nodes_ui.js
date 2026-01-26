@@ -74,4 +74,58 @@ export const nodeTypes = [
             { id: 'message', label: 'Message', type: 'textarea', value: data.message ?? '' },
         ],
     },
+
+    // Run Command node - execute shell commands
+    {
+        id: 'run_command',
+        name: 'Run Command',
+        category: 'System',
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="4 17 10 11 4 5"/>
+            <line x1="12" y1="19" x2="20" y2="19"/>
+        </svg>`,
+        defaultData: { command: '', workingDirectory: '', timeout: '300' },
+        getConnectors: () => ({
+            inputs: [{ id: 'trigger', name: 'trigger' }],
+            outputs: [{ id: 'out', name: 'out' }],
+        }),
+        getProperties: (data) => [
+            {
+                id: 'command',
+                label: 'Command',
+                type: 'textarea',
+                value: data.command ?? '',
+                placeholder: 'e.g., npm test',
+                instructions: 'Use {{ $.field }} to reference input data',
+            },
+            {
+                id: 'workingDirectory',
+                label: 'Working Directory',
+                type: 'text',
+                value: data.workingDirectory ?? '',
+                placeholder: 'Leave empty for current directory',
+            },
+            {
+                id: 'timeout',
+                label: 'Timeout',
+                type: 'select',
+                value: data.timeout ?? '300',
+                options: [
+                    { value: '30', label: '30 seconds' },
+                    { value: '60', label: '1 minute' },
+                    { value: '120', label: '2 minutes' },
+                    { value: '300', label: '5 minutes (default)' },
+                    { value: '600', label: '10 minutes' },
+                    { value: '900', label: '15 minutes' },
+                    { value: '1800', label: '30 minutes' },
+                    { value: '3600', label: '1 hour' },
+                    { value: '7200', label: '2 hours' },
+                    { value: '14400', label: '4 hours' },
+                    { value: '28800', label: '8 hours' },
+                    { value: '43200', label: '12 hours' },
+                    { value: '86400', label: '24 hours' },
+                ],
+            },
+        ],
+    },
 ];
