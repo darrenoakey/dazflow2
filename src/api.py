@@ -311,7 +311,7 @@ async def get_modules():
     return {
         "nodeTypes": get_node_types_for_api(),
         "credentialTypes": get_credential_types_for_api(),
-        "moduleUIPaths": [f"/modules/{p.parent.name}/{p.name}" for p in get_modules_ui_paths()],
+        "moduleUIPaths": [f"/modules/{p.parent.name}/{p.name}?v={int(SERVER_START_TIME)}" for p in get_modules_ui_paths()],
     }
 
 
