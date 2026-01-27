@@ -79,3 +79,21 @@ The `run` script uses `/opt/homebrew/bin/python3.13` explicitly because:
 - `auto` daemon may have different PATH than interactive shell
 - uvicorn is installed in Python 3.13's site-packages
 - Using `#!/usr/bin/env python3` can pick up wrong Python (e.g., Xcode's)
+
+### Git-Based Workflow Versioning
+
+The data directory is automatically initialized as a git repo on startup:
+- **src/git.py** - Git operations (init, add, commit, log, show, diff)
+- **src/git_ai.py** - AI commit message generation using Claude Agent SDK
+- **.gitignore** excludes runtime files: `local/`, `agents.json`, `tags.json`, etc.
+
+**On workflow save:**
+1. File is written to disk
+2. Staged immediately with `git_add()`
+3. Background task generates AI commit message via Claude
+4. Commit is created asynchronously (non-blocking)
+
+**History API endpoints:**
+- `GET /api/workflow/{path}/history` - Git log for workflow
+- `GET /api/workflow/{path}/version/{hash}` - Get workflow at commit
+- `POST /api/workflow/{path}/restore/{hash}` - Restore to version (creates new commit)
