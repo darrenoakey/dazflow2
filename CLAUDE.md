@@ -140,3 +140,36 @@ The system includes AI-powered features via Claude Agent SDK:
 - Modify credentials (security)
 - Access files outside data directory
 - Make permanent external changes
+
+## Autosave
+
+The editor has debounced autosave that triggers 1 second after changes:
+
+- **State tracking:** `lastSavedSnapshot` stores JSON of last saved state
+- **Status:** `saveStatus` can be 'clean' | 'modified' | 'saving' | 'saved' | 'error'
+- **Visual indicator:** `SaveStatusIndicator` component in editor header shows current status
+
+The autosave is triggered via Zustand subscription watching `nodes` and `connections`.
+
+## Workflow Testing Framework
+
+Test workflows by executing them and asserting results (no mocking):
+
+```bash
+./run workflow-test                           # Run all tests in workflows/tests/
+./run workflow-test tests/my_test.json        # Run specific test
+./run workflow-test --test-dir custom-tests   # Custom test directory
+```
+
+Test workflows should be named `*_test.json` or `test_*.json`.
+
+**Key files:**
+- `src/workflow_testing.py` - Test runner and assertions
+- `src/workflow_testing_test.py` - Unit tests for the framework
+
+**Assertion helpers:**
+- `node_executed(name)` - Check node ran
+- `node_output_equals(name, expected)` - Exact output match
+- `node_output_contains(name, key, value?)` - Partial output match
+- `node_output_matches(name, predicate)` - Custom predicate
+- `no_errors()` - No node errors
