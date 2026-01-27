@@ -152,4 +152,32 @@ test.describe('Smoke Tests - Production Instance', () => {
     // Should return to dashboard
     await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 10000 });
   });
+
+  test('editor shows history tab', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 10000 });
+
+    // Open sample.json workflow
+    await page.getByTestId('file-item-sample.json').dblclick();
+    await expect(page.getByTestId('editor')).toBeVisible({ timeout: 10000 });
+
+    // History tab should be visible
+    await expect(page.getByTestId('editor-tab-history')).toBeVisible();
+  });
+
+  test('history tab shows workflow history', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 10000 });
+
+    // Open sample.json workflow
+    await page.getByTestId('file-item-sample.json').dblclick();
+    await expect(page.getByTestId('editor')).toBeVisible({ timeout: 10000 });
+
+    // Click History tab
+    await page.getByTestId('editor-tab-history').click();
+    await expect(page.getByTestId('editor-tab-history')).toHaveClass(/active/);
+
+    // History tab content should be visible
+    await expect(page.getByTestId('workflow-history-tab')).toBeVisible();
+  });
 });

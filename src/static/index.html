@@ -1033,6 +1033,101 @@
             color: #888;
             font-size: 14px;
         }
+        /* History Tab Styles */
+        .history-tab-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #1a1a2e;
+            overflow: hidden;
+        }
+        .history-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 24px;
+        }
+        .history-item {
+            display: flex;
+            flex-direction: column;
+            padding: 12px 16px;
+            background: #2a2a4e;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .history-item:hover {
+            background: #3a3a5e;
+        }
+        .history-item.selected {
+            background: #3a3a5e;
+            border: 1px solid #667eea;
+        }
+        .history-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+        .history-item-hash {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 11px;
+            color: #667eea;
+        }
+        .history-item-time {
+            font-size: 11px;
+            color: #888;
+        }
+        .history-item-message {
+            font-size: 13px;
+            color: #ccc;
+        }
+        .history-viewing-banner {
+            padding: 8px 16px;
+            background: #3a3a5e;
+            border-bottom: 1px solid #667eea;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .history-viewing-text {
+            font-size: 12px;
+            color: #ccc;
+        }
+        .history-restore-btn {
+            padding: 6px 12px;
+            background: #667eea;
+            border: none;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .history-restore-btn:hover {
+            background: #5a6fd6;
+        }
+        .history-back-btn {
+            padding: 6px 12px;
+            background: transparent;
+            border: 1px solid #667eea;
+            border-radius: 4px;
+            color: #667eea;
+            font-size: 12px;
+            cursor: pointer;
+            margin-right: 8px;
+        }
+        .history-back-btn:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+        .history-empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #888;
+            font-size: 14px;
+        }
         /* Credentials Tab Styles */
         .credentials-list {
             display: flex;
@@ -2228,6 +2323,9 @@
                             workflowExecutionsList: [],
                             workflowExecutionsHasMore: true,
                             workflowExecutionsBeforeCursor: null,
+                            workflowHistory: [],
+                            workflowHistoryLoading: false,
+                            selectedHistoryCommit: null,
                             isReadOnly: false,
                             executionViewerId: null,
                             executionViewerData: null,
@@ -2319,6 +2417,89 @@
                 } finally {
                     set({ workflowExecutionsLoading: false });
                 }
+            },
+
+            // Workflow history state (git commits)
+            workflowHistory: [],
+            workflowHistoryLoading: false,
+            selectedHistoryCommit: null,
+
+            // Load workflow history from git
+            loadWorkflowHistory: async () => {
+                const state = get();
+                if (!state.currentWorkflowPath || state.workflowHistoryLoading) return;
+
+                set({ workflowHistoryLoading: true });
+                try {
+                    const response = await fetch(`/api/workflow/${encodeURIComponent(state.currentWorkflowPath)}/history`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        set({ workflowHistory: data.commits });
+                    }
+                } catch (e) {
+                    console.error('Failed to load history:', e);
+                    useToastStore.getState().error('Failed to load history', e.message || String(e));
+                } finally {
+                    set({ workflowHistoryLoading: false });
+                }
+            },
+
+            // Load a specific version from history
+            loadHistoryVersion: async (commitHash) => {
+                const state = get();
+                if (!state.currentWorkflowPath) return;
+
+                try {
+                    const response = await fetch(`/api/workflow/${encodeURIComponent(state.currentWorkflowPath)}/version/${commitHash}`);
+                    if (response.ok) {
+                        const workflow = await response.json();
+                        set({
+                            nodes: workflow.nodes || [],
+                            connections: workflow.connections || [],
+                            isReadOnly: true,
+                            selectedHistoryCommit: commitHash,
+                            editorTab: 'editor',
+                        });
+                    }
+                } catch (e) {
+                    useToastStore.getState().error('Failed to load version', e.message || String(e));
+                }
+            },
+
+            // Restore workflow to a previous version
+            restoreHistoryVersion: async (commitHash) => {
+                const state = get();
+                if (!state.currentWorkflowPath) return;
+
+                try {
+                    const response = await fetch(`/api/workflow/${encodeURIComponent(state.currentWorkflowPath)}/restore/${commitHash}`, {
+                        method: 'POST',
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        set({
+                            nodes: data.workflow.nodes || [],
+                            connections: data.workflow.connections || [],
+                            isReadOnly: false,
+                            selectedHistoryCommit: null,
+                            editorTab: 'editor',
+                        });
+                        useToastStore.getState().success('Restored', `Workflow restored to version ${commitHash.slice(0, 7)}`);
+                        // Refresh history
+                        get().loadWorkflowHistory();
+                    }
+                } catch (e) {
+                    useToastStore.getState().error('Failed to restore', e.message || String(e));
+                }
+            },
+
+            // Exit history view and return to current version
+            exitHistoryView: () => {
+                const state = get();
+                if (state.currentWorkflowPath) {
+                    get().loadWorkflow(state.currentWorkflowPath);
+                }
+                set({ selectedHistoryCommit: null, isReadOnly: false });
             },
 
             // Load paginated executions list
@@ -5019,6 +5200,75 @@
             );
         }
 
+        // Workflow History Tab (git commit history)
+        function WorkflowHistoryTab() {
+            const workflowHistory = useWorkflowStore((state) => state.workflowHistory);
+            const workflowHistoryLoading = useWorkflowStore((state) => state.workflowHistoryLoading);
+            const loadWorkflowHistory = useWorkflowStore((state) => state.loadWorkflowHistory);
+            const loadHistoryVersion = useWorkflowStore((state) => state.loadHistoryVersion);
+            const selectedHistoryCommit = useWorkflowStore((state) => state.selectedHistoryCommit);
+
+            useEffect(() => {
+                loadWorkflowHistory();
+            }, []);
+
+            const formatTime = (timestamp) => {
+                return new Date(timestamp * 1000).toLocaleString();
+            };
+
+            if (workflowHistoryLoading) {
+                return React.createElement('div', {
+                    className: 'history-tab-container',
+                    'data-testid': 'workflow-history-tab',
+                },
+                    React.createElement('div', { className: 'history-empty' }, 'Loading history...')
+                );
+            }
+
+            if (workflowHistory.length === 0) {
+                return React.createElement('div', {
+                    className: 'history-tab-container',
+                    'data-testid': 'workflow-history-tab',
+                },
+                    React.createElement('div', { className: 'history-empty' }, 'No history available')
+                );
+            }
+
+            return React.createElement('div', {
+                className: 'history-tab-container',
+                'data-testid': 'workflow-history-tab',
+            },
+                React.createElement('div', {
+                    className: 'history-list',
+                }, workflowHistory.map(commit =>
+                    React.createElement('div', {
+                        key: commit.hash,
+                        className: `history-item ${selectedHistoryCommit === commit.hash ? 'selected' : ''}`,
+                        onClick: () => loadHistoryVersion(commit.hash),
+                        'data-testid': `history-item-${commit.short_hash}`,
+                    }, [
+                        React.createElement('div', {
+                            key: 'header',
+                            className: 'history-item-header',
+                        }, [
+                            React.createElement('span', {
+                                key: 'hash',
+                                className: 'history-item-hash',
+                            }, commit.short_hash),
+                            React.createElement('span', {
+                                key: 'time',
+                                className: 'history-item-time',
+                            }, formatTime(commit.timestamp)),
+                        ]),
+                        React.createElement('div', {
+                            key: 'message',
+                            className: 'history-item-message',
+                        }, commit.message),
+                    ])
+                ))
+            );
+        }
+
         // Credential Editor Modal Component
         function CredentialEditorModal({ credential, onClose, onSave }) {
             const credentialTypes = window.credentialTypes || [];
@@ -6161,6 +6411,12 @@
                         onClick: () => setEditorTab('executions'),
                         'data-testid': 'editor-tab-executions',
                     }, 'Executions'),
+                    React.createElement('button', {
+                        key: 'history',
+                        className: `editor-tab ${editorTab === 'history' ? 'active' : ''}`,
+                        onClick: () => setEditorTab('history'),
+                        'data-testid': 'editor-tab-history',
+                    }, 'History'),
                 ]),
             ]);
         }
@@ -6180,6 +6436,9 @@
             const executionViewerData = useWorkflowStore((state) => state.executionViewerData);
             const closeExecutionViewer = useWorkflowStore((state) => state.closeExecutionViewer);
             const editorTab = useWorkflowStore((state) => state.editorTab);
+            const selectedHistoryCommit = useWorkflowStore((state) => state.selectedHistoryCommit);
+            const exitHistoryView = useWorkflowStore((state) => state.exitHistoryView);
+            const restoreHistoryVersion = useWorkflowStore((state) => state.restoreHistoryVersion);
 
             // Keyboard shortcuts
             useEffect(() => {
@@ -6251,11 +6510,37 @@
                     key: 'execution-logs',
                     executionId: executionViewerData.id,
                 }),
-                // Main content: Editor or Workflow Executions based on tab
+                // History viewing banner (when viewing a historical version)
+                selectedHistoryCommit && React.createElement('div', {
+                    key: 'history-banner',
+                    className: 'history-viewing-banner',
+                    'data-testid': 'history-viewing-banner',
+                }, [
+                    React.createElement('span', {
+                        key: 'text',
+                        className: 'history-viewing-text',
+                    }, `Viewing version ${selectedHistoryCommit.slice(0, 7)} - Read Only`),
+                    React.createElement('div', { key: 'actions' }, [
+                        React.createElement('button', {
+                            key: 'back',
+                            className: 'history-back-btn',
+                            onClick: exitHistoryView,
+                            'data-testid': 'history-back-btn',
+                        }, '← Back'),
+                        React.createElement('button', {
+                            key: 'restore',
+                            className: 'history-restore-btn',
+                            onClick: () => restoreHistoryVersion(selectedHistoryCommit),
+                            'data-testid': 'history-restore-btn',
+                        }, 'Restore This Version'),
+                    ]),
+                ]),
+                // Main content: Editor, Workflow Executions, or History based on tab
                 (editorTab === 'editor' || isReadOnly) ? React.createElement('div', { key: 'main', className: 'editor', 'data-testid': 'editor' }, [
                     React.createElement(Sidebar, { key: 'sidebar', onAddNode: handleAddNode }),
                     React.createElement(Canvas, { key: 'canvas', onAddNode: handleAddNode }),
-                ]) : React.createElement(WorkflowExecutionsTab, { key: 'workflow-executions' }),
+                ]) : editorTab === 'executions' ? React.createElement(WorkflowExecutionsTab, { key: 'workflow-executions' })
+                   : React.createElement(WorkflowHistoryTab, { key: 'workflow-history' }),
                 // Node editor dialog
                 openEditorNodeId && React.createElement(NodeEditorDialog, {
                     key: 'node-editor',
