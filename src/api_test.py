@@ -1720,3 +1720,132 @@ def test_list_executions_workflow_filter():
         # Restore original cache
         api_module._executions_cache.clear()
         api_module._executions_cache.update(original_cache)
+
+
+# ##################################################################
+# test AI chat endpoints
+# verifies AI chat API functionality
+
+
+def test_ai_chat_endpoint(tmp_path, monkeypatch):
+    """Test POST /api/ai/chat calls process_input."""
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+
+    # Mock process_input to avoid calling Claude
+    async def mock_process_input(input_str, workflow_context=None):
+        return f"Response to: {input_str}"
+
+    monkeypatch.setattr("src.ai_brain.process_input", mock_process_input)
+
+    client = TestClient(app)
+    response = client.post("/api/ai/chat", json={"message": "list workflows"})
+    assert response.status_code == 200
+    data = response.json()
+    assert "response" in data
+    assert "list workflows" in data["response"]
+
+
+def test_ai_chat_workflow_endpoint(tmp_path, monkeypatch):
+    """Test POST /api/ai/chat/workflow/{path} with workflow context."""
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+
+    # Mock chat_with_validation to avoid calling Claude
+    async def mock_chat_with_validation(message, workflow_context=None):
+        return f"Editing workflow: {message}", None
+
+    monkeypatch.setattr("src.ai_brain.chat_with_validation", mock_chat_with_validation)
+
+    client = TestClient(app)
+    workflow = {"nodes": [], "connections": []}
+    response = client.post(
+        "/api/ai/chat/workflow/test.json",
+        json={"message": "add a node", "workflow": workflow},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "response" in data
+    assert "Editing workflow" in data["response"]
+
+
+def test_ai_chat_workflow_empty_message(tmp_path):
+    """Test POST /api/ai/chat/workflow/{path} with empty message."""
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/ai/chat/workflow/test.json",
+        json={"message": "", "workflow": {}},
+    )
+    assert response.status_code == 400
+    assert "required" in response.json()["detail"]
+
+
+def test_ai_session_clear_endpoint(tmp_path, monkeypatch):
+    """Test DELETE /api/ai/session clears session."""
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+
+    # Create a session file
+    ai_dir = tmp_path / "ai"
+    ai_dir.mkdir(parents=True, exist_ok=True)
+    session_file = ai_dir / "session.json"
+    session_file.write_text('{"session_id": "test"}')
+
+    # Mock get_config in ai_brain module
+    from src.config import ServerConfig as SC
+
+    mock_config = SC(data_dir=str(tmp_path))
+    monkeypatch.setattr("src.ai_brain.get_config", lambda: mock_config)
+
+    client = TestClient(app)
+    response = client.delete("/api/ai/session")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["cleared"] is True
+
+    # Session file should be gone
+    assert not session_file.exists()
+
+
+def test_ai_session_get_endpoint(tmp_path, monkeypatch):
+    """Test GET /api/ai/session returns session state."""
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+
+    # Create a session file
+    ai_dir = tmp_path / "ai"
+    ai_dir.mkdir(parents=True, exist_ok=True)
+    session_file = ai_dir / "session.json"
+    session_file.write_text(
+        '{"session_id": "test-123", "message_count": 5, "token_estimate": 1000, '
+        '"created_at": "2025-01-01", "last_activity": "2025-01-02", "conversation_history": []}'
+    )
+
+    # Mock get_config in ai_brain module
+    from src.config import ServerConfig as SC
+
+    mock_config = SC(data_dir=str(tmp_path))
+    monkeypatch.setattr("src.ai_brain.get_config", lambda: mock_config)
+
+    client = TestClient(app)
+    response = client.get("/api/ai/session")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["session_id"] == "test-123"
+    assert data["message_count"] == 5
+
+
+def test_ai_session_get_empty(tmp_path, monkeypatch):
+    """Test GET /api/ai/session returns new session when none exists."""
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+
+    # Mock get_config in ai_brain module
+    from src.config import ServerConfig as SC
+
+    mock_config = SC(data_dir=str(tmp_path))
+    monkeypatch.setattr("src.ai_brain.get_config", lambda: mock_config)
+
+    client = TestClient(app)
+    response = client.get("/api/ai/session")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["session_id"] is None
+    assert data["message_count"] == 0

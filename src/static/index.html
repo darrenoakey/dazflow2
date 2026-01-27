@@ -1984,6 +1984,261 @@
             from { opacity: 0; transform: translateX(20px); }
             to { opacity: 1; transform: translateX(0); }
         }
+
+        /* AI Chat Panel */
+        .dashboard-with-chat {
+            display: flex;
+            height: 100%;
+        }
+        .dashboard-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        .chat-panel {
+            width: 380px;
+            border-left: 1px solid #3a3a5e;
+            display: flex;
+            flex-direction: column;
+            background: #1a1a2e;
+        }
+        .chat-panel.collapsed {
+            width: 48px;
+        }
+        .chat-header {
+            padding: 16px;
+            border-bottom: 1px solid #3a3a5e;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .chat-header-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #667eea;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .chat-panel.collapsed .chat-header-title span {
+            display: none;
+        }
+        .chat-toggle-btn {
+            background: none;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .chat-toggle-btn:hover {
+            color: #ccc;
+        }
+        .chat-clear-btn {
+            background: none;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            font-size: 12px;
+            padding: 4px 8px;
+        }
+        .chat-clear-btn:hover {
+            color: #f87171;
+        }
+        .chat-panel.collapsed .chat-clear-btn {
+            display: none;
+        }
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .chat-panel.collapsed .chat-messages {
+            display: none;
+        }
+        .chat-message {
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            line-height: 1.5;
+            max-width: 90%;
+            word-wrap: break-word;
+        }
+        .chat-message.user {
+            background: #667eea;
+            color: #fff;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+        .chat-message.assistant {
+            background: #2a2a4e;
+            color: #ddd;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+        .chat-message.error {
+            background: #3a1a1a;
+            color: #f87171;
+            align-self: flex-start;
+            border: 1px solid #5a2a2a;
+        }
+        .chat-message pre {
+            background: #1a1a2e;
+            padding: 8px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 8px 0;
+            font-size: 12px;
+        }
+        .chat-message code {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+        }
+        .chat-input-container {
+            padding: 16px;
+            border-top: 1px solid #3a3a5e;
+        }
+        .chat-panel.collapsed .chat-input-container {
+            display: none;
+        }
+        .chat-input-form {
+            display: flex;
+            gap: 8px;
+        }
+        .chat-input {
+            flex: 1;
+            padding: 10px 14px;
+            background: #2a2a4e;
+            border: 1px solid #4a4a6e;
+            border-radius: 8px;
+            color: #eee;
+            font-size: 13px;
+            outline: none;
+            resize: none;
+            min-height: 40px;
+            max-height: 120px;
+        }
+        .chat-input:focus {
+            border-color: #667eea;
+        }
+        .chat-input::placeholder {
+            color: #666;
+        }
+        .chat-send-btn {
+            padding: 10px 16px;
+            background: #667eea;
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .chat-send-btn:hover {
+            background: #5a6fd6;
+        }
+        .chat-send-btn:disabled {
+            background: #4a4a6e;
+            cursor: not-allowed;
+        }
+        .chat-typing {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 10px 14px;
+            background: #2a2a4e;
+            border-radius: 12px;
+            align-self: flex-start;
+        }
+        .chat-typing-dot {
+            width: 6px;
+            height: 6px;
+            background: #667eea;
+            border-radius: 50%;
+            animation: chat-typing 1.4s infinite;
+        }
+        .chat-typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .chat-typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes chat-typing {
+            0%, 100% { opacity: 0.4; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1); }
+        }
+        .chat-empty {
+            text-align: center;
+            color: #666;
+            font-size: 13px;
+            padding: 40px 20px;
+        }
+        .chat-empty-hint {
+            margin-top: 12px;
+            font-size: 11px;
+            color: #555;
+        }
+
+        /* Save status indicator */
+        .save-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .save-status.clean {
+            color: #666;
+        }
+        .save-status.modified {
+            color: #f59e0b;
+            background: rgba(245, 158, 11, 0.1);
+        }
+        .save-status.saving {
+            color: #60a5fa;
+            background: rgba(96, 165, 250, 0.1);
+        }
+        .save-status.saved {
+            color: #34d399;
+            background: rgba(52, 211, 153, 0.1);
+        }
+        .save-status.error {
+            color: #f87171;
+            background: rgba(248, 113, 113, 0.1);
+        }
+        .save-status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+        .save-status.clean .save-status-dot {
+            background: #666;
+        }
+        .save-status.modified .save-status-dot {
+            background: #f59e0b;
+            animation: pulse-dot 1.5s infinite;
+        }
+        .save-status.saving .save-status-dot {
+            background: #60a5fa;
+            animation: pulse-dot 0.8s infinite;
+        }
+        .save-status.saved .save-status-dot {
+            background: #34d399;
+        }
+        .save-status.error .save-status-dot {
+            background: #f87171;
+        }
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
     </style>
     <link href="https://esm.sh/@xyflow/react@12/dist/style.css" rel="stylesheet">
 </head>
@@ -2275,6 +2530,13 @@
             // Format: { [nodeId]: { input, nodeOutput, output (combined), executedAt } }
             ambientExecution: {},
 
+            // Autosave state
+            // 'clean' = no changes since load, 'modified' = unsaved changes,
+            // 'saving' = save in progress, 'saved' = saved to disk, 'error' = save failed
+            saveStatus: 'clean',
+            lastSavedSnapshot: null, // JSON string of last saved {nodes, connections}
+            autosaveTimerId: null,
+
             // Dashboard actions
             setCurrentView: (view) => set({ currentView: view }),
             setDashboardPath: (path) => set({ dashboardPath: path }),
@@ -2311,9 +2573,13 @@
                         // Strip .json from URL for cleaner paths
                         const urlPath = path.replace(/\.json$/, '');
                         history.pushState(null, '', `/editor/${urlPath}`);
+                        // Create snapshot of loaded state for autosave comparison
+                        const loadedNodes = workflow.nodes || [];
+                        const loadedConnections = workflow.connections || [];
+                        const snapshot = JSON.stringify({ nodes: loadedNodes, connections: loadedConnections });
                         set({
-                            nodes: workflow.nodes || [],
-                            connections: workflow.connections || [],
+                            nodes: loadedNodes,
+                            connections: loadedConnections,
                             nameCounts: {},
                             viewport: { x: 0, y: 0, zoom: 1 },
                             ambientExecution: {},
@@ -2329,6 +2595,8 @@
                             isReadOnly: false,
                             executionViewerId: null,
                             executionViewerData: null,
+                            saveStatus: 'clean',
+                            lastSavedSnapshot: snapshot,
                         });
                     } else {
                         useToastStore.getState().error('Failed to load workflow', `Server returned ${response.status}`);
@@ -2340,22 +2608,33 @@
             },
 
             // Save current workflow
-            saveWorkflow: async (path) => {
+            saveWorkflow: async (path, silent = false) => {
                 const state = get();
                 const workflow = { nodes: state.nodes, connections: state.connections };
+                set({ saveStatus: 'saving' });
                 try {
                     const response = await fetch(`/api/workflow/${encodeURIComponent(path)}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ workflow }),
                     });
-                    if (!response.ok) {
-                        useToastStore.getState().error('Failed to save workflow', `Server returned ${response.status}`);
+                    if (response.ok) {
+                        const snapshot = JSON.stringify(workflow);
+                        set({ saveStatus: 'saved', lastSavedSnapshot: snapshot });
+                        return true;
+                    } else {
+                        set({ saveStatus: 'error' });
+                        if (!silent) {
+                            useToastStore.getState().error('Failed to save workflow', `Server returned ${response.status}`);
+                        }
+                        return false;
                     }
-                    return response.ok;
                 } catch (e) {
                     console.error('Failed to save workflow:', e);
-                    useToastStore.getState().error('Failed to save workflow', e.message || String(e));
+                    set({ saveStatus: 'error' });
+                    if (!silent) {
+                        useToastStore.getState().error('Failed to save workflow', e.message || String(e));
+                    }
                     return false;
                 }
             },
@@ -3010,11 +3289,173 @@
                 }
                 return false;
             },
+
+            // AI Chat state
+            chatMessages: [],
+            chatLoading: false,
+            chatPanelCollapsed: false,
+
+            // Toggle chat panel
+            toggleChatPanel: () => {
+                set((state) => ({ chatPanelCollapsed: !state.chatPanelCollapsed }));
+            },
+
+            // Clear chat history
+            clearChat: async () => {
+                try {
+                    await fetch('/api/ai/session', { method: 'DELETE' });
+                } catch (e) {
+                    console.error('Failed to clear session:', e);
+                }
+                set({ chatMessages: [] });
+            },
+
+            // Send a chat message (dashboard context - no workflow)
+            sendChatMessage: async (message) => {
+                const state = get();
+                if (state.chatLoading || !message.trim()) return;
+
+                // Add user message
+                const userMsg = { role: 'user', content: message };
+                set({
+                    chatMessages: [...state.chatMessages, userMsg],
+                    chatLoading: true,
+                });
+
+                try {
+                    const response = await fetch('/api/ai/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message }),
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        const assistantMsg = { role: 'assistant', content: data.response };
+                        set((s) => ({
+                            chatMessages: [...s.chatMessages, assistantMsg],
+                        }));
+                        // Reload dashboard items if we might have created/modified workflows
+                        get().loadDashboardItems(get().dashboardPath);
+                    } else {
+                        const errorText = await response.text();
+                        const errorMsg = { role: 'error', content: `Error: ${errorText || response.status}` };
+                        set((s) => ({
+                            chatMessages: [...s.chatMessages, errorMsg],
+                        }));
+                    }
+                } catch (e) {
+                    const errorMsg = { role: 'error', content: `Network error: ${e.message}` };
+                    set((s) => ({
+                        chatMessages: [...s.chatMessages, errorMsg],
+                    }));
+                } finally {
+                    set({ chatLoading: false });
+                }
+            },
+
+            // Send a chat message with workflow context (editor context)
+            sendWorkflowChatMessage: async (message) => {
+                const state = get();
+                if (state.chatLoading || !message.trim() || !state.currentWorkflowPath) return;
+
+                // Add user message
+                const userMsg = { role: 'user', content: message };
+                set({
+                    chatMessages: [...state.chatMessages, userMsg],
+                    chatLoading: true,
+                });
+
+                try {
+                    // Use current editor state (possibly unsaved)
+                    const currentWorkflow = { nodes: state.nodes, connections: state.connections };
+                    const path = encodeURIComponent(state.currentWorkflowPath);
+                    const response = await fetch(`/api/ai/chat/workflow/${path}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message, workflow: currentWorkflow }),
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        const assistantMsg = { role: 'assistant', content: data.response };
+                        set((s) => ({
+                            chatMessages: [...s.chatMessages, assistantMsg],
+                        }));
+
+                        // If we got a modified workflow, update the editor
+                        if (data.modified_workflow) {
+                            set({
+                                nodes: data.modified_workflow.nodes || [],
+                                connections: data.modified_workflow.connections || [],
+                            });
+                            useToastStore.getState().success('Workflow updated', 'AI modified the workflow');
+                        }
+                    } else {
+                        const errorText = await response.text();
+                        const errorMsg = { role: 'error', content: `Error: ${errorText || response.status}` };
+                        set((s) => ({
+                            chatMessages: [...s.chatMessages, errorMsg],
+                        }));
+                    }
+                } catch (e) {
+                    const errorMsg = { role: 'error', content: `Network error: ${e.message}` };
+                    set((s) => ({
+                        chatMessages: [...s.chatMessages, errorMsg],
+                    }));
+                } finally {
+                    set({ chatLoading: false });
+                }
+            },
+
+            // Trigger autosave with debounce (1 second delay)
+            triggerAutosave: () => {
+                const state = get();
+                // Only autosave if we have a workflow loaded and not in read-only mode
+                if (!state.currentWorkflowPath || state.isReadOnly) return;
+
+                // Check if state has changed from last saved snapshot
+                const currentSnapshot = JSON.stringify({ nodes: state.nodes, connections: state.connections });
+                if (currentSnapshot === state.lastSavedSnapshot) {
+                    // No changes, keep current status (could be 'saved' or 'clean')
+                    return;
+                }
+
+                // State has changed, mark as modified
+                set({ saveStatus: 'modified' });
+
+                // Clear existing timer if any
+                if (state.autosaveTimerId) {
+                    clearTimeout(state.autosaveTimerId);
+                }
+
+                // Start debounce timer for autosave (1 second)
+                const timerId = setTimeout(() => {
+                    const s = get();
+                    if (s.currentWorkflowPath && !s.isReadOnly && s.saveStatus === 'modified') {
+                        s.saveWorkflow(s.currentWorkflowPath, true); // silent save
+                    }
+                }, 1000);
+
+                set({ autosaveTimerId: timerId });
+            },
         }));
 
         // Subscribe to store changes and save to localStorage
         useWorkflowStore.subscribe((state) => {
             saveToStorage(state);
+        });
+
+        // Subscribe to workflow changes for autosave
+        let prevNodes = null;
+        let prevConnections = null;
+        useWorkflowStore.subscribe((state) => {
+            // Only trigger autosave if nodes or connections changed
+            if (state.nodes !== prevNodes || state.connections !== prevConnections) {
+                prevNodes = state.nodes;
+                prevConnections = state.connections;
+                state.triggerAutosave();
+            }
         });
 
         // Expose store globally for testing
@@ -5891,58 +6332,243 @@
             ]);
         }
 
+        // AI Chat Panel Component
+        function ChatPanel({ workflowContext = false }) {
+            const chatMessages = useWorkflowStore((state) => state.chatMessages);
+            const chatLoading = useWorkflowStore((state) => state.chatLoading);
+            const chatPanelCollapsed = useWorkflowStore((state) => state.chatPanelCollapsed);
+            const toggleChatPanel = useWorkflowStore((state) => state.toggleChatPanel);
+            const clearChat = useWorkflowStore((state) => state.clearChat);
+            const sendChatMessage = useWorkflowStore((state) => state.sendChatMessage);
+            const sendWorkflowChatMessage = useWorkflowStore((state) => state.sendWorkflowChatMessage);
+
+            const [inputValue, setInputValue] = useState('');
+            const messagesEndRef = useRef(null);
+
+            // Auto-scroll to bottom when messages change
+            useEffect(() => {
+                if (messagesEndRef.current) {
+                    messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+                }
+            }, [chatMessages, chatLoading]);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (!inputValue.trim() || chatLoading) return;
+
+                const message = inputValue;
+                setInputValue('');
+
+                if (workflowContext) {
+                    await sendWorkflowChatMessage(message);
+                } else {
+                    await sendChatMessage(message);
+                }
+            };
+
+            const handleKeyDown = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit(e);
+                }
+            };
+
+            // Format message content (basic markdown-like formatting)
+            const formatContent = (content) => {
+                // Split by code blocks
+                const parts = content.split(/(```[\s\S]*?```)/g);
+                return parts.map((part, i) => {
+                    if (part.startsWith('```') && part.endsWith('```')) {
+                        const code = part.slice(3, -3).replace(/^[a-z]*\n/, '');
+                        return React.createElement('pre', { key: i },
+                            React.createElement('code', null, code)
+                        );
+                    }
+                    return React.createElement('span', { key: i }, part);
+                });
+            };
+
+            // Collapse icon (chevron)
+            const CollapseIcon = ({ collapsed }) =>
+                React.createElement('svg', {
+                    width: 16,
+                    height: 16,
+                    viewBox: '0 0 24 24',
+                    fill: 'none',
+                    stroke: 'currentColor',
+                    strokeWidth: 2,
+                    style: { transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' },
+                }, React.createElement('path', { d: 'M15 18l-6-6 6-6' }));
+
+            // AI Icon
+            const AIIcon = () =>
+                React.createElement('svg', {
+                    width: 18,
+                    height: 18,
+                    viewBox: '0 0 24 24',
+                    fill: 'none',
+                    stroke: 'currentColor',
+                    strokeWidth: 2,
+                }, [
+                    React.createElement('circle', { key: 1, cx: 12, cy: 12, r: 10 }),
+                    React.createElement('path', { key: 2, d: 'M12 16v-4' }),
+                    React.createElement('path', { key: 3, d: 'M12 8h.01' }),
+                ]);
+
+            // Send Icon
+            const SendIcon = () =>
+                React.createElement('svg', {
+                    width: 16,
+                    height: 16,
+                    viewBox: '0 0 24 24',
+                    fill: 'none',
+                    stroke: 'currentColor',
+                    strokeWidth: 2,
+                }, React.createElement('path', { d: 'M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z' }));
+
+            return React.createElement('div', {
+                className: `chat-panel ${chatPanelCollapsed ? 'collapsed' : ''}`,
+                'data-testid': 'chat-panel',
+            }, [
+                // Header
+                React.createElement('div', { key: 'header', className: 'chat-header' }, [
+                    React.createElement('div', { key: 'title', className: 'chat-header-title' }, [
+                        React.createElement(AIIcon, { key: 'icon' }),
+                        React.createElement('span', { key: 'text' }, workflowContext ? 'Workflow AI' : 'AI Assistant'),
+                    ]),
+                    React.createElement('div', { key: 'actions', style: { display: 'flex', gap: '4px' } }, [
+                        !chatPanelCollapsed && chatMessages.length > 0 && React.createElement('button', {
+                            key: 'clear',
+                            className: 'chat-clear-btn',
+                            onClick: clearChat,
+                            title: 'Clear chat',
+                        }, 'Clear'),
+                        React.createElement('button', {
+                            key: 'toggle',
+                            className: 'chat-toggle-btn',
+                            onClick: toggleChatPanel,
+                            title: chatPanelCollapsed ? 'Expand' : 'Collapse',
+                        }, React.createElement(CollapseIcon, { collapsed: chatPanelCollapsed })),
+                    ]),
+                ]),
+
+                // Messages
+                React.createElement('div', { key: 'messages', className: 'chat-messages' }, [
+                    chatMessages.length === 0 && !chatLoading && React.createElement('div', {
+                        key: 'empty',
+                        className: 'chat-empty',
+                    }, [
+                        React.createElement('div', { key: 'text' }, workflowContext
+                            ? 'Ask me to modify this workflow'
+                            : 'Ask me anything about your workflows'),
+                        React.createElement('div', { key: 'hint', className: 'chat-empty-hint' },
+                            workflowContext
+                                ? 'Try: "Add a delay of 5 seconds" or "Change the HTTP method to POST"'
+                                : 'Try: "List workflows" or "Create a workflow that posts to Discord"'),
+                    ]),
+
+                    ...chatMessages.map((msg, i) =>
+                        React.createElement('div', {
+                            key: i,
+                            className: `chat-message ${msg.role}`,
+                        }, formatContent(msg.content))
+                    ),
+
+                    chatLoading && React.createElement('div', { key: 'typing', className: 'chat-typing' }, [
+                        React.createElement('div', { key: 1, className: 'chat-typing-dot' }),
+                        React.createElement('div', { key: 2, className: 'chat-typing-dot' }),
+                        React.createElement('div', { key: 3, className: 'chat-typing-dot' }),
+                    ]),
+
+                    React.createElement('div', { key: 'end', ref: messagesEndRef }),
+                ]),
+
+                // Input
+                React.createElement('div', { key: 'input', className: 'chat-input-container' },
+                    React.createElement('form', {
+                        className: 'chat-input-form',
+                        onSubmit: handleSubmit,
+                    }, [
+                        React.createElement('textarea', {
+                            key: 'textarea',
+                            className: 'chat-input',
+                            value: inputValue,
+                            onChange: (e) => setInputValue(e.target.value),
+                            onKeyDown: handleKeyDown,
+                            placeholder: workflowContext ? 'Ask about this workflow...' : 'Ask anything...',
+                            disabled: chatLoading,
+                            rows: 1,
+                            'data-testid': 'chat-input',
+                        }),
+                        React.createElement('button', {
+                            key: 'submit',
+                            type: 'submit',
+                            className: 'chat-send-btn',
+                            disabled: chatLoading || !inputValue.trim(),
+                            'data-testid': 'chat-send-btn',
+                        }, React.createElement(SendIcon)),
+                    ])
+                ),
+            ]);
+        }
+
         // Dashboard Component
         function Dashboard() {
             const dashboardTab = useWorkflowStore((state) => state.dashboardTab);
             const setDashboardTab = useWorkflowStore((state) => state.setDashboardTab);
 
-            return React.createElement('div', { className: 'dashboard', 'data-testid': 'dashboard' }, [
-                React.createElement('div', { key: 'header', className: 'dashboard-header' }, [
-                    React.createElement('h1', { key: 'title', className: 'dashboard-title', 'data-testid': 'dashboard-title' }, 'dazflow'),
-                    React.createElement('div', { key: 'tabs', className: 'dashboard-tabs' }, [
-                        React.createElement('button', {
-                            key: 'workflows',
-                            className: `dashboard-tab ${dashboardTab === 'workflows' ? 'active' : ''}`,
-                            onClick: () => setDashboardTab('workflows'),
-                            'data-testid': 'tab-workflows',
-                        }, 'Workflows'),
-                        React.createElement('button', {
-                            key: 'executions',
-                            className: `dashboard-tab ${dashboardTab === 'executions' ? 'active' : ''}`,
-                            onClick: () => setDashboardTab('executions'),
-                            'data-testid': 'tab-executions',
-                        }, 'Executions'),
-                        React.createElement('button', {
-                            key: 'credentials',
-                            className: `dashboard-tab ${dashboardTab === 'credentials' ? 'active' : ''}`,
-                            onClick: () => setDashboardTab('credentials'),
-                            'data-testid': 'tab-credentials',
-                        }, 'Credentials'),
-                        React.createElement('button', {
-                            key: 'agents',
-                            className: `dashboard-tab ${dashboardTab === 'agents' ? 'active' : ''}`,
-                            onClick: () => setDashboardTab('agents'),
-                            'data-testid': 'tab-agents',
-                        }, 'Agents'),
-                        React.createElement('button', {
-                            key: 'concurrency',
-                            className: `dashboard-tab ${dashboardTab === 'concurrency' ? 'active' : ''}`,
-                            onClick: () => setDashboardTab('concurrency'),
-                            'data-testid': 'tab-concurrency',
-                        }, 'Concurrency'),
+            return React.createElement('div', { className: 'dashboard-with-chat', 'data-testid': 'dashboard' }, [
+                // Main dashboard area
+                React.createElement('div', { key: 'main', className: 'dashboard-main' }, [
+                    React.createElement('div', { key: 'header', className: 'dashboard-header' }, [
+                        React.createElement('h1', { key: 'title', className: 'dashboard-title', 'data-testid': 'dashboard-title' }, 'dazflow'),
+                        React.createElement('div', { key: 'tabs', className: 'dashboard-tabs' }, [
+                            React.createElement('button', {
+                                key: 'workflows',
+                                className: `dashboard-tab ${dashboardTab === 'workflows' ? 'active' : ''}`,
+                                onClick: () => setDashboardTab('workflows'),
+                                'data-testid': 'tab-workflows',
+                            }, 'Workflows'),
+                            React.createElement('button', {
+                                key: 'executions',
+                                className: `dashboard-tab ${dashboardTab === 'executions' ? 'active' : ''}`,
+                                onClick: () => setDashboardTab('executions'),
+                                'data-testid': 'tab-executions',
+                            }, 'Executions'),
+                            React.createElement('button', {
+                                key: 'credentials',
+                                className: `dashboard-tab ${dashboardTab === 'credentials' ? 'active' : ''}`,
+                                onClick: () => setDashboardTab('credentials'),
+                                'data-testid': 'tab-credentials',
+                            }, 'Credentials'),
+                            React.createElement('button', {
+                                key: 'agents',
+                                className: `dashboard-tab ${dashboardTab === 'agents' ? 'active' : ''}`,
+                                onClick: () => setDashboardTab('agents'),
+                                'data-testid': 'tab-agents',
+                            }, 'Agents'),
+                            React.createElement('button', {
+                                key: 'concurrency',
+                                className: `dashboard-tab ${dashboardTab === 'concurrency' ? 'active' : ''}`,
+                                onClick: () => setDashboardTab('concurrency'),
+                                'data-testid': 'tab-concurrency',
+                            }, 'Concurrency'),
+                        ]),
                     ]),
+                    React.createElement('div', { key: 'content', className: 'dashboard-content' },
+                        dashboardTab === 'workflows'
+                            ? React.createElement(WorkflowsTab)
+                            : dashboardTab === 'executions'
+                            ? React.createElement(ExecutionsTab)
+                            : dashboardTab === 'credentials'
+                            ? React.createElement(CredentialsTab)
+                            : dashboardTab === 'agents'
+                            ? React.createElement(AgentsTab)
+                            : React.createElement(ConcurrencyTab)
+                    ),
                 ]),
-                React.createElement('div', { key: 'content', className: 'dashboard-content' },
-                    dashboardTab === 'workflows'
-                        ? React.createElement(WorkflowsTab)
-                        : dashboardTab === 'executions'
-                        ? React.createElement(ExecutionsTab)
-                        : dashboardTab === 'credentials'
-                        ? React.createElement(CredentialsTab)
-                        : dashboardTab === 'agents'
-                        ? React.createElement(AgentsTab)
-                        : React.createElement(ConcurrencyTab)
-                ),
+                // Chat panel
+                React.createElement(ChatPanel, { key: 'chat', workflowContext: false }),
             ]);
         }
 
@@ -6371,6 +6997,27 @@
 
         // Editor Component
         // Editor Header with tabs
+        // Save Status Indicator Component
+        function SaveStatusIndicator() {
+            const saveStatus = useWorkflowStore((state) => state.saveStatus);
+
+            const statusLabels = {
+                clean: 'Saved',
+                modified: 'Modified',
+                saving: 'Saving...',
+                saved: 'Saved',
+                error: 'Save failed',
+            };
+
+            return React.createElement('div', {
+                className: `save-status ${saveStatus}`,
+                'data-testid': 'save-status',
+            }, [
+                React.createElement('span', { key: 'dot', className: 'save-status-dot' }),
+                React.createElement('span', { key: 'text' }, statusLabels[saveStatus] || 'Unknown'),
+            ]);
+        }
+
         function EditorHeader() {
             const currentWorkflowPath = useWorkflowStore((state) => state.currentWorkflowPath);
             const editorTab = useWorkflowStore((state) => state.editorTab);
@@ -6397,6 +7044,7 @@
                         className: 'editor-workflow-name',
                         'data-testid': 'editor-workflow-name',
                     }, displayName),
+                    !isReadOnly && React.createElement(SaveStatusIndicator, { key: 'save-status' }),
                 ]),
                 !isReadOnly && React.createElement('div', { key: 'tabs', className: 'editor-tabs' }, [
                     React.createElement('button', {
@@ -6483,71 +7131,78 @@
                 return new Date(ts * 1000).toLocaleString();
             };
 
-            return React.createElement(ReactFlowProvider, null, [
-                // Header with workflow name and tabs
-                React.createElement(EditorHeader, { key: 'header' }),
-                // Readonly banner when viewing an execution
-                isReadOnly && executionViewerData && React.createElement('div', {
-                    key: 'readonly-banner',
-                    className: 'readonly-banner',
-                    'data-testid': 'readonly-banner',
-                }, [
-                    React.createElement('div', { key: 'text', className: 'readonly-banner-text' }, [
-                        React.createElement('span', { key: 'icon' }, '📜'),
-                        React.createElement('span', { key: 'msg' },
-                            `Viewing execution from ${formatTimestamp(executionViewerData.completed_at)} - Read Only`
-                        ),
+            return React.createElement(ReactFlowProvider, null,
+                React.createElement('div', { className: 'dashboard-with-chat', style: { height: '100%' } }, [
+                    // Main editor area
+                    React.createElement('div', { key: 'main-area', className: 'dashboard-main', style: { display: 'flex', flexDirection: 'column' } }, [
+                        // Header with workflow name and tabs
+                        React.createElement(EditorHeader, { key: 'header' }),
+                        // Readonly banner when viewing an execution
+                        isReadOnly && executionViewerData && React.createElement('div', {
+                            key: 'readonly-banner',
+                            className: 'readonly-banner',
+                            'data-testid': 'readonly-banner',
+                        }, [
+                            React.createElement('div', { key: 'text', className: 'readonly-banner-text' }, [
+                                React.createElement('span', { key: 'icon' }, '📜'),
+                                React.createElement('span', { key: 'msg' },
+                                    `Viewing execution from ${formatTimestamp(executionViewerData.completed_at)} - Read Only`
+                                ),
+                            ]),
+                            React.createElement('button', {
+                                key: 'close',
+                                className: 'readonly-banner-close',
+                                onClick: closeExecutionViewer,
+                                'data-testid': 'readonly-back-btn',
+                            }, '← Back to Executions'),
+                        ]),
+                        // Execution logs when viewing an execution
+                        isReadOnly && executionViewerData && React.createElement(ExecutionLogs, {
+                            key: 'execution-logs',
+                            executionId: executionViewerData.id,
+                        }),
+                        // History viewing banner (when viewing a historical version)
+                        selectedHistoryCommit && React.createElement('div', {
+                            key: 'history-banner',
+                            className: 'history-viewing-banner',
+                            'data-testid': 'history-viewing-banner',
+                        }, [
+                            React.createElement('span', {
+                                key: 'text',
+                                className: 'history-viewing-text',
+                            }, `Viewing version ${selectedHistoryCommit.slice(0, 7)} - Read Only`),
+                            React.createElement('div', { key: 'actions' }, [
+                                React.createElement('button', {
+                                    key: 'back',
+                                    className: 'history-back-btn',
+                                    onClick: exitHistoryView,
+                                    'data-testid': 'history-back-btn',
+                                }, '← Back'),
+                                React.createElement('button', {
+                                    key: 'restore',
+                                    className: 'history-restore-btn',
+                                    onClick: () => restoreHistoryVersion(selectedHistoryCommit),
+                                    'data-testid': 'history-restore-btn',
+                                }, 'Restore This Version'),
+                            ]),
+                        ]),
+                        // Main content: Editor, Workflow Executions, or History based on tab
+                        (editorTab === 'editor' || isReadOnly) ? React.createElement('div', { key: 'main', className: 'editor', 'data-testid': 'editor' }, [
+                            React.createElement(Sidebar, { key: 'sidebar', onAddNode: handleAddNode }),
+                            React.createElement(Canvas, { key: 'canvas', onAddNode: handleAddNode }),
+                        ]) : editorTab === 'executions' ? React.createElement(WorkflowExecutionsTab, { key: 'workflow-executions' })
+                           : React.createElement(WorkflowHistoryTab, { key: 'workflow-history' }),
+                        // Node editor dialog
+                        openEditorNodeId && React.createElement(NodeEditorDialog, {
+                            key: 'node-editor',
+                            nodeId: openEditorNodeId,
+                            onClose: () => setOpenEditorNodeId(null),
+                        }),
                     ]),
-                    React.createElement('button', {
-                        key: 'close',
-                        className: 'readonly-banner-close',
-                        onClick: closeExecutionViewer,
-                        'data-testid': 'readonly-back-btn',
-                    }, '← Back to Executions'),
-                ]),
-                // Execution logs when viewing an execution
-                isReadOnly && executionViewerData && React.createElement(ExecutionLogs, {
-                    key: 'execution-logs',
-                    executionId: executionViewerData.id,
-                }),
-                // History viewing banner (when viewing a historical version)
-                selectedHistoryCommit && React.createElement('div', {
-                    key: 'history-banner',
-                    className: 'history-viewing-banner',
-                    'data-testid': 'history-viewing-banner',
-                }, [
-                    React.createElement('span', {
-                        key: 'text',
-                        className: 'history-viewing-text',
-                    }, `Viewing version ${selectedHistoryCommit.slice(0, 7)} - Read Only`),
-                    React.createElement('div', { key: 'actions' }, [
-                        React.createElement('button', {
-                            key: 'back',
-                            className: 'history-back-btn',
-                            onClick: exitHistoryView,
-                            'data-testid': 'history-back-btn',
-                        }, '← Back'),
-                        React.createElement('button', {
-                            key: 'restore',
-                            className: 'history-restore-btn',
-                            onClick: () => restoreHistoryVersion(selectedHistoryCommit),
-                            'data-testid': 'history-restore-btn',
-                        }, 'Restore This Version'),
-                    ]),
-                ]),
-                // Main content: Editor, Workflow Executions, or History based on tab
-                (editorTab === 'editor' || isReadOnly) ? React.createElement('div', { key: 'main', className: 'editor', 'data-testid': 'editor' }, [
-                    React.createElement(Sidebar, { key: 'sidebar', onAddNode: handleAddNode }),
-                    React.createElement(Canvas, { key: 'canvas', onAddNode: handleAddNode }),
-                ]) : editorTab === 'executions' ? React.createElement(WorkflowExecutionsTab, { key: 'workflow-executions' })
-                   : React.createElement(WorkflowHistoryTab, { key: 'workflow-history' }),
-                // Node editor dialog
-                openEditorNodeId && React.createElement(NodeEditorDialog, {
-                    key: 'node-editor',
-                    nodeId: openEditorNodeId,
-                    onClose: () => setOpenEditorNodeId(null),
-                }),
-            ]);
+                    // Chat panel with workflow context
+                    !isReadOnly && React.createElement(ChatPanel, { key: 'chat', workflowContext: true }),
+                ])
+            );
         }
 
         // Toast icons

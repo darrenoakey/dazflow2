@@ -180,4 +180,74 @@ test.describe('Smoke Tests - Production Instance', () => {
     // History tab content should be visible
     await expect(page.getByTestId('workflow-history-tab')).toBeVisible();
   });
+
+  test('chat panel is visible on dashboard', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 10000 });
+
+    // Chat panel should be visible
+    await expect(page.getByTestId('chat-panel')).toBeVisible();
+
+    // Chat input and send button should be visible
+    await expect(page.getByTestId('chat-input')).toBeVisible();
+    await expect(page.getByTestId('chat-send-btn')).toBeVisible();
+  });
+
+  test('chat panel can be collapsed and expanded', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 10000 });
+
+    // Chat panel should be visible and expanded initially
+    const chatPanel = page.getByTestId('chat-panel');
+    await expect(chatPanel).toBeVisible();
+    await expect(chatPanel).not.toHaveClass(/collapsed/);
+
+    // Chat input should be visible when expanded
+    await expect(page.getByTestId('chat-input')).toBeVisible();
+
+    // Click collapse button (the toggle button in the header)
+    await chatPanel.locator('.chat-toggle-btn').click();
+
+    // Chat panel should now have collapsed class
+    await expect(chatPanel).toHaveClass(/collapsed/);
+
+    // Chat input should be hidden when collapsed
+    await expect(page.getByTestId('chat-input')).not.toBeVisible();
+
+    // Click expand button
+    await chatPanel.locator('.chat-toggle-btn').click();
+
+    // Chat panel should be expanded again
+    await expect(chatPanel).not.toHaveClass(/collapsed/);
+    await expect(page.getByTestId('chat-input')).toBeVisible();
+  });
+
+  test('chat panel is visible in workflow editor', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 10000 });
+
+    // Open sample.json workflow
+    await page.getByTestId('file-item-sample.json').dblclick();
+    await expect(page.getByTestId('editor')).toBeVisible({ timeout: 10000 });
+
+    // Chat panel should be visible in editor
+    await expect(page.getByTestId('chat-panel')).toBeVisible();
+    await expect(page.getByTestId('chat-input')).toBeVisible();
+    await expect(page.getByTestId('chat-send-btn')).toBeVisible();
+  });
+
+  test('save status indicator is visible in editor', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 10000 });
+
+    // Open sample.json workflow
+    await page.getByTestId('file-item-sample.json').dblclick();
+    await expect(page.getByTestId('editor')).toBeVisible({ timeout: 10000 });
+
+    // Save status indicator should be visible
+    await expect(page.getByTestId('save-status')).toBeVisible();
+
+    // Initially should show clean/saved status
+    await expect(page.getByTestId('save-status')).toContainText(/Saved/);
+  });
 });

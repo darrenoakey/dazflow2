@@ -1447,6 +1447,71 @@ def delete_concurrency_group(name: str):
         raise HTTPException(status_code=404, detail=str(e))
 
 
+# ##################################################################
+# AI chat endpoints
+# Natural language interface to the workflow system
+
+
+class AIChatRequest(BaseModel):
+    message: str
+
+
+class AIChatResponse(BaseModel):
+    response: str
+    modified_workflow: dict | None = None
+
+
+@api_router.post("/ai/chat")
+async def ai_chat(request: AIChatRequest):
+    """Chat with AI about the repository.
+
+    The AI can create/modify workflows, organize folders, manage tags, etc.
+    """
+    from .ai_brain import process_input
+
+    response = await process_input(request.message)
+    return AIChatResponse(response=response, modified_workflow=None)
+
+
+@api_router.post("/ai/chat/workflow/{path:path}")
+async def ai_chat_workflow(path: str, request: Request):
+    """Chat with AI in the context of a specific workflow.
+
+    The AI can modify the workflow based on natural language commands.
+    Request body: { message: string, workflow: object }
+    """
+    from .ai_brain import chat_with_validation
+
+    body = await request.json()
+    message = body.get("message", "")
+    workflow = body.get("workflow")
+
+    if not message:
+        raise HTTPException(status_code=400, detail="Message is required")
+
+    response, modified_workflow = await chat_with_validation(message, workflow_context=workflow)
+
+    return AIChatResponse(response=response, modified_workflow=modified_workflow)
+
+
+@api_router.delete("/ai/session")
+async def clear_ai_session():
+    """Clear the AI conversation session."""
+    from .ai_brain import clear_session
+
+    clear_session()
+    return {"cleared": True}
+
+
+@api_router.get("/ai/session")
+async def get_ai_session():
+    """Get the current AI session state."""
+    from .ai_brain import load_session
+
+    session = load_session()
+    return session.to_dict()
+
+
 # Include the API router
 app.include_router(api_router)
 

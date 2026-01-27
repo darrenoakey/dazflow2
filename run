@@ -80,6 +80,82 @@ def command_check(_: argparse.Namespace) -> int:
 
 
 # ##################################################################
+# ai command
+# natural language interface to the workflow system
+def command_ai(args: argparse.Namespace) -> int:
+    import asyncio
+
+    # Combine all words into the input string
+    input_str = " ".join(args.words) if args.words else ""
+
+    if not input_str:
+        print("Usage: ./run ai <command or prompt>")
+        print("")
+        print("Simple commands:")
+        print("  list              List all workflows")
+        print("  enable <name>     Enable a workflow")
+        print("  disable <name>    Disable a workflow")
+        print("  run <name>        Run/execute a workflow")
+        print("  status            Server status")
+        print("  tags              List tags")
+        print("  groups            List concurrency groups")
+        print("  folders           List folders")
+        print("")
+        print("Or use natural language:")
+        print("  ./run ai create a workflow that does x y z")
+        print("  ./run ai move all news workflows to a news folder")
+        return 1
+
+    # Set up environment
+    data_dir = args.data_dir if args.data_dir else "."
+    os.environ["DAZFLOW_DATA_DIR"] = data_dir
+
+    # Import and run
+    sys.path.insert(0, str(PROJECT_ROOT))
+    from src.ai_brain import process_input
+
+    result = asyncio.run(process_input(input_str))
+    print(result)
+    return 0
+
+
+# ##################################################################
+# workflow-test command
+# runs workflow tests (execute workflows and assert against results)
+def command_workflow_test(args: argparse.Namespace) -> int:
+    # Set up environment
+    data_dir = args.data_dir if args.data_dir else "."
+    os.environ["DAZFLOW_DATA_DIR"] = data_dir
+
+    # Import and run
+    sys.path.insert(0, str(PROJECT_ROOT))
+    from src.workflow_testing import (
+        discover_test_workflows,
+        format_suite_result,
+        format_test_result,
+        run_workflow_test_sync,
+        run_test_suite_sync,
+    )
+
+    if args.workflow:
+        # Run specific workflow test
+        result = run_workflow_test_sync(args.workflow)
+        print(format_test_result(result))
+        return 0 if result.passed else 1
+    else:
+        # Discover and run all tests
+        test_files = discover_test_workflows(args.test_dir)
+        if not test_files:
+            print(f"No test workflows found in workflows/{args.test_dir}/")
+            print("Test workflows should be named *_test.json or test_*.json")
+            return 0
+
+        suite = run_test_suite_sync(test_files, args.test_dir)
+        print(format_suite_result(suite))
+        return 0 if suite.all_passed else 1
+
+
+# ##################################################################
 # main
 # parse arguments and dispatch to the appropriate command
 def main(argv: list[str]) -> int:
@@ -100,6 +176,17 @@ def main(argv: list[str]) -> int:
 
     p_check = sub.add_parser("check", help="Run full suite and gates")
     p_check.set_defaults(func=command_check)
+
+    p_ai = sub.add_parser("ai", help="AI interface to workflow system")
+    p_ai.add_argument("words", nargs="*", help="Command or natural language prompt")
+    p_ai.add_argument("--data-dir", type=str, help="Data directory (default .)")
+    p_ai.set_defaults(func=command_ai)
+
+    p_wf_test = sub.add_parser("workflow-test", help="Run workflow tests")
+    p_wf_test.add_argument("workflow", nargs="?", help="Specific workflow test to run (e.g., tests/my_test.json)")
+    p_wf_test.add_argument("--test-dir", type=str, default="tests", help="Directory to discover tests (default: tests)")
+    p_wf_test.add_argument("--data-dir", type=str, help="Data directory (default .)")
+    p_wf_test.set_defaults(func=command_workflow_test)
 
     args = parser.parse_args(argv)
     return args.func(args)
