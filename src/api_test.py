@@ -1676,3 +1676,47 @@ async def test_execute_multi_node_workflow_step_by_step(tmp_path):
     # Both nodes should be in execution (n1 auto-completed, n2 via queue)
     assert "n1" in data["execution"]
     assert "n2" in data["execution"]
+
+
+# ##################################################################
+# test list_executions with workflow_path filter
+# verifies that workflow_path parameter filters executions correctly
+def test_list_executions_workflow_filter():
+    import src.api as api_module
+
+    # Set up mock cache data
+    original_cache = api_module._executions_cache.copy()
+    try:
+        api_module._executions_cache["items"] = [
+            {"id": "exec1", "workflow_path": "workflow-a.json", "completed_at": 1000},
+            {"id": "exec2", "workflow_path": "workflow-b.json", "completed_at": 2000},
+            {"id": "exec3", "workflow_path": "workflow-a.json", "completed_at": 3000},
+            {"id": "exec4", "workflow_path": "workflow-c.json", "completed_at": 4000},
+        ]
+        api_module._executions_cache["last_updated"] = 5000
+
+        client = TestClient(app)
+
+        # Test without filter - should return all
+        response = client.get("/api/executions")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["items"]) == 4
+
+        # Test with workflow_path filter
+        response = client.get("/api/executions?workflow_path=workflow-a.json")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["items"]) == 2
+        assert all(e["workflow_path"] == "workflow-a.json" for e in data["items"])
+
+        # Test filter with no matches
+        response = client.get("/api/executions?workflow_path=nonexistent.json")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["items"]) == 0
+
+    finally:
+        # Restore original cache
+        api_module._executions_cache.clear()
+        api_module._executions_cache.update(original_cache)

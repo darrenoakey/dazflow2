@@ -957,6 +957,82 @@
             overflow-y: auto;
             padding: 24px 32px;
         }
+        /* Editor Header Styles */
+        .editor-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 24px;
+            background: #1a1a2e;
+            border-bottom: 1px solid #3a3a5e;
+            flex-shrink: 0;
+        }
+        .editor-header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .editor-back-btn {
+            background: transparent;
+            border: 1px solid #3a3a5e;
+            border-radius: 4px;
+            color: #888;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.15s;
+        }
+        .editor-back-btn:hover {
+            background: #2a2a4e;
+            color: #ccc;
+        }
+        .editor-workflow-name {
+            font-size: 16px;
+            font-weight: 500;
+            color: #e0e0e0;
+        }
+        .editor-tabs {
+            display: flex;
+            gap: 0;
+        }
+        .editor-tab {
+            padding: 8px 20px;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: #888;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .editor-tab:hover {
+            color: #ccc;
+        }
+        .editor-tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+        /* Workflow Executions List (inside editor view) */
+        .workflow-executions-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #1a1a2e;
+            overflow: hidden;
+        }
+        .workflow-executions-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 24px;
+        }
+        .workflow-executions-empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #888;
+            font-size: 14px;
+        }
         /* Credentials Tab Styles */
         .credentials-list {
             display: flex;
@@ -2148,6 +2224,13 @@
                             ambientExecution: {},
                             currentWorkflowPath: path,
                             currentView: 'editor',
+                            editorTab: 'editor',
+                            workflowExecutionsList: [],
+                            workflowExecutionsHasMore: true,
+                            workflowExecutionsBeforeCursor: null,
+                            isReadOnly: false,
+                            executionViewerId: null,
+                            executionViewerData: null,
                         });
                     } else {
                         useToastStore.getState().error('Failed to load workflow', `Server returned ${response.status}`);
@@ -2191,11 +2274,52 @@
             executionViewerId: null,
             executionViewerData: null,
 
-            // Executions list state
+            // Executions list state (dashboard)
             executionsList: [],
             executionsLoading: false,
             executionsHasMore: true,
             executionsBeforeCursor: null,
+
+            // Editor tab state
+            editorTab: 'editor', // 'editor' | 'executions'
+            setEditorTab: (tab) => set({ editorTab: tab }),
+
+            // Workflow-specific executions list (editor view)
+            workflowExecutionsList: [],
+            workflowExecutionsLoading: false,
+            workflowExecutionsHasMore: true,
+            workflowExecutionsBeforeCursor: null,
+
+            // Load executions filtered by current workflow
+            loadWorkflowExecutionsList: async (reset = false) => {
+                const state = get();
+                if (state.workflowExecutionsLoading || !state.currentWorkflowPath) return;
+
+                set({ workflowExecutionsLoading: true });
+                try {
+                    const before = reset ? null : state.workflowExecutionsBeforeCursor;
+                    const encodedPath = encodeURIComponent(state.currentWorkflowPath);
+                    const url = before
+                        ? `/api/executions?limit=50&workflow_path=${encodedPath}&before=${before}`
+                        : `/api/executions?limit=50&workflow_path=${encodedPath}`;
+                    const response = await fetch(url);
+                    if (response.ok) {
+                        const data = await response.json();
+                        const newItems = reset ? data.items : [...state.workflowExecutionsList, ...data.items];
+                        const lastItem = data.items[data.items.length - 1];
+                        set({
+                            workflowExecutionsList: newItems,
+                            workflowExecutionsHasMore: data.has_more,
+                            workflowExecutionsBeforeCursor: lastItem?.completed_at || null,
+                        });
+                    }
+                } catch (e) {
+                    console.error('Failed to load workflow executions:', e);
+                    useToastStore.getState().error('Failed to load executions', e.message || String(e));
+                } finally {
+                    set({ workflowExecutionsLoading: false });
+                }
+            },
 
             // Load paginated executions list
             loadExecutionsList: async (reset = false) => {
@@ -2227,8 +2351,14 @@
                 }
             },
 
+            // Track if execution was opened from workflow context
+            executionFromWorkflowContext: false,
+
             // Load a historical execution and open in read-only editor
             loadExecution: async (id) => {
+                const state = get();
+                // Track if we're coming from workflow executions tab
+                const fromWorkflowContext = state.currentView === 'editor' && state.editorTab === 'executions';
                 try {
                     const response = await fetch(`/api/execution/${encodeURIComponent(id)}`);
                     if (response.ok) {
@@ -2245,6 +2375,7 @@
                             executionViewerData: data,
                             isReadOnly: true,
                             currentWorkflowPath: data.workflow_path,
+                            executionFromWorkflowContext: fromWorkflowContext,
                         });
                     } else {
                         useToastStore.getState().error('Failed to load execution', `Server returned ${response.status}`);
@@ -2255,16 +2386,32 @@
                 }
             },
 
-            // Close execution viewer and return to executions tab
+            // Close execution viewer and return to appropriate view
             closeExecutionViewer: () => {
-                history.pushState(null, '', '/executions');
-                set({
-                    currentView: 'dashboard',
-                    dashboardTab: 'executions',
-                    isReadOnly: false,
-                    executionViewerId: null,
-                    executionViewerData: null,
-                });
+                const state = get();
+                if (state.executionFromWorkflowContext) {
+                    // Return to workflow's executions tab
+                    const urlPath = state.currentWorkflowPath.replace(/\.json$/, '');
+                    history.pushState(null, '', `/editor/${urlPath}`);
+                    set({
+                        isReadOnly: false,
+                        executionViewerId: null,
+                        executionViewerData: null,
+                        executionFromWorkflowContext: false,
+                        editorTab: 'executions',
+                    });
+                } else {
+                    // Return to dashboard executions tab
+                    history.pushState(null, '', '/executions');
+                    set({
+                        currentView: 'dashboard',
+                        dashboardTab: 'executions',
+                        isReadOnly: false,
+                        executionViewerId: null,
+                        executionViewerData: null,
+                        executionFromWorkflowContext: false,
+                    });
+                }
             },
 
             setViewport: (viewport) => set({ viewport }),
@@ -4784,6 +4931,94 @@
             ]);
         }
 
+        // Workflow Executions Tab (filtered to current workflow)
+        function WorkflowExecutionsTab() {
+            const workflowExecutionsList = useWorkflowStore((state) => state.workflowExecutionsList);
+            const workflowExecutionsLoading = useWorkflowStore((state) => state.workflowExecutionsLoading);
+            const workflowExecutionsHasMore = useWorkflowStore((state) => state.workflowExecutionsHasMore);
+            const loadWorkflowExecutionsList = useWorkflowStore((state) => state.loadWorkflowExecutionsList);
+            const loadExecution = useWorkflowStore((state) => state.loadExecution);
+            const listRef = useRef(null);
+
+            // Initial load and auto-refresh every 10 seconds
+            useEffect(() => {
+                loadWorkflowExecutionsList(true);
+                const interval = setInterval(() => {
+                    loadWorkflowExecutionsList(true);
+                }, 10000);
+                return () => clearInterval(interval);
+            }, []);
+
+            // Infinite scroll - load more when near bottom
+            const handleScroll = (e) => {
+                const { scrollTop, scrollHeight, clientHeight } = e.target;
+                if (scrollHeight - scrollTop - clientHeight < 400 && workflowExecutionsHasMore && !workflowExecutionsLoading) {
+                    loadWorkflowExecutionsList(false);
+                }
+            };
+
+            const formatTime = (timestamp) => {
+                if (!timestamp) return '-';
+                const date = new Date(timestamp * 1000);
+                return date.toLocaleString();
+            };
+
+            const formatDuration = (ms) => {
+                if (!ms) return '-';
+                if (ms < 1000) return `${ms}ms`;
+                return `${(ms / 1000).toFixed(1)}s`;
+            };
+
+            if (workflowExecutionsList.length === 0 && !workflowExecutionsLoading) {
+                return React.createElement('div', {
+                    className: 'workflow-executions-container',
+                    'data-testid': 'workflow-executions-tab',
+                },
+                    React.createElement('div', { className: 'workflow-executions-empty' },
+                        'No executions for this workflow'
+                    )
+                );
+            }
+
+            return React.createElement('div', {
+                className: 'workflow-executions-container',
+                'data-testid': 'workflow-executions-tab',
+            },
+                React.createElement('div', {
+                    className: 'workflow-executions-list executions-list',
+                    'data-testid': 'workflow-executions-list',
+                    onScroll: handleScroll,
+                    ref: listRef,
+                }, [
+                    ...workflowExecutionsList.map((exec) =>
+                        React.createElement('div', {
+                            key: exec.id,
+                            className: `execution-item ${exec.status}`,
+                            onClick: () => loadExecution(exec.id),
+                            'data-testid': `workflow-execution-item-${exec.id}`,
+                        }, [
+                            React.createElement('span', {
+                                key: 'time',
+                                className: 'exec-time',
+                            }, formatTime(exec.completed_at)),
+                            React.createElement('span', {
+                                key: 'status',
+                                className: `exec-status ${exec.status}`,
+                            }, exec.status === 'completed' ? '✓' : '✗'),
+                            React.createElement('span', {
+                                key: 'duration',
+                                className: 'exec-duration',
+                            }, formatDuration(exec.duration_ms)),
+                        ])
+                    ),
+                    workflowExecutionsLoading && React.createElement('div', {
+                        key: 'loading',
+                        className: 'executions-loading',
+                    }, 'Loading...'),
+                ])
+            );
+        }
+
         // Credential Editor Modal Component
         function CredentialEditorModal({ credential, onClose, onSave }) {
             const credentialTypes = window.credentialTypes || [];
@@ -5885,6 +6120,51 @@
         }
 
         // Editor Component
+        // Editor Header with tabs
+        function EditorHeader() {
+            const currentWorkflowPath = useWorkflowStore((state) => state.currentWorkflowPath);
+            const editorTab = useWorkflowStore((state) => state.editorTab);
+            const setEditorTab = useWorkflowStore((state) => state.setEditorTab);
+            const goToDashboard = useWorkflowStore((state) => state.goToDashboard);
+            const isReadOnly = useWorkflowStore((state) => state.isReadOnly);
+
+            // Display name: strip .json extension
+            const displayName = currentWorkflowPath ? currentWorkflowPath.replace(/\.json$/, '') : '';
+
+            return React.createElement('div', {
+                className: 'editor-header',
+                'data-testid': 'editor-header',
+            }, [
+                React.createElement('div', { key: 'left', className: 'editor-header-left' }, [
+                    React.createElement('button', {
+                        key: 'back',
+                        className: 'editor-back-btn',
+                        onClick: goToDashboard,
+                        'data-testid': 'editor-back-btn',
+                    }, '← Dashboard'),
+                    React.createElement('span', {
+                        key: 'name',
+                        className: 'editor-workflow-name',
+                        'data-testid': 'editor-workflow-name',
+                    }, displayName),
+                ]),
+                !isReadOnly && React.createElement('div', { key: 'tabs', className: 'editor-tabs' }, [
+                    React.createElement('button', {
+                        key: 'editor',
+                        className: `editor-tab ${editorTab === 'editor' ? 'active' : ''}`,
+                        onClick: () => setEditorTab('editor'),
+                        'data-testid': 'editor-tab-editor',
+                    }, 'Editor'),
+                    React.createElement('button', {
+                        key: 'executions',
+                        className: `editor-tab ${editorTab === 'executions' ? 'active' : ''}`,
+                        onClick: () => setEditorTab('executions'),
+                        'data-testid': 'editor-tab-executions',
+                    }, 'Executions'),
+                ]),
+            ]);
+        }
+
         function Editor() {
             const addNode = useWorkflowStore((state) => state.addNode);
             const deleteSelected = useWorkflowStore((state) => state.deleteSelected);
@@ -5899,6 +6179,7 @@
             const isReadOnly = useWorkflowStore((state) => state.isReadOnly);
             const executionViewerData = useWorkflowStore((state) => state.executionViewerData);
             const closeExecutionViewer = useWorkflowStore((state) => state.closeExecutionViewer);
+            const editorTab = useWorkflowStore((state) => state.editorTab);
 
             // Keyboard shortcuts
             useEffect(() => {
@@ -5944,6 +6225,9 @@
             };
 
             return React.createElement(ReactFlowProvider, null, [
+                // Header with workflow name and tabs
+                React.createElement(EditorHeader, { key: 'header' }),
+                // Readonly banner when viewing an execution
                 isReadOnly && executionViewerData && React.createElement('div', {
                     key: 'readonly-banner',
                     className: 'readonly-banner',
@@ -5962,14 +6246,17 @@
                         'data-testid': 'readonly-back-btn',
                     }, '← Back to Executions'),
                 ]),
+                // Execution logs when viewing an execution
                 isReadOnly && executionViewerData && React.createElement(ExecutionLogs, {
                     key: 'execution-logs',
                     executionId: executionViewerData.id,
                 }),
-                React.createElement('div', { key: 'main', className: 'editor', 'data-testid': 'editor' }, [
+                // Main content: Editor or Workflow Executions based on tab
+                (editorTab === 'editor' || isReadOnly) ? React.createElement('div', { key: 'main', className: 'editor', 'data-testid': 'editor' }, [
                     React.createElement(Sidebar, { key: 'sidebar', onAddNode: handleAddNode }),
                     React.createElement(Canvas, { key: 'canvas', onAddNode: handleAddNode }),
-                ]),
+                ]) : React.createElement(WorkflowExecutionsTab, { key: 'workflow-executions' }),
+                // Node editor dialog
                 openEditorNodeId && React.createElement(NodeEditorDialog, {
                     key: 'node-editor',
                     nodeId: openEditorNodeId,

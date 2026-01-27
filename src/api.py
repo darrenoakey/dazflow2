@@ -1007,14 +1007,27 @@ async def get_queue():
 # list executions endpoint
 # returns paginated list of completed/errored executions
 @api_router.get("/executions")
-async def list_executions(limit: int = 100, before: float | None = None):
+async def list_executions(
+    limit: int = 100,
+    before: float | None = None,
+    workflow_path: str | None = None,
+):
     """List executions, newest first, with pagination.
 
     Returns cached data that refreshes every 10 seconds server-side.
     Multiple clients hitting this endpoint share the same cached result.
+
+    Args:
+        limit: Maximum number of executions to return
+        before: Only return executions with completed_at < this value (for pagination)
+        workflow_path: Filter to only executions of this workflow
     """
     # Use cached data
     executions = list(_executions_cache.get("items", []))
+
+    # Filter by workflow path if provided
+    if workflow_path is not None:
+        executions = [e for e in executions if e.get("workflow_path") == workflow_path]
 
     # Filter by before cursor if provided (for pagination)
     if before is not None:

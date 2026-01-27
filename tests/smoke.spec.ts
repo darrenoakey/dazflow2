@@ -101,4 +101,55 @@ test.describe('Smoke Tests - Production Instance', () => {
     expect(data.status).toBe('ok');
     expect(data.start_time).toBeDefined();
   });
+
+  test('editor shows header with workflow name and tabs', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 10000 });
+
+    // Open sample.json workflow
+    await page.getByTestId('file-item-sample.json').dblclick();
+    await expect(page.getByTestId('editor')).toBeVisible({ timeout: 10000 });
+
+    // Editor header should be visible
+    await expect(page.getByTestId('editor-header')).toBeVisible();
+    await expect(page.getByTestId('editor-workflow-name')).toHaveText('sample');
+
+    // Tabs should be visible
+    await expect(page.getByTestId('editor-tab-editor')).toBeVisible();
+    await expect(page.getByTestId('editor-tab-executions')).toBeVisible();
+
+    // Editor tab should be active by default
+    await expect(page.getByTestId('editor-tab-editor')).toHaveClass(/active/);
+  });
+
+  test('editor executions tab shows workflow executions', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 10000 });
+
+    // Open sample.json workflow
+    await page.getByTestId('file-item-sample.json').dblclick();
+    await expect(page.getByTestId('editor')).toBeVisible({ timeout: 10000 });
+
+    // Click Executions tab
+    await page.getByTestId('editor-tab-executions').click();
+    await expect(page.getByTestId('editor-tab-executions')).toHaveClass(/active/);
+
+    // Workflow executions tab should be visible
+    await expect(page.getByTestId('workflow-executions-tab')).toBeVisible();
+  });
+
+  test('editor back button returns to dashboard', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 10000 });
+
+    // Open sample.json workflow
+    await page.getByTestId('file-item-sample.json').dblclick();
+    await expect(page.getByTestId('editor')).toBeVisible({ timeout: 10000 });
+
+    // Click back button
+    await page.getByTestId('editor-back-btn').click();
+
+    // Should return to dashboard
+    await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 10000 });
+  });
 });
