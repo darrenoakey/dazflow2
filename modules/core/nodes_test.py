@@ -122,3 +122,59 @@ def test_register_scheduled_uses_defaults():
     result = register_scheduled(node_data, lambda: None)
     # Default is 5 minutes = 300 seconds
     assert result["interval_seconds"] == 300
+
+
+# ##################################################################
+# test register_scheduled with cron mode
+def test_register_scheduled_cron_mode_returns_timing_info():
+    node_data = {"mode": "cron", "cron": "*/5 * * * *"}
+    result = register_scheduled(node_data, lambda: None)
+    assert result["type"] == "timed"
+    assert "trigger_at" in result
+    assert result["cron"] == "*/5 * * * *"
+
+
+def test_register_scheduled_cron_mode_calculates_future_trigger():
+    import time
+
+    node_data = {"mode": "cron", "cron": "0 * * * *"}  # Every hour at minute 0
+    result = register_scheduled(node_data, lambda: None)
+    # Trigger should be in the future
+    assert result["trigger_at"] > time.time()
+
+
+def test_register_scheduled_cron_mode_with_last_execution():
+    import time
+
+    node_data = {"mode": "cron", "cron": "*/5 * * * *"}
+    last_time = time.time() - 60  # 1 minute ago
+    result = register_scheduled(node_data, lambda: None, last_execution_time=last_time)
+    assert result["type"] == "timed"
+    assert "trigger_at" in result
+
+
+def test_register_scheduled_cron_mode_invalid_expression():
+    node_data = {"mode": "cron", "cron": "invalid cron"}
+    result = register_scheduled(node_data, lambda: None)
+    # Should fall back gracefully with an error
+    assert result["type"] == "timed"
+    assert "error" in result
+    assert result["interval_seconds"] == 300  # Falls back to 5-minute interval
+
+
+def test_register_scheduled_interval_mode_explicit():
+    # Verify interval mode still works when mode is explicitly set
+    node_data = {"mode": "interval", "interval": 10, "unit": "seconds"}
+    result = register_scheduled(node_data, lambda: None)
+    assert result["type"] == "timed"
+    assert result["interval_seconds"] == 10
+    assert "cron" not in result
+
+
+def test_register_scheduled_cron_weekday_expression():
+    # Test a more complex cron expression: 9am on weekdays
+    node_data = {"mode": "cron", "cron": "0 9 * * 1-5"}
+    result = register_scheduled(node_data, lambda: None)
+    assert result["type"] == "timed"
+    assert result["cron"] == "0 9 * * 1-5"
+    assert "trigger_at" in result

@@ -65,3 +65,17 @@ Each node type is defined in two places:
 - **Frontend:** `modules/*/nodes_ui.js` - UI definition with `getProperties()`
 
 The `register` key in NODE_TYPES indicates a trigger node that sets up scheduling.
+
+### Cache Busting
+
+Module UI files (`modules/*/nodes_ui.js`) are loaded with `?v=<server_start_time>` query parameter.
+This ensures browsers fetch fresh JS after server restart - no hard refresh needed.
+
+The cache busting is added in `src/api.py` in the `/api/modules` endpoint.
+
+### Python Environment
+
+The `run` script uses `/opt/homebrew/bin/python3.13` explicitly because:
+- `auto` daemon may have different PATH than interactive shell
+- uvicorn is installed in Python 3.13's site-packages
+- Using `#!/usr/bin/env python3` can pick up wrong Python (e.g., Xcode's)

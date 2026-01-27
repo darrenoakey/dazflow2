@@ -3801,8 +3801,16 @@
             const isReadOnly = useWorkflowStore((state) => state.isReadOnly);
             const agents = useWorkflowStore((state) => state.agents);
             const tags = useWorkflowStore((state) => state.tags);
+            const loadAgents = useWorkflowStore((state) => state.loadAgents);
+            const loadTags = useWorkflowStore((state) => state.loadTags);
 
             const [localName, setLocalName] = useState(node?.name || '');
+
+            // Load agents and tags if not already loaded
+            useEffect(() => {
+                if (agents.length === 0) loadAgents();
+                if (tags.length === 0) loadTags();
+            }, []);
             const [nameError, setNameError] = useState(false);
             const [showOutputEditor, setShowOutputEditor] = useState(false);
 
@@ -4955,6 +4963,11 @@
             useEffect(() => {
                 loadAgents();
                 loadTags();
+                // Auto-refresh agents every 5 seconds
+                const interval = setInterval(() => {
+                    loadAgents();
+                }, 5000);
+                return () => clearInterval(interval);
             }, []);
 
             const handleCreateAgent = () => {

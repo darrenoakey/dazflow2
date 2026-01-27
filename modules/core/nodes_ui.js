@@ -34,19 +34,32 @@ export const nodeTypes = [
             <circle cx="12" cy="12" r="10"/>
             <polyline points="12 6 12 12 16 14"/>
         </svg>`,
-        defaultData: { interval: 5, unit: 'minutes' },
+        defaultData: { mode: 'interval', interval: 5, unit: 'minutes', cron: '*/5 * * * *' },
         getConnectors: () => ({
             inputs: [],
             outputs: [{ id: 'trigger', name: 'trigger' }],
         }),
         getProperties: (data) => [
-            { id: 'interval', label: 'Interval', type: 'number', value: data.interval ?? 5, min: 1 },
-            { id: 'unit', label: 'Unit', type: 'select', value: data.unit ?? 'minutes', options: [
-                { value: 'seconds', label: 'Seconds' },
-                { value: 'minutes', label: 'Minutes' },
-                { value: 'hours', label: 'Hours' },
-                { value: 'days', label: 'Days' },
+            { id: 'mode', label: 'Mode', type: 'select', value: data.mode ?? 'interval', options: [
+                { value: 'interval', label: 'Interval' },
+                { value: 'cron', label: 'Cron Expression' },
             ]},
+            // Interval mode properties
+            ...(data.mode !== 'cron' ? [
+                { id: 'interval', label: 'Interval', type: 'number', value: data.interval ?? 5, min: 1 },
+                { id: 'unit', label: 'Unit', type: 'select', value: data.unit ?? 'minutes', options: [
+                    { value: 'seconds', label: 'Seconds' },
+                    { value: 'minutes', label: 'Minutes' },
+                    { value: 'hours', label: 'Hours' },
+                    { value: 'days', label: 'Days' },
+                ]},
+            ] : []),
+            // Cron mode properties
+            ...(data.mode === 'cron' ? [
+                { id: 'cron', label: 'Cron Expression', type: 'text', value: data.cron ?? '*/5 * * * *',
+                  placeholder: '*/5 * * * *',
+                  instructions: 'Format: minute hour day month weekday (e.g., "0 9 * * 1-5" for 9am weekdays)' },
+            ] : []),
         ],
         execute: (nodeData, inputs) => {
             return [{ time: new Date().toISOString() }];

@@ -9,6 +9,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
+from croniter import croniter
+
 
 def execute_start(_node_data: dict, _input_data: Any, _credential_data: dict | None = None) -> list:
     """Start node - just passes through or creates empty item."""
@@ -107,34 +109,69 @@ def register_scheduled(node_data: dict, _callback: Callable, last_execution_time
     """Register a scheduled trigger. Returns timing info for scheduler.
 
     Args:
-        node_data: Node configuration (interval, unit)
+        node_data: Node configuration (mode, interval, unit, cron)
         _callback: Callback function (not used here, handled by scheduler)
         last_execution_time: Unix timestamp of the last execution, or None if never run
+
+    Supports two modes:
+        - interval: Run every X seconds/minutes/hours/days
+        - cron: Run according to cron expression (e.g., "0 9 * * 1-5" for weekdays at 9am)
     """
-    interval = node_data.get("interval", 5)
-    unit = node_data.get("unit", "minutes")
-
-    # Convert to seconds
-    multipliers = {"seconds": 1, "minutes": 60, "hours": 3600, "days": 86400}
-    interval_seconds = interval * multipliers.get(unit, 60)
-
+    mode = node_data.get("mode", "interval")
     now = time.time()
 
-    if last_execution_time is None:
-        # Never executed before - fire immediately
-        trigger_at = now
-    else:
-        # Calculate next trigger based on last execution
-        trigger_at = last_execution_time + interval_seconds
-        # If that time has already passed, fire immediately
-        if trigger_at <= now:
-            trigger_at = now
+    if mode == "cron":
+        cron_expression = node_data.get("cron", "*/5 * * * *")  # Default: every 5 minutes
+        try:
+            # Use the current time as base for calculating next trigger
+            base_time = datetime.fromtimestamp(last_execution_time) if last_execution_time else datetime.now()
+            cron = croniter(cron_expression, base_time)
+            next_time = cron.get_next(datetime)
+            trigger_at = next_time.timestamp()
 
-    return {
-        "type": "timed",
-        "trigger_at": trigger_at,
-        "interval_seconds": interval_seconds,
-    }
+            # If the next trigger time is in the past (shouldn't happen often), adjust
+            if trigger_at <= now:
+                cron = croniter(cron_expression, datetime.now())
+                next_time = cron.get_next(datetime)
+                trigger_at = next_time.timestamp()
+
+            return {
+                "type": "timed",
+                "trigger_at": trigger_at,
+                "cron": cron_expression,
+            }
+        except (ValueError, KeyError) as e:
+            # Invalid cron expression - fall back to 5-minute interval
+            return {
+                "type": "timed",
+                "trigger_at": now + 300,
+                "interval_seconds": 300,
+                "error": f"Invalid cron expression: {e}",
+            }
+    else:
+        # Interval mode (default)
+        interval = node_data.get("interval", 5)
+        unit = node_data.get("unit", "minutes")
+
+        # Convert to seconds
+        multipliers = {"seconds": 1, "minutes": 60, "hours": 3600, "days": 86400}
+        interval_seconds = interval * multipliers.get(unit, 60)
+
+        if last_execution_time is None:
+            # Never executed before - fire immediately
+            trigger_at = now
+        else:
+            # Calculate next trigger based on last execution
+            trigger_at = last_execution_time + interval_seconds
+            # If that time has already passed, fire immediately
+            if trigger_at <= now:
+                trigger_at = now
+
+        return {
+            "type": "timed",
+            "trigger_at": trigger_at,
+            "interval_seconds": interval_seconds,
+        }
 
 
 # Node type registry
