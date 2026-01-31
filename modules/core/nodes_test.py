@@ -79,7 +79,136 @@ def test_execute_if_accepts_credential_data():
 
 def test_execute_http_accepts_credential_data():
     result = execute_http({}, None, None)
-    assert "status" in result[0]
+    assert "error" in result[0]  # Empty URL returns error
+
+
+def test_execute_http_requires_url():
+    result = execute_http({"method": "GET"}, None, None)
+    assert result[0]["error"] == "URL is required"
+
+
+def test_execute_http_get_request(httpserver):
+    """Test basic GET request."""
+    httpserver.expect_request("/test").respond_with_json({"message": "hello"})
+    result = execute_http(
+        {"url": httpserver.url_for("/test"), "method": "GET"},
+        None,
+        None,
+    )
+    assert result[0]["status"] == 200
+    assert result[0]["body"] == {"message": "hello"}
+
+
+def test_execute_http_post_with_json_body(httpserver):
+    """Test POST request with JSON body."""
+    httpserver.expect_request("/api", method="POST").respond_with_json({"success": True})
+    result = execute_http(
+        {
+            "url": httpserver.url_for("/api"),
+            "method": "POST",
+            "body_mode": "json",
+            "json_body": '{"name": "test"}',
+        },
+        None,
+        None,
+    )
+    assert result[0]["status"] == 200
+    assert result[0]["body"] == {"success": True}
+
+
+def test_execute_http_post_with_body_fields(httpserver):
+    """Test POST request with body fields."""
+    httpserver.expect_request("/api", method="POST").respond_with_json({"received": True})
+    result = execute_http(
+        {
+            "url": httpserver.url_for("/api"),
+            "method": "POST",
+            "body_mode": "fields",
+            "body_fields": [
+                {"name": "user", "value": "alice"},
+                {"name": "count", "value": "42"},
+            ],
+        },
+        None,
+        None,
+    )
+    assert result[0]["status"] == 200
+
+
+def test_execute_http_with_headers(httpserver):
+    """Test request with custom headers."""
+    httpserver.expect_request(
+        "/auth",
+        headers={"Authorization": "Bearer token123"},
+    ).respond_with_json({"authenticated": True})
+    result = execute_http(
+        {
+            "url": httpserver.url_for("/auth"),
+            "method": "GET",
+            "headers": [{"name": "Authorization", "value": "Bearer token123"}],
+        },
+        None,
+        None,
+    )
+    assert result[0]["status"] == 200
+    assert result[0]["body"] == {"authenticated": True}
+
+
+def test_execute_http_handles_http_error(httpserver):
+    """Test handling of HTTP error responses."""
+    httpserver.expect_request("/notfound").respond_with_json(
+        {"error": "Not found"}, status=404
+    )
+    result = execute_http(
+        {"url": httpserver.url_for("/notfound"), "method": "GET"},
+        None,
+        None,
+    )
+    assert "error" in result[0]
+    assert result[0]["status"] == 404
+
+
+def test_execute_http_invalid_json_body():
+    """Test error handling for invalid JSON body."""
+    result = execute_http(
+        {
+            "url": "https://example.com",
+            "method": "POST",
+            "body_mode": "json",
+            "json_body": "{invalid json}",
+        },
+        None,
+        None,
+    )
+    assert "error" in result[0]
+    assert "Invalid JSON body" in result[0]["error"]
+
+
+def test_execute_http_put_request(httpserver):
+    """Test PUT request."""
+    httpserver.expect_request("/resource", method="PUT").respond_with_json({"updated": True})
+    result = execute_http(
+        {
+            "url": httpserver.url_for("/resource"),
+            "method": "PUT",
+            "body_mode": "json",
+            "json_body": '{"data": "new"}',
+        },
+        None,
+        None,
+    )
+    assert result[0]["status"] == 200
+
+
+def test_execute_http_delete_request(httpserver):
+    """Test DELETE request."""
+    httpserver.expect_request("/resource/1", method="DELETE").respond_with_json({"deleted": True})
+    result = execute_http(
+        {"url": httpserver.url_for("/resource/1"), "method": "DELETE"},
+        None,
+        None,
+    )
+    assert result[0]["status"] == 200
 
 
 def test_execute_rss_accepts_credential_data():

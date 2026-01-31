@@ -75,11 +75,110 @@ def execute_if(node_data: dict, input_data: Any, _credential_data: dict | None =
 
 
 def execute_http(node_data: dict, _input_data: Any, _credential_data: dict | None = None) -> list:
-    """HTTP node - makes HTTP requests (placeholder for now)."""
+    """HTTP node - makes HTTP/HTTPS requests.
+
+    Supports GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS methods.
+    Can send JSON body or form-encoded data.
+    """
+    import urllib.request
+    import urllib.error
+    import urllib.parse
+
     url = node_data.get("url", "")
-    method = node_data.get("method", "GET")
-    # TODO: Implement actual HTTP requests
-    return [{"url": url, "method": method, "status": "not_implemented"}]
+    method = node_data.get("method", "GET").upper()
+    timeout = node_data.get("timeout", 30)
+
+    if not url:
+        return [{"error": "URL is required"}]
+
+    # Build headers from fieldlist
+    headers_list = node_data.get("headers", [])
+    headers = {}
+    for header in headers_list:
+        name = header.get("name", "")
+        value = header.get("value", "")
+        if name:
+            headers[name] = value
+
+    # Build request body
+    body_mode = node_data.get("body_mode", "none")
+    body_data = None
+
+    if body_mode == "json":
+        json_body = node_data.get("json_body", "")
+        if json_body:
+            try:
+                # Validate JSON
+                json.loads(json_body)
+                body_data = json_body.encode("utf-8")
+                if "Content-Type" not in headers:
+                    headers["Content-Type"] = "application/json"
+            except json.JSONDecodeError as e:
+                return [{"error": f"Invalid JSON body: {e}"}]
+    elif body_mode == "fields":
+        body_fields = node_data.get("body_fields", [])
+        body_obj = {}
+        for field in body_fields:
+            name = field.get("name", "")
+            value = field.get("value", "")
+            if name:
+                # Try to parse value as JSON for nested objects/arrays/numbers
+                try:
+                    body_obj[name] = json.loads(value)
+                except (json.JSONDecodeError, TypeError):
+                    body_obj[name] = value
+        if body_obj:
+            body_data = json.dumps(body_obj).encode("utf-8")
+            if "Content-Type" not in headers:
+                headers["Content-Type"] = "application/json"
+
+    try:
+        request = urllib.request.Request(url, data=body_data, headers=headers, method=method)
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            response_body = response.read().decode("utf-8")
+            response_headers = dict(response.headers)
+
+            # Try to parse response as JSON
+            try:
+                response_data = json.loads(response_body)
+            except json.JSONDecodeError:
+                response_data = response_body
+
+            return [
+                {
+                    "status": response.status,
+                    "statusText": response.reason,
+                    "headers": response_headers,
+                    "body": response_data,
+                    "url": response.url,
+                }
+            ]
+    except urllib.error.HTTPError as e:
+        # HTTP error (4xx, 5xx)
+        error_body = ""
+        try:
+            error_body = e.read().decode("utf-8")
+            try:
+                error_body = json.loads(error_body)
+            except json.JSONDecodeError:
+                pass
+        except Exception:
+            pass
+        return [
+            {
+                "error": f"HTTP {e.code}: {e.reason}",
+                "status": e.code,
+                "statusText": e.reason,
+                "headers": dict(e.headers) if e.headers else {},
+                "body": error_body,
+            }
+        ]
+    except urllib.error.URLError as e:
+        return [{"error": f"URL error: {e.reason}"}]
+    except TimeoutError:
+        return [{"error": f"Request timed out after {timeout} seconds"}]
+    except Exception as e:
+        return [{"error": str(e)}]
 
 
 def execute_rss(node_data: dict, _input_data: Any, _credential_data: dict | None = None) -> list:

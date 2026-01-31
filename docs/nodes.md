@@ -133,14 +133,69 @@ Conditional filter. Only passes through items where condition is true.
 ---
 
 ### `http`
-Makes HTTP requests. (TODO: Implementation pending)
+Makes HTTP/HTTPS requests to external APIs.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `url` | string | Request URL |
-| `method` | string | HTTP method |
+| `url` | string | Request URL (required) |
+| `method` | string | HTTP method: `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, `OPTIONS` |
+| `headers` | array | List of `{name, value}` header objects |
+| `body_mode` | string | Body type: `none`, `json`, or `fields` |
+| `json_body` | string | Raw JSON body (when `body_mode` is `json`) |
+| `body_fields` | array | List of `{name, value}` body fields (when `body_mode` is `fields`) |
+| `timeout` | number | Request timeout in seconds (default: 30) |
 
 **Kind**: array
+**Output**:
+```json
+{
+  "status": 200,
+  "statusText": "OK",
+  "headers": {"Content-Type": "application/json", ...},
+  "body": {"response": "data"},
+  "url": "https://..."
+}
+```
+
+On error:
+```json
+{"error": "HTTP 404: Not Found", "status": 404, "statusText": "Not Found", "body": "..."}
+```
+
+**Examples**:
+```json
+// Simple GET
+{"url": "https://api.example.com/data", "method": "GET"}
+
+// POST with JSON body
+{
+  "url": "https://api.example.com/users",
+  "method": "POST",
+  "body_mode": "json",
+  "json_body": "{\"name\": \"Alice\", \"email\": \"alice@example.com\"}"
+}
+
+// POST with key-value fields
+{
+  "url": "https://api.example.com/users",
+  "method": "POST",
+  "body_mode": "fields",
+  "body_fields": [
+    {"name": "name", "value": "{{$.input.name}}"},
+    {"name": "count", "value": "42"}
+  ]
+}
+
+// With custom headers
+{
+  "url": "https://api.example.com/protected",
+  "method": "GET",
+  "headers": [
+    {"name": "Authorization", "value": "Bearer {{$.token}}"},
+    {"name": "Accept", "value": "application/json"}
+  ]
+}
+```
 
 ---
 

@@ -191,7 +191,7 @@ export const nodeTypes = [
             <path d="M2 12h20"/>
             <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
         </svg>`,
-        defaultData: { url: '', method: 'GET' },
+        defaultData: { url: '', method: 'GET', headers: [], body_mode: 'none', json_body: '', body_fields: [], timeout: 30 },
         getConnectors: () => ({
             inputs: [{ id: 'trigger', name: 'trigger' }],
             outputs: [
@@ -206,8 +206,30 @@ export const nodeTypes = [
                 { value: 'PUT', label: 'PUT' },
                 { value: 'DELETE', label: 'DELETE' },
                 { value: 'PATCH', label: 'PATCH' },
+                { value: 'HEAD', label: 'HEAD' },
+                { value: 'OPTIONS', label: 'OPTIONS' },
             ]},
-            { id: 'url', label: 'URL', type: 'text', value: data.url ?? '', placeholder: 'https://api.example.com/endpoint' },
+            { id: 'url', label: 'URL', type: 'text', value: data.url ?? '', placeholder: 'https://api.example.com/endpoint',
+              instructions: 'Use {{ $.field }} to reference input data' },
+            { id: 'headers', label: 'Headers', type: 'fieldlist', value: data.headers ?? [],
+              instructions: 'Add custom headers (e.g., Authorization, Accept)' },
+            { id: 'body_mode', label: 'Body', type: 'select', value: data.body_mode ?? 'none', options: [
+                { value: 'none', label: 'None' },
+                { value: 'json', label: 'Raw JSON' },
+                { value: 'fields', label: 'Key-Value Fields' },
+            ]},
+            // JSON body textarea (shown when body_mode is 'json')
+            ...(data.body_mode === 'json' ? [
+                { id: 'json_body', label: 'JSON Body', type: 'textarea', value: data.json_body ?? '',
+                  placeholder: '{"key": "value"}',
+                  instructions: 'Raw JSON body. Use {{ $.field }} for dynamic values.' },
+            ] : []),
+            // Body fields (shown when body_mode is 'fields')
+            ...(data.body_mode === 'fields' ? [
+                { id: 'body_fields', label: 'Body Fields', type: 'fieldlist', value: data.body_fields ?? [],
+                  instructions: 'Fields are sent as JSON. Values can use {{ $.field }} syntax.' },
+            ] : []),
+            { id: 'timeout', label: 'Timeout (seconds)', type: 'number', value: data.timeout ?? 30, min: 1, max: 300 },
         ],
     },
 

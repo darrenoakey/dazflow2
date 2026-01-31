@@ -145,17 +145,19 @@ def test_execute_if_single_item_input():
 
 # ##################################################################
 # test execute_http
-# verifies http node returns placeholder
-def test_execute_http():
-    node_data = {"url": "https://example.com", "method": "POST"}
+# verifies http node makes real HTTP requests
+def test_execute_http(httpserver):
+    httpserver.expect_request("/test").respond_with_json({"ok": True})
+    node_data = {"url": httpserver.url_for("/test"), "method": "GET"}
     result = execute_http(node_data, None)
-    assert result == [{"url": "https://example.com", "method": "POST", "status": "not_implemented"}]
+    assert result[0]["status"] == 200
+    assert result[0]["body"] == {"ok": True}
 
 
-def test_execute_http_defaults():
+def test_execute_http_requires_url():
     node_data = {}
     result = execute_http(node_data, None)
-    assert result == [{"url": "", "method": "GET", "status": "not_implemented"}]
+    assert result == [{"error": "URL is required"}]
 
 
 # ##################################################################
