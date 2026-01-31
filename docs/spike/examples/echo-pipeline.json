@@ -1,0 +1,52 @@
+{
+  "name": "echo-pipeline",
+  "description": "Simple test pipeline: input -> transform -> output",
+  "mode": "pipeline",
+  "stateRoot": "test_output/",
+  "scanInterval": 30,
+  "maxConcurrentEntities": 5,
+  "retryPolicy": {
+    "maxAttempts": 3,
+    "backoffSeconds": [5, 10, 30]
+  },
+  "stages": [
+    {
+      "id": "input",
+      "name": "Input Files",
+      "type": "source",
+      "pattern": "input/{id}.txt",
+      "description": "Text files to process"
+    },
+    {
+      "id": "transformed",
+      "name": "Transformed",
+      "type": "transform",
+      "input": "input",
+      "pattern": "transformed/{id}.txt",
+      "node": {
+        "typeId": "transform",
+        "data": {
+          "expression": "$.input.content.toUpperCase()"
+        }
+      }
+    },
+    {
+      "id": "output",
+      "name": "Final Output",
+      "type": "transform",
+      "input": "transformed",
+      "pattern": "output/{id}.json",
+      "node": {
+        "typeId": "set",
+        "data": {
+          "fields": [
+            {"name": "id", "value": "{{$.entity.id}}"},
+            {"name": "original", "value": "{{$.input.content}}"},
+            {"name": "transformed", "value": "{{$.transformed.content}}"},
+            {"name": "processed_at", "value": "{{new Date().toISOString()}}"}
+          ]
+        }
+      }
+    }
+  ]
+}

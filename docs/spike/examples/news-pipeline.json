@@ -1,0 +1,57 @@
+{
+  "name": "news-pipeline",
+  "description": "Processes RSS items through scoring and publishing",
+  "mode": "pipeline",
+  "stateRoot": "data/",
+  "scanInterval": 60,
+  "maxConcurrentEntities": 10,
+  "retryPolicy": {
+    "maxAttempts": 3,
+    "backoffSeconds": [60, 300, 900]
+  },
+  "stages": [
+    {
+      "id": "rss_items",
+      "name": "RSS Items",
+      "type": "source",
+      "pattern": "feeds/{feed}/{guid}.json",
+      "description": "Raw RSS items fetched from configured feeds"
+    },
+    {
+      "id": "score",
+      "name": "Score",
+      "type": "transform",
+      "input": "rss_items",
+      "pattern": "scores/{feed}/{guid}.json",
+      "node": {
+        "typeId": "http",
+        "data": {
+          "url": "http://scorer:8080/score",
+          "method": "POST",
+          "body_mode": "json",
+          "json_body": "{\"url\": \"{{$.rss_items.content.link}}\", \"title\": \"{{$.rss_items.content.title}}\"}"
+        }
+      }
+    },
+    {
+      "id": "notification",
+      "name": "Notification",
+      "type": "transform",
+      "input": "score",
+      "pattern": "notifications/{feed}/{guid}.json",
+      "node": {
+        "typeId": "if",
+        "data": {
+          "condition": "{{$.score.content.rank >= 8}}"
+        }
+      },
+      "then": {
+        "typeId": "discord_send",
+        "data": {
+          "channel_id": "{{$env.DISCORD_NEWS_CHANNEL}}",
+          "content": "**{{$.rss_items.content.title}}**\nScore: {{$.score.content.rank}}/10\n{{$.rss_items.content.link}}"
+        }
+      }
+    }
+  ]
+}

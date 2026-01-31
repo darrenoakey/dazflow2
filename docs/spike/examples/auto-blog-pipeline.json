@@ -1,0 +1,93 @@
+{
+  "name": "auto-blog-pipeline",
+  "description": "Transforms daily logs into blog posts, podcasts, and audio",
+  "mode": "pipeline",
+  "stateRoot": "output/",
+  "scanInterval": 300,
+  "maxConcurrentEntities": 5,
+  "retryPolicy": {
+    "maxAttempts": 6,
+    "backoffSeconds": [60, 300, 900, 3600, 14400, 86400]
+  },
+  "stages": [
+    {
+      "id": "logs",
+      "name": "Daily Logs",
+      "type": "source",
+      "pattern": "daily/{date}/",
+      "description": "Raw log files collected from claude, codex, git commits"
+    },
+    {
+      "id": "summary",
+      "name": "Summary",
+      "type": "transform",
+      "input": "logs",
+      "pattern": "daily/{date}/summary.txt",
+      "node": {
+        "typeId": "claude_agent",
+        "data": {
+          "model": "claude-3-haiku",
+          "system": "You are a technical writer. Summarize the day's work from the provided log files.",
+          "prompt": "Summarize the following development logs into a coherent 2000-4000 word summary:\n\n{{$.logs.content}}",
+          "tools": ["read_file"]
+        }
+      },
+      "validation": {
+        "minSize": 500
+      }
+    },
+    {
+      "id": "blog",
+      "name": "Blog Post",
+      "type": "transform",
+      "input": "summary",
+      "pattern": "final/{date}-daily-digest.md",
+      "node": {
+        "typeId": "claude_agent",
+        "data": {
+          "model": "claude-3-sonnet",
+          "system": "You are a technical blogger with a friendly, informative voice.",
+          "prompt": "Transform this summary into an engaging blog post:\n\n{{$.summary.content}}"
+        }
+      },
+      "validation": {
+        "minSize": 500
+      }
+    },
+    {
+      "id": "podcast",
+      "name": "Podcast Script",
+      "type": "transform",
+      "input": "blog",
+      "pattern": "podcasts/{date}-podcast.md",
+      "node": {
+        "typeId": "claude_agent",
+        "data": {
+          "model": "claude-3-opus",
+          "system": "You are a podcast scriptwriter. Write conversational scripts for a ~10 minute audio episode.",
+          "prompt": "Transform this blog post into a podcast script:\n\n{{$.blog.content}}"
+        }
+      },
+      "validation": {
+        "minSize": 500
+      }
+    },
+    {
+      "id": "audio",
+      "name": "Audio File",
+      "type": "transform",
+      "input": "podcast",
+      "pattern": "audio/{date}-podcast.mp3",
+      "node": {
+        "typeId": "run_command",
+        "data": {
+          "command": "~/bin/tts",
+          "args": ["{{$.podcast.path}}", "-o", "{{output_path}}", "-v", "gary"]
+        }
+      },
+      "validation": {
+        "minSize": 50000
+      }
+    }
+  ]
+}

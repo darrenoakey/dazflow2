@@ -156,9 +156,7 @@ def test_execute_http_with_headers(httpserver):
 
 def test_execute_http_handles_http_error(httpserver):
     """Test handling of HTTP error responses."""
-    httpserver.expect_request("/notfound").respond_with_json(
-        {"error": "Not found"}, status=404
-    )
+    httpserver.expect_request("/notfound").respond_with_json({"error": "Not found"}, status=404)
     result = execute_http(
         {"url": httpserver.url_for("/notfound"), "method": "GET"},
         None,
