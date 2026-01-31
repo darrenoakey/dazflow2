@@ -173,3 +173,37 @@ Test workflows should be named `*_test.json` or `test_*.json`.
 - `node_output_contains(name, key, value?)` - Partial output match
 - `node_output_matches(name, predicate)` - Custom predicate
 - `no_errors()` - No node errors
+
+## Pipeline Workflow System
+
+State-based idempotent workflows for data pipelines (auto-blog, news-feed patterns).
+
+### Key Files
+- **Infrastructure:** `src/pipeline/` (patterns, state_store, staleness, scanner)
+- **Nodes:** `modules/pipeline/` (state_trigger, state_read, state_write, state_check, state_list)
+- **Design docs:** `docs/spike/` (research, design decisions, examples)
+
+### How It Works
+
+Pipeline nodes use the standard workflow infrastructure but add:
+1. **Pattern matching:** `{variable}` syntax extracts entity IDs from paths
+2. **State manifests:** `.dazflow/manifests/` tracks code hash, content hash, input hashes
+3. **Staleness detection:** Rebuilds if code changes, inputs change, or output missing
+4. **Failure tracking:** `.dazflow/failures/` with exponential backoff
+
+### Pipeline Node Types
+
+| Node | Purpose |
+|------|---------|
+| `state_trigger` | Watch pattern, trigger on new/stale entities |
+| `state_read` | Read state content for entity |
+| `state_write` | Write with manifest tracking |
+| `state_check` | Check existence (for IF logic) |
+| `state_list` | List all entities matching pattern |
+
+### Cross-Workflow Triggers
+
+Workflows share state through patterns:
+- Workflow A writes to `articles/{slug}.md`
+- Workflow B's `state_trigger` watches `articles/{slug}.md`
+- When A produces, B finds new work automatically
