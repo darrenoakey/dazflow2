@@ -141,6 +141,48 @@ The system includes AI-powered features via Claude Agent SDK:
 - Access files outside data directory
 - Make permanent external changes
 
+## Editor UI Layout
+
+### Header with Tabs
+
+The workflow editor has a header bar with:
+- "← Dashboard" button to return to main view
+- Workflow name (without .json extension)
+- Save status indicator (Saved/Modified/Saving)
+- Tabs: Editor | Executions | History
+
+The Executions tab shows executions filtered to the current workflow only.
+
+### Collapsible Node Categories
+
+Sidebar node categories are collapsible (click to expand/collapse):
+- **Expanded by default:** Input, Transform, Logic, Action
+- **Collapsed by default:** Pipeline, Output, AI, Discord, System, Database
+
+Each category header shows an arrow (▶/▼) and count of nodes.
+
+### Layout CSS
+
+The editor uses viewport units (`100vw`, `100vh`) and `overflow: hidden` to prevent page scrollbar:
+- All container elements must have `overflow: hidden` or `overflow: auto`
+- Use `flex: 1` with `min-height: 0` for flex children that should fill remaining space
+- Never use `height: 100%` on flex children that need to shrink
+
+### Browser Caching
+
+HTML responses include no-cache headers to ensure fresh content after server restart:
+```
+Cache-Control: no-cache, no-store, must-revalidate
+```
+
+### Debugging Tool
+
+Use `screenshot-editor.js` with Playwright to debug layout issues:
+```bash
+node screenshot-editor.js
+```
+This captures dimensions and checks for scrollbar issues against the running server.
+
 ## Autosave
 
 The editor has debounced autosave that triggers 1 second after changes:
