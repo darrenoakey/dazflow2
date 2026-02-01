@@ -10,19 +10,29 @@
             padding: 0;
             box-sizing: border-box;
         }
-        html, body, #root {
-            width: 100%;
-            height: 100%;
+        html {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
         }
         body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: #1a1a2e;
             color: #eee;
         }
+        #root {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
         .editor {
             display: flex;
             width: 100%;
-            height: 100%;
+            flex: 1;
+            min-height: 0;
         }
         .sidebar {
             width: 200px;
@@ -47,6 +57,23 @@
             text-transform: uppercase;
             margin-bottom: 8px;
             letter-spacing: 0.5px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            user-select: none;
+        }
+        .category-label:hover {
+            color: #aaa;
+        }
+        .category-arrow {
+            font-size: 8px;
+            width: 10px;
+        }
+        .category-count {
+            font-size: 10px;
+            color: #666;
+            margin-left: auto;
         }
         .category-items {
             display: flex;
@@ -1989,15 +2016,19 @@
         .dashboard-with-chat {
             display: flex;
             height: 100%;
+            overflow: hidden;
         }
         .dashboard-main {
             flex: 1;
             display: flex;
             flex-direction: column;
             min-width: 0;
+            min-height: 0;
+            overflow: hidden;
         }
         .chat-panel {
             width: 380px;
+            height: 100%;
             border-left: 1px solid #3a3a5e;
             display: flex;
             flex-direction: column;
@@ -6586,6 +6617,22 @@
             const currentWorkflowPath = useWorkflowStore((state) => state.currentWorkflowPath);
             const [showJson, setShowJson] = useState(false);
             const [saveStatus, setSaveStatus] = useState(null); // null, 'saving', 'saved', 'error'
+            // Default commonly used categories to expanded, others collapsed
+            const expandedByDefault = ['Input', 'Transform', 'Logic', 'Action'];
+            const [collapsedCategories, setCollapsedCategories] = useState(() => {
+                const initial = {};
+                Object.keys(baseCategorized).forEach(cat => {
+                    initial[cat] = !expandedByDefault.includes(cat);
+                });
+                return initial;
+            });
+
+            const toggleCategory = (category) => {
+                setCollapsedCategories(prev => ({
+                    ...prev,
+                    [category]: !prev[category]
+                }));
+            };
 
             const handleSave = async () => {
                 if (!currentWorkflowPath || isReadOnly) return;
@@ -6659,26 +6706,20 @@
             }, null, 2);
 
             return React.createElement('div', { className: 'sidebar', 'data-testid': 'sidebar' }, [
-                !isReadOnly && React.createElement('div', { key: 'sidebar-actions', className: 'sidebar-actions' }, [
-                    React.createElement('button', {
-                        key: 'back',
-                        className: 'back-btn',
-                        onClick: goToDashboard,
-                        'data-testid': 'back-to-dashboard',
-                    }, '\u2190 Dashboard'),
-                    React.createElement('button', {
-                        key: 'save',
-                        className: `save-btn${saveStatus === 'saved' ? ' saved' : ''}${saveStatus === 'error' ? ' error' : ''}`,
-                        onClick: handleSave,
-                        disabled: saveStatus === 'saving',
-                        'data-testid': 'save-workflow',
-                    }, saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved!' : saveStatus === 'error' ? 'Error' : 'Save'),
-                ]),
                 React.createElement('div', { key: 'title', className: 'sidebar-title', 'data-testid': 'sidebar-title' }, 'Nodes'),
                 ...Object.entries(categorized).filter(([_, items]) => items.length > 0).map(([category, items]) =>
                     React.createElement('div', { key: category, className: 'category-group', style: isReadOnly ? { opacity: 0.5, pointerEvents: 'none' } : {} }, [
-                        React.createElement('div', { key: 'label', className: 'category-label' }, category),
-                        React.createElement('div', { key: 'items', className: 'category-items' },
+                        React.createElement('div', {
+                            key: 'label',
+                            className: `category-label ${collapsedCategories[category] ? 'collapsed' : ''}`,
+                            onClick: () => toggleCategory(category),
+                            'data-testid': `category-${category.toLowerCase()}`,
+                        }, [
+                            React.createElement('span', { key: 'arrow', className: 'category-arrow' }, collapsedCategories[category] ? '▶' : '▼'),
+                            React.createElement('span', { key: 'name' }, category),
+                            React.createElement('span', { key: 'count', className: 'category-count' }, `(${items.length})`),
+                        ]),
+                        !collapsedCategories[category] && React.createElement('div', { key: 'items', className: 'category-items' },
                             items.map((item) =>
                                 React.createElement('div', {
                                     key: item.sidebarId,
@@ -6864,15 +6905,11 @@
 
             const onInit = useCallback((instance) => {
                 reactFlowInstance.current = instance;
-                // Restore viewport from storage if we have one and haven't already
-                if (!hasRestoredViewport.current && storedViewport && (storedViewport.x !== 0 || storedViewport.y !== 0 || storedViewport.zoom !== 1)) {
-                    hasRestoredViewport.current = true;
-                    instance.setViewport(storedViewport);
+                // Always fit view to center and zoom nodes to 80% of container
+                if (workflowNodes.length > 0) {
+                    instance.fitView({ padding: 0.1, maxZoom: 1.5 });
                 }
-            }, [storedViewport]);
-
-            // Determine if we should fitView (only when no stored viewport with nodes)
-            const shouldFitView = !initialState || initialState.nodes.length === 0;
+            }, [workflowNodes.length]);
 
             return React.createElement('div', { className: 'canvas-container', 'data-testid': 'canvas' },
                 React.createElement(ReactFlow, {
@@ -6891,9 +6928,8 @@
                     onPaneClick,
                     onDragOver,
                     onDrop,
-                    fitView: shouldFitView,
-                    fitViewOptions: { padding: 0.2 },
-                    defaultViewport: storedViewport,
+                    fitView: true,
+                    fitViewOptions: { padding: 0.1, maxZoom: 1.5 },
                     minZoom: 0.1,
                     maxZoom: 2,
                     panOnDrag: [1, 2],

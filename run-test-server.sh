@@ -28,4 +28,4 @@ trap cleanup EXIT
 export DAZFLOW_DATA_DIR="$TEST_DATA_DIR"
 export DAZFLOW_PORT=31416
 export DAZFLOW_EXECUTIONS_CACHE_INTERVAL=1
-python -m uvicorn src.api:app --host 0.0.0.0 --port 31416
+/opt/homebrew/bin/python3.13 -m uvicorn src.api:app --host 0.0.0.0 --port 31416

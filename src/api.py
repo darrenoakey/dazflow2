@@ -1280,11 +1280,19 @@ async def heartbeat():
 
 # ##################################################################
 # serve index
-# serves the main frontend shell html page
+# serves the main frontend shell html page with no-cache headers
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
     index_path = STATIC_DIR / "index.html"
-    return FileResponse(index_path, media_type="text/html")
+    return FileResponse(
+        index_path,
+        media_type="text/html",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
 
 
 # ##################################################################
@@ -1522,7 +1530,15 @@ app.include_router(api_router)
 @app.get("/{_path:path}", response_class=HTMLResponse)
 async def spa_catch_all(_path: str):
     index_path = STATIC_DIR / "index.html"
-    return FileResponse(index_path, media_type="text/html")
+    return FileResponse(
+        index_path,
+        media_type="text/html",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
 
 
 # ##################################################################

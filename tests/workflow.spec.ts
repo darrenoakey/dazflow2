@@ -629,11 +629,56 @@ test.describe('Workflow Editor', () => {
     await expect(page.getByTestId('editor')).toBeVisible();
 
     // Click back to dashboard button
-    await page.getByTestId('back-to-dashboard').click();
+    await page.getByTestId('editor-back-btn').click();
 
     // Verify we're back on the dashboard
     await expect(page.getByTestId('dashboard')).toBeVisible();
     await expect(page.getByTestId('dashboard-title')).toHaveText('dazflow');
+  });
+
+  test('editor header shows workflow name and tabs', async ({ page }) => {
+    // Verify editor header is visible
+    const header = page.getByTestId('editor-header');
+    await expect(header).toBeVisible();
+
+    // Verify workflow name is shown (sample.json without extension)
+    const workflowName = page.getByTestId('editor-workflow-name');
+    await expect(workflowName).toHaveText('sample');
+
+    // Verify tabs are present
+    await expect(page.getByTestId('editor-tab-editor')).toBeVisible();
+    await expect(page.getByTestId('editor-tab-executions')).toBeVisible();
+    await expect(page.getByTestId('editor-tab-history')).toBeVisible();
+
+    // Editor tab should be active by default
+    await expect(page.getByTestId('editor-tab-editor')).toHaveClass(/active/);
+  });
+
+  test('can switch to executions tab in editor', async ({ page }) => {
+    // Click executions tab
+    await page.getByTestId('editor-tab-executions').click();
+
+    // Verify executions tab content is shown
+    await expect(page.getByTestId('workflow-executions-tab')).toBeVisible();
+
+    // Editor should not be visible
+    await expect(page.getByTestId('editor')).not.toBeVisible();
+
+    // Switch back to editor tab
+    await page.getByTestId('editor-tab-editor').click();
+    await expect(page.getByTestId('editor')).toBeVisible();
+  });
+
+  test('editor page has no vertical scrollbar', async ({ page }) => {
+    // The editor should fit exactly in the viewport with no scrollbar
+    const hasScrollbar = await page.evaluate(() => {
+      return document.documentElement.scrollHeight > document.documentElement.clientHeight;
+    });
+    expect(hasScrollbar).toBe(false);
+
+    // Verify header is at top of viewport (y=0)
+    const headerBox = await page.getByTestId('editor-header').boundingBox();
+    expect(headerBox?.y).toBe(0);
   });
 
   test('can pin output and see pin indicator on canvas', async ({ page }) => {
@@ -1256,7 +1301,7 @@ test.describe('Agent Configuration in Node Editor', () => {
 
   test('can select specific agents', async ({ page }) => {
     // First, ensure we have at least one agent
-    await page.getByTestId('back-to-dashboard').click();
+    await page.getByTestId('editor-back-btn').click();
     await expect(page.getByTestId('dashboard')).toBeVisible();
     await page.getByTestId('tab-agents').click();
 
@@ -1311,7 +1356,7 @@ test.describe('Agent Configuration in Node Editor', () => {
 
   test('selecting Any agent deselects specific agents', async ({ page }) => {
     // Create test agent
-    await page.getByTestId('back-to-dashboard').click();
+    await page.getByTestId('editor-back-btn').click();
     await page.getByTestId('tab-agents').click();
     const agentName = `test-any-${Date.now()}`;
     page.once('dialog', async dialog => await dialog.accept(agentName));
@@ -1366,7 +1411,7 @@ test.describe('Agent Configuration in Node Editor', () => {
 
   test('can select required tags for a node', async ({ page }) => {
     // First create some tags
-    await page.getByTestId('back-to-dashboard').click();
+    await page.getByTestId('editor-back-btn').click();
     await page.getByTestId('tab-agents').click();
 
     const tag1 = `tag-${Date.now()}-1`;
