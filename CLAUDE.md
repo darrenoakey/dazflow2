@@ -161,6 +161,14 @@ Sidebar node categories are collapsible (click to expand/collapse):
 
 Each category header shows an arrow (▶/▼) and count of nodes.
 
+### Pipeline Node Styling
+
+Pipeline nodes have a distinctive **teal color scheme** (#14b8a6) to differentiate them from regular nodes (purple #667eea):
+- **Sidebar:** Dark teal background with teal icons
+- **Canvas:** Teal border and icons; selected state uses brighter teal (#2dd4bf)
+
+This visual distinction makes pipeline nodes immediately identifiable in complex workflows.
+
 ### Layout CSS
 
 The editor uses viewport units (`100vw`, `100vh`) and `overflow: hidden` to prevent page scrollbar:
