@@ -105,6 +105,17 @@
             height: 24px;
             color: #667eea;
         }
+        /* Pipeline nodes in sidebar - teal colored */
+        .node-type-item.pipeline {
+            background: #1a3a3e;
+            border-color: #14b8a6;
+        }
+        .node-type-item.pipeline:hover {
+            background: #1e4a4e;
+        }
+        .node-type-item.pipeline svg {
+            color: #14b8a6;
+        }
         .node-type-item span {
             font-size: 13px;
             color: #ccc;
@@ -147,6 +158,18 @@
             width: 32px;
             height: 32px;
             color: #667eea;
+        }
+        /* Pipeline nodes - distinctly teal colored */
+        .custom-node.pipeline {
+            background: #1a3a3e;
+            border-color: #14b8a6;
+        }
+        .custom-node.pipeline.selected {
+            background: #1e4a4e;
+            border-color: #2dd4bf;
+        }
+        .custom-node.pipeline .node-icon {
+            color: #14b8a6;
         }
         .custom-node .node-pin-indicator {
             position: absolute;
@@ -3618,7 +3641,7 @@
                 // The actual node box (double-click handled by global position-based detection)
                 React.createElement('div', {
                     key: 'node',
-                    className: `custom-node ${selected ? 'selected' : ''} ${shapeClasses}`,
+                    className: `custom-node ${selected ? 'selected' : ''} ${nodeType.category === 'Pipeline' ? 'pipeline' : ''} ${shapeClasses}`,
                 }, [
                     // Input handles
                     ...connectors.inputs.map((input, idx) => {
@@ -6723,7 +6746,7 @@
                             items.map((item) =>
                                 React.createElement('div', {
                                     key: item.sidebarId,
-                                    className: `node-type-item${isReadOnly ? ' disabled' : ''}`,
+                                    className: `node-type-item${isReadOnly ? ' disabled' : ''}${item.category === 'Pipeline' ? ' pipeline' : ''}`,
                                     'data-testid': `node-type-${item.id}`,
                                     onClick: () => handleClick(item),
                                     draggable: !isReadOnly,
