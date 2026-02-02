@@ -80,6 +80,24 @@ The `run` script uses `/opt/homebrew/bin/python3.13` explicitly because:
 - uvicorn is installed in Python 3.13's site-packages
 - Using `#!/usr/bin/env python3` can pick up wrong Python (e.g., Xcode's)
 
+### Config Auto-Discovery
+
+The `src/config.py` auto-discovers the project root based on `__file__` location:
+- Default `data_dir` is the project root (parent of `src/`), not the current working directory
+- This ensures the server finds workflows regardless of where it's started from
+- Critical for `auto` daemon which may have different cwd than the project
+
+### Built-in Agent Event Loop
+
+**CRITICAL:** The built-in agent runs in-process with the server. Node execution MUST use `asyncio.to_thread()`:
+
+```python
+# In agent/agent.py _execute_task():
+new_execution = await asyncio.to_thread(execute_node, node_id, workflow, execution)
+```
+
+Without this, long-running nodes (e.g., `run_command` with 24-hour timeout) block the entire event loop, making the server unresponsive. This caused the server to appear "crashed" when executing workflows with shell commands.
+
 ### Git-Based Workflow Versioning
 
 The data directory is automatically initialized as a git repo on startup:
