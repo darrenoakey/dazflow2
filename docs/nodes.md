@@ -18,6 +18,32 @@ All string fields in node.data support template expressions:
 
 The `$` variable contains the current item from upstream nodes.
 
+### Property Types
+
+Node properties can have the following types:
+
+| Type | Description |
+|------|-------------|
+| `text` | Single-line text input with expression support |
+| `textarea` | Multi-line text input with expression support |
+| `number` | Numeric input with optional min/max |
+| `select` | Dropdown with predefined options |
+| `boolean` | Toggle checkbox |
+| `fieldlist` | Key-value pair list |
+| `dynamicSelect` | Dropdown with options loaded from backend |
+| `directory_path` | Directory picker with browse/expression modes |
+| `file_path` | File picker with browse/expression modes |
+
+#### Path Types (`directory_path`, `file_path`)
+
+These types provide a directory tree browser UI with:
+- **Browse mode**: Visual file tree for selecting paths
+- **Expression mode**: Text input with expression support
+- Path validation (red indicator if path doesn't exist)
+- Hidden files toggle
+
+When the workflow has a `dataDirectory` setting, the browser is restricted to that directory.
+
 ---
 
 ## Core Module (`core`)

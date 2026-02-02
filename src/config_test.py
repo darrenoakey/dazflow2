@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from config import ServerConfig, get_config, set_config
+from config import ServerConfig, get_config, set_config, _PROJECT_ROOT
 
 
 # ##################################################################
@@ -13,7 +13,8 @@ from config import ServerConfig, get_config, set_config
 def test_default_config_values():
     config = ServerConfig()
     assert config.port == 5000
-    assert config.data_dir == "."
+    # Default data_dir is the project root (parent of src/)
+    assert config.data_dir == _PROJECT_ROOT
 
 
 # ##################################################################
@@ -76,7 +77,8 @@ def test_get_config_creates_default():
 
     cfg = get_config()
     assert cfg.port == 5000
-    assert cfg.data_dir == "."
+    # Default data_dir is the project root
+    assert cfg.data_dir == _PROJECT_ROOT
 
 
 def test_get_config_returns_same_instance():

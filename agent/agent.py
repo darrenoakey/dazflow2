@@ -376,9 +376,10 @@ class DazflowAgent:
             except ImportError as e:
                 raise RuntimeError(f"Failed to import executor (code not downloaded?): {e}") from e
 
-            # Execute the node
+            # Execute the node in a thread to avoid blocking the event loop
+            # This is critical for long-running nodes like run_command
             print(f"[{self._timestamp()}] Running node {node_id}...")
-            new_execution = execute_node(node_id, workflow, execution)
+            new_execution = await asyncio.to_thread(execute_node, node_id, workflow, execution)
 
             # Get the result for this node
             node_result = new_execution.get(node_id, {})

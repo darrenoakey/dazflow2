@@ -1849,3 +1849,167 @@ def test_ai_session_get_empty(tmp_path, monkeypatch):
     data = response.json()
     assert data["session_id"] is None
     assert data["message_count"] == 0
+
+
+# ##################################################################
+# filesystem API tests
+
+
+def test_filesystem_list_home(tmp_path):
+    """Test listing home directory."""
+    client = TestClient(app)
+    response = client.get("/api/filesystem/list")
+    assert response.status_code == 200
+    data = response.json()
+    assert "path" in data
+    assert "directories" in data
+    assert "files" in data
+    # Home directory should have some contents
+    assert len(data["directories"]) > 0 or len(data["files"]) > 0
+
+
+def test_filesystem_list_specific_path(tmp_path):
+    """Test listing a specific directory."""
+    # Create test structure
+    subdir = tmp_path / "testdir"
+    subdir.mkdir()
+    (subdir / "file.txt").write_text("content")
+    (subdir / "subdir2").mkdir()
+
+    client = TestClient(app)
+    response = client.get(f"/api/filesystem/list?path={subdir}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["path"] == str(subdir)
+    assert data["error"] is None
+    assert len(data["directories"]) == 1
+    assert data["directories"][0]["name"] == "subdir2"
+    assert len(data["files"]) == 1
+    assert data["files"][0]["name"] == "file.txt"
+
+
+def test_filesystem_list_hidden_files_excluded(tmp_path):
+    """Test that hidden files are excluded by default."""
+    # Create test structure with hidden files
+    (tmp_path / ".hidden").write_text("hidden")
+    (tmp_path / "visible.txt").write_text("visible")
+
+    client = TestClient(app)
+    response = client.get(f"/api/filesystem/list?path={tmp_path}")
+    assert response.status_code == 200
+    data = response.json()
+    file_names = [f["name"] for f in data["files"]]
+    assert ".hidden" not in file_names
+    assert "visible.txt" in file_names
+
+
+def test_filesystem_list_show_hidden(tmp_path):
+    """Test showing hidden files when requested."""
+    # Create test structure with hidden files
+    (tmp_path / ".hidden").write_text("hidden")
+    (tmp_path / "visible.txt").write_text("visible")
+
+    client = TestClient(app)
+    response = client.get(f"/api/filesystem/list?path={tmp_path}&show_hidden=true")
+    assert response.status_code == 200
+    data = response.json()
+    file_names = [f["name"] for f in data["files"]]
+    assert ".hidden" in file_names
+    assert "visible.txt" in file_names
+
+
+def test_filesystem_list_directories_only(tmp_path):
+    """Test listing directories only."""
+    # Create test structure
+    (tmp_path / "dir1").mkdir()
+    (tmp_path / "file.txt").write_text("content")
+
+    client = TestClient(app)
+    response = client.get(f"/api/filesystem/list?path={tmp_path}&directories_only=true")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["directories"]) == 1
+    assert len(data["files"]) == 0
+
+
+def test_filesystem_list_not_found():
+    """Test listing non-existent directory."""
+    client = TestClient(app)
+    response = client.get("/api/filesystem/list?path=/nonexistent/xyz123")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["error"] == "Directory not found"
+    assert len(data["directories"]) == 0
+    assert len(data["files"]) == 0
+
+
+def test_filesystem_list_with_root_restriction(tmp_path):
+    """Test listing with root path restriction."""
+    # Create test structure
+    subdir = tmp_path / "allowed"
+    subdir.mkdir()
+    (subdir / "file.txt").write_text("content")
+
+    client = TestClient(app)
+    # Should work within root
+    response = client.get(f"/api/filesystem/list?path={subdir}&root_path={tmp_path}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["error"] is None
+    assert len(data["files"]) == 1
+
+
+def test_filesystem_list_root_restriction_blocks_escape(tmp_path):
+    """Test that root restriction blocks paths outside root."""
+    client = TestClient(app)
+    response = client.get(f"/api/filesystem/list?path=/tmp&root_path={tmp_path}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["error"] is not None
+    assert "must be within" in data["error"]
+
+
+def test_filesystem_exists_file(tmp_path):
+    """Test checking if a file exists."""
+    file_path = tmp_path / "test.txt"
+    file_path.write_text("content")
+
+    client = TestClient(app)
+    response = client.get(f"/api/filesystem/exists?path={file_path}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["exists"] is True
+    assert data["isDirectory"] is False
+
+
+def test_filesystem_exists_directory(tmp_path):
+    """Test checking if a directory exists."""
+    client = TestClient(app)
+    response = client.get(f"/api/filesystem/exists?path={tmp_path}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["exists"] is True
+    assert data["isDirectory"] is True
+
+
+def test_filesystem_exists_not_found():
+    """Test checking non-existent path."""
+    client = TestClient(app)
+    response = client.get("/api/filesystem/exists?path=/nonexistent/xyz123")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["exists"] is False
+    assert data["isDirectory"] is None
+
+
+def test_filesystem_exists_tilde_expansion():
+    """Test that tilde is expanded in path."""
+    client = TestClient(app)
+    response = client.get("/api/filesystem/exists?path=~")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["exists"] is True
+    assert data["isDirectory"] is True
+    # Path should be expanded
+    assert data["path"] != "~"
+    assert "/" in data["path"]

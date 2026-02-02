@@ -270,7 +270,7 @@ export const nodeTypes = [
             outputs: [{ id: 'output', name: 'output' }],
         }),
         getProperties: (data) => [
-            { id: 'filepath', label: 'File Path', type: 'text', value: data.filepath ?? '' },
+            { id: 'filepath', label: 'File Path', type: 'file_path', value: data.filepath ?? '', placeholder: '/path/to/file.txt' },
             { id: 'content', label: 'Content', type: 'textarea', value: data.content ?? '' },
         ],
         kind: 'array',

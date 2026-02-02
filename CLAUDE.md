@@ -191,6 +191,34 @@ node screenshot-editor.js
 ```
 This captures dimensions and checks for scrollbar issues against the running server.
 
+## Workflow Settings Tab
+
+The editor has a **Settings** tab (alongside Editor/Executions/History) for workflow-level configuration:
+
+- **Data Directory**: Root directory for file/directory path fields
+  - When set, file browsers are restricted to this directory
+  - Falls back to home directory (~) if not set
+  - Stored in workflow JSON as `settings.dataDirectory`
+
+## File and Directory Path Properties
+
+Nodes can use `file_path` and `directory_path` property types for filesystem paths:
+
+- **`directory_path`**: Shows directory-only browser (no files)
+- **`file_path`**: Shows full file browser (directories for navigation, files for selection)
+
+**Features:**
+- Toggle between Browse mode (visual tree) and Expression mode (text input)
+- Path validation (red indicator if path doesn't exist)
+- Hidden files toggle
+- Respects workflow's data directory setting for root restriction
+
+**Nodes using path types:**
+- `append_to_file`: `filepath` (file_path)
+- `run_command`: `workingDirectory` (directory_path)
+- `claude_agent`: `cwd` (directory_path)
+- Pipeline nodes: `state_root` (directory_path)
+
 ## Autosave
 
 The editor has debounced autosave that triggers 1 second after changes:

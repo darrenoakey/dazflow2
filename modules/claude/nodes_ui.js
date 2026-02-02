@@ -82,7 +82,7 @@ export const nodeTypes = [
             {
                 id: 'cwd',
                 label: 'Working Directory',
-                type: 'text',
+                type: 'directory_path',
                 value: data.cwd ?? '',
                 placeholder: '/path/to/project',
                 instructions: 'Optional. The working directory for the agent.',

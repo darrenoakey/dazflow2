@@ -11,9 +11,26 @@ Workflows are stored as JSON files in `data_dir/local/work/workflows/`. They can
 ```json
 {
   "nodes": [...],
-  "connections": [...]
+  "connections": [...],
+  "settings": {...}
 }
 ```
+
+### Settings Object
+
+Workflow-level settings that affect all nodes.
+
+```json
+{
+  "settings": {
+    "dataDirectory": "/path/to/data"
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `dataDirectory` | string | Root directory for file/directory path fields. When set, file browsers are restricted to this directory. |
 
 ### Nodes Array
 

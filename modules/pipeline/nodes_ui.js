@@ -31,7 +31,7 @@ export const nodeTypes = [
             {
                 id: 'state_root',
                 label: 'State Root',
-                type: 'text',
+                type: 'directory_path',
                 value: data.state_root ?? 'output/',
                 placeholder: 'output/',
                 instructions: 'Root directory for state files (relative to data directory)',
@@ -86,7 +86,7 @@ export const nodeTypes = [
             {
                 id: 'state_root',
                 label: 'State Root',
-                type: 'text',
+                type: 'directory_path',
                 value: data.state_root ?? 'output/',
             },
             {
@@ -134,7 +134,7 @@ export const nodeTypes = [
             {
                 id: 'state_root',
                 label: 'State Root',
-                type: 'text',
+                type: 'directory_path',
                 value: data.state_root ?? 'output/',
             },
             {
@@ -199,7 +199,7 @@ export const nodeTypes = [
             {
                 id: 'state_root',
                 label: 'State Root',
-                type: 'text',
+                type: 'directory_path',
                 value: data.state_root ?? 'output/',
             },
             {
@@ -255,7 +255,7 @@ export const nodeTypes = [
             {
                 id: 'state_root',
                 label: 'State Root',
-                type: 'text',
+                type: 'directory_path',
                 value: data.state_root ?? 'output/',
             },
             {
@@ -302,7 +302,7 @@ export const nodeTypes = [
             {
                 id: 'state_root',
                 label: 'State Root',
-                type: 'text',
+                type: 'directory_path',
                 value: data.state_root ?? 'output/',
             },
             {

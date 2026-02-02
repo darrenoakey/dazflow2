@@ -755,6 +755,167 @@
             color: #555;
         }
 
+        /* Directory Tree Browser */
+        .directory-tree {
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+            font-size: 12px;
+            color: #ccc;
+            overflow-y: auto;
+            max-height: 300px;
+            background: #1a1a2e;
+            border: 1px solid #3a3a5e;
+            border-radius: 6px;
+            padding: 8px;
+        }
+        .directory-tree-node {
+            display: flex;
+            align-items: center;
+            padding: 4px 8px;
+            cursor: pointer;
+            border-radius: 4px;
+            user-select: none;
+        }
+        .directory-tree-node:hover {
+            background: #2a2a4e;
+        }
+        .directory-tree-node.selected {
+            background: #3a3a5e;
+            outline: 1px solid #667eea;
+        }
+        .directory-tree-node .expand-icon {
+            width: 16px;
+            height: 16px;
+            margin-right: 4px;
+            color: #888;
+            transition: transform 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+        }
+        .directory-tree-node .expand-icon.expanded {
+            transform: rotate(90deg);
+        }
+        .directory-tree-node .expand-icon.empty {
+            visibility: hidden;
+        }
+        .directory-tree-node .item-icon {
+            width: 16px;
+            height: 16px;
+            margin-right: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .directory-tree-node .item-icon.folder {
+            color: #f0c674;
+        }
+        .directory-tree-node .item-icon.file {
+            color: #888;
+        }
+        .directory-tree-node .item-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .directory-tree-children {
+            margin-left: 16px;
+        }
+        .directory-tree-loading {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 8px;
+            margin-left: 16px;
+            color: #666;
+            font-style: italic;
+            font-size: 11px;
+        }
+        .directory-tree-error {
+            color: #e74c3c;
+            padding: 8px;
+            font-size: 11px;
+        }
+
+        /* Path Mode Toggle */
+        .path-mode-toggle {
+            display: flex;
+            gap: 2px;
+            margin-bottom: 8px;
+        }
+        .path-mode-toggle button {
+            padding: 4px 10px;
+            background: #2a2a4e;
+            border: 1px solid #3a3a5e;
+            color: #888;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .path-mode-toggle button:first-child {
+            border-radius: 4px 0 0 4px;
+        }
+        .path-mode-toggle button:last-child {
+            border-radius: 0 4px 4px 0;
+        }
+        .path-mode-toggle button.active {
+            background: #667eea;
+            border-color: #667eea;
+            color: #fff;
+        }
+        .path-mode-toggle button:hover:not(.active) {
+            background: #3a3a5e;
+        }
+
+        /* Hidden files toggle */
+        .hidden-files-toggle {
+            font-size: 11px;
+            color: #666;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 8px;
+            user-select: none;
+        }
+        .hidden-files-toggle:hover {
+            color: #888;
+        }
+        .hidden-files-toggle input {
+            margin: 0;
+        }
+
+        /* Current path display */
+        .current-path-display {
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+            font-size: 12px;
+            color: #9cdcfe;
+            padding: 8px 12px;
+            background: #2a2a4e;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            word-break: break-all;
+        }
+        .current-path-display.invalid {
+            border: 1px solid #e74c3c;
+        }
+
+        /* Path validation indicator */
+        .path-validation {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            margin-top: 4px;
+        }
+        .path-validation.valid {
+            color: #4ade80;
+        }
+        .path-validation.invalid {
+            color: #e74c3c;
+        }
+
         /* Expression Editor Modal */
         .expr-editor-overlay {
             position: fixed;
@@ -1177,6 +1338,33 @@
             height: 100%;
             color: #888;
             font-size: 14px;
+        }
+        /* Workflow Settings Tab Styles */
+        .settings-tab-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #1a1a2e;
+            overflow-y: auto;
+            padding: 24px;
+        }
+        .settings-section {
+            max-width: 600px;
+            margin-bottom: 32px;
+        }
+        .settings-section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .settings-section-description {
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 16px;
+            line-height: 1.5;
         }
         /* Credentials Tab Styles */
         .credentials-list {
@@ -2584,11 +2772,14 @@
             // Format: { [nodeId]: { input, nodeOutput, output (combined), executedAt } }
             ambientExecution: {},
 
+            // Workflow settings (e.g., data directory)
+            workflowSettings: {},
+
             // Autosave state
             // 'clean' = no changes since load, 'modified' = unsaved changes,
             // 'saving' = save in progress, 'saved' = saved to disk, 'error' = save failed
             saveStatus: 'clean',
-            lastSavedSnapshot: null, // JSON string of last saved {nodes, connections}
+            lastSavedSnapshot: null, // JSON string of last saved {nodes, connections, settings}
             autosaveTimerId: null,
 
             // Dashboard actions
@@ -2630,10 +2821,12 @@
                         // Create snapshot of loaded state for autosave comparison
                         const loadedNodes = workflow.nodes || [];
                         const loadedConnections = workflow.connections || [];
-                        const snapshot = JSON.stringify({ nodes: loadedNodes, connections: loadedConnections });
+                        const loadedSettings = workflow.settings || {};
+                        const snapshot = JSON.stringify({ nodes: loadedNodes, connections: loadedConnections, settings: loadedSettings });
                         set({
                             nodes: loadedNodes,
                             connections: loadedConnections,
+                            workflowSettings: loadedSettings,
                             nameCounts: {},
                             viewport: { x: 0, y: 0, zoom: 1 },
                             ambientExecution: {},
@@ -2664,7 +2857,11 @@
             // Save current workflow
             saveWorkflow: async (path, silent = false) => {
                 const state = get();
-                const workflow = { nodes: state.nodes, connections: state.connections };
+                const workflow = {
+                    nodes: state.nodes,
+                    connections: state.connections,
+                    settings: state.workflowSettings,
+                };
                 set({ saveStatus: 'saving' });
                 try {
                     const response = await fetch(`/api/workflow/${encodeURIComponent(path)}`, {
@@ -2691,6 +2888,14 @@
                     }
                     return false;
                 }
+            },
+
+            // Update workflow settings
+            updateWorkflowSettings: (newSettings) => {
+                set((state) => ({
+                    workflowSettings: { ...state.workflowSettings, ...newSettings },
+                    saveStatus: 'modified',
+                }));
             },
 
             // Go back to dashboard
@@ -3469,7 +3674,11 @@
                 if (!state.currentWorkflowPath || state.isReadOnly) return;
 
                 // Check if state has changed from last saved snapshot
-                const currentSnapshot = JSON.stringify({ nodes: state.nodes, connections: state.connections });
+                const currentSnapshot = JSON.stringify({
+                    nodes: state.nodes,
+                    connections: state.connections,
+                    settings: state.workflowSettings,
+                });
                 if (currentSnapshot === state.lastSavedSnapshot) {
                     // No changes, keep current status (could be 'saved' or 'clean')
                     return;
@@ -3503,11 +3712,13 @@
         // Subscribe to workflow changes for autosave
         let prevNodes = null;
         let prevConnections = null;
+        let prevSettings = null;
         useWorkflowStore.subscribe((state) => {
-            // Only trigger autosave if nodes or connections changed
-            if (state.nodes !== prevNodes || state.connections !== prevConnections) {
+            // Only trigger autosave if nodes, connections, or settings changed
+            if (state.nodes !== prevNodes || state.connections !== prevConnections || state.workflowSettings !== prevSettings) {
                 prevNodes = state.nodes;
                 prevConnections = state.connections;
+                prevSettings = state.workflowSettings;
                 state.triggerAutosave();
             }
         });
@@ -4496,7 +4707,410 @@
             ]);
         }
 
-        function PropertyEditor({ property, onChange, inputData, nodeTypeId, credentialName, nodeData }) {
+        // Directory Tree Browser Component
+        // Lazy-loads directory contents from filesystem API
+        function DirectoryTreeBrowser({ rootPath, showFiles, showHidden, onSelect, selectedPath }) {
+            const [expandedPaths, setExpandedPaths] = useState(new Set());
+            const [contents, setContents] = useState({});
+            const [loadingPaths, setLoadingPaths] = useState(new Set());
+            const [errors, setErrors] = useState({});
+
+            // Folder icon SVG
+            const folderIcon = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>';
+            // File icon SVG
+            const fileIcon = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>';
+            // Expand arrow SVG
+            const arrowIcon = '▶';
+
+            // Load directory contents
+            const loadDirectory = async (path) => {
+                if (loadingPaths.has(path) || contents[path]) return;
+
+                setLoadingPaths(prev => new Set([...prev, path]));
+                try {
+                    const params = new URLSearchParams({
+                        path: path,
+                        show_hidden: showHidden ? 'true' : 'false',
+                        directories_only: showFiles ? 'false' : 'true',
+                    });
+                    if (rootPath) {
+                        params.set('root_path', rootPath);
+                    }
+
+                    const response = await fetch(`/api/filesystem/list?${params}`);
+                    const data = await response.json();
+
+                    if (data.error) {
+                        setErrors(prev => ({ ...prev, [path]: data.error }));
+                    } else {
+                        setContents(prev => ({ ...prev, [path]: data }));
+                        setErrors(prev => {
+                            const next = { ...prev };
+                            delete next[path];
+                            return next;
+                        });
+                    }
+                } catch (err) {
+                    setErrors(prev => ({ ...prev, [path]: 'Failed to load' }));
+                } finally {
+                    setLoadingPaths(prev => {
+                        const next = new Set(prev);
+                        next.delete(path);
+                        return next;
+                    });
+                }
+            };
+
+            // Load root directory on mount
+            useEffect(() => {
+                const initialPath = rootPath || '~';
+                loadDirectory(initialPath);
+                setExpandedPaths(new Set([initialPath]));
+            }, [rootPath, showHidden, showFiles]);
+
+            // Toggle expand/collapse
+            const handleToggle = (path, isDir) => {
+                if (!isDir) return;
+
+                if (expandedPaths.has(path)) {
+                    setExpandedPaths(prev => {
+                        const next = new Set(prev);
+                        next.delete(path);
+                        return next;
+                    });
+                } else {
+                    setExpandedPaths(prev => new Set([...prev, path]));
+                    loadDirectory(path);
+                }
+            };
+
+            // Handle selection
+            const handleSelect = (path, isDir) => {
+                // For directory_path: only select directories
+                // For file_path: select files, but also allow selecting directories
+                if (!showFiles && !isDir) return;
+                if (showFiles || isDir) {
+                    onSelect(path);
+                }
+            };
+
+            // Render a tree node
+            const renderNode = (item, level = 0) => {
+                const isDir = item.isDirectory !== false;
+                const isExpanded = expandedPaths.has(item.path);
+                const isSelected = selectedPath === item.path;
+                const isLoading = loadingPaths.has(item.path);
+                const error = errors[item.path];
+                const children = contents[item.path];
+
+                const hasChildren = isDir && children && (children.directories?.length > 0 || children.files?.length > 0);
+
+                return React.createElement('div', { key: item.path }, [
+                    React.createElement('div', {
+                        key: 'node',
+                        className: `directory-tree-node${isSelected ? ' selected' : ''}`,
+                        style: { paddingLeft: `${level * 16 + 8}px` },
+                        onClick: (e) => {
+                            e.stopPropagation();
+                            if (isDir) {
+                                handleToggle(item.path, true);
+                            }
+                            handleSelect(item.path, isDir);
+                        },
+                    }, [
+                        // Expand arrow (only for directories)
+                        React.createElement('span', {
+                            key: 'expand',
+                            className: `expand-icon${isExpanded ? ' expanded' : ''}${!isDir ? ' empty' : ''}`,
+                        }, isDir ? arrowIcon : ''),
+                        // Item icon
+                        React.createElement('span', {
+                            key: 'icon',
+                            className: `item-icon ${isDir ? 'folder' : 'file'}`,
+                            dangerouslySetInnerHTML: { __html: isDir ? folderIcon : fileIcon },
+                        }),
+                        // Item name
+                        React.createElement('span', {
+                            key: 'name',
+                            className: 'item-name',
+                        }, item.name),
+                    ]),
+                    // Loading indicator
+                    isDir && isExpanded && isLoading && React.createElement('div', {
+                        key: 'loading',
+                        className: 'directory-tree-loading',
+                    }, 'Loading...'),
+                    // Error message
+                    isDir && isExpanded && error && React.createElement('div', {
+                        key: 'error',
+                        className: 'directory-tree-error',
+                        style: { paddingLeft: `${(level + 1) * 16 + 8}px` },
+                    }, error),
+                    // Children
+                    isDir && isExpanded && hasChildren && React.createElement('div', {
+                        key: 'children',
+                        className: 'directory-tree-children',
+                    }, [
+                        ...(children.directories || []).map(d =>
+                            renderNode({ name: d.name, path: d.path, isDirectory: true }, level + 1)
+                        ),
+                        ...(showFiles ? (children.files || []).map(f =>
+                            renderNode({ name: f.name, path: f.path, isDirectory: false }, level + 1)
+                        ) : []),
+                    ]),
+                ]);
+            };
+
+            // Get root items
+            const rootItems = contents[rootPath || '~'];
+            const rootError = errors[rootPath || '~'];
+            const rootLoading = loadingPaths.has(rootPath || '~');
+
+            return React.createElement('div', { className: 'directory-tree' }, [
+                rootLoading && React.createElement('div', {
+                    key: 'loading',
+                    className: 'directory-tree-loading',
+                }, 'Loading...'),
+                rootError && React.createElement('div', {
+                    key: 'error',
+                    className: 'directory-tree-error',
+                }, rootError),
+                rootItems && [
+                    ...(rootItems.directories || []).map(d =>
+                        renderNode({ name: d.name, path: d.path, isDirectory: true }, 0)
+                    ),
+                    ...(showFiles ? (rootItems.files || []).map(f =>
+                        renderNode({ name: f.name, path: f.path, isDirectory: false }, 0)
+                    ) : []),
+                ],
+            ]);
+        }
+
+        // Path Mode Toggle Component
+        function PathModeToggle({ mode, onChange }) {
+            return React.createElement('div', { className: 'path-mode-toggle' }, [
+                React.createElement('button', {
+                    key: 'browse',
+                    className: mode === 'browse' ? 'active' : '',
+                    onClick: () => onChange('browse'),
+                }, 'Browse'),
+                React.createElement('button', {
+                    key: 'expression',
+                    className: mode === 'expression' ? 'active' : '',
+                    onClick: () => onChange('expression'),
+                }, 'Expression'),
+            ]);
+        }
+
+        // Directory Path Property Editor
+        // For selecting directories only
+        function DirectoryPathPropertyEditor({ property, onChange, inputData, workflowSettings }) {
+            const [mode, setMode] = useState('browse');
+            const [localValue, setLocalValue] = useState(property.value || '');
+            const [showHidden, setShowHidden] = useState(false);
+            const [pathExists, setPathExists] = useState(null);
+
+            // Determine root path from workflow settings
+            const rootPath = workflowSettings?.dataDirectory || null;
+
+            // Check if path exists (only in browse mode)
+            useEffect(() => {
+                if (mode !== 'browse' || !localValue) {
+                    setPathExists(null);
+                    return;
+                }
+
+                const checkPath = async () => {
+                    try {
+                        const response = await fetch(`/api/filesystem/exists?path=${encodeURIComponent(localValue)}`);
+                        const data = await response.json();
+                        setPathExists(data.exists && data.isDirectory);
+                    } catch {
+                        setPathExists(false);
+                    }
+                };
+
+                checkPath();
+            }, [localValue, mode]);
+
+            const handleSelect = (path) => {
+                setLocalValue(path);
+                onChange(property.id, path);
+            };
+
+            const handleExpressionChange = (newValue) => {
+                setLocalValue(newValue);
+            };
+
+            const handleExpressionBlur = () => {
+                if (localValue !== property.value) {
+                    onChange(property.id, localValue);
+                }
+            };
+
+            return React.createElement('div', { className: 'property-group' }, [
+                React.createElement('label', { key: 'label' }, property.label),
+                React.createElement(PathModeToggle, {
+                    key: 'toggle',
+                    mode: mode,
+                    onChange: setMode,
+                }),
+                mode === 'browse' ? [
+                    // Current path display
+                    localValue && React.createElement('div', {
+                        key: 'path',
+                        className: `current-path-display${pathExists === false ? ' invalid' : ''}`,
+                    }, localValue),
+                    // Directory tree browser
+                    React.createElement(DirectoryTreeBrowser, {
+                        key: 'tree',
+                        rootPath: rootPath,
+                        showFiles: false,
+                        showHidden: showHidden,
+                        onSelect: handleSelect,
+                        selectedPath: localValue,
+                    }),
+                    // Hidden files toggle
+                    React.createElement('label', {
+                        key: 'hidden',
+                        className: 'hidden-files-toggle',
+                    }, [
+                        React.createElement('input', {
+                            key: 'checkbox',
+                            type: 'checkbox',
+                            checked: showHidden,
+                            onChange: (e) => setShowHidden(e.target.checked),
+                        }),
+                        'Show hidden files',
+                    ]),
+                    // Validation indicator
+                    localValue && pathExists !== null && React.createElement('div', {
+                        key: 'validation',
+                        className: `path-validation ${pathExists ? 'valid' : 'invalid'}`,
+                    }, pathExists ? '✓ Directory exists' : '✗ Directory not found'),
+                ] : [
+                    // Expression mode - use ExpressionInput
+                    React.createElement(ExpressionInput, {
+                        key: 'expr',
+                        value: localValue,
+                        onChange: handleExpressionChange,
+                        onBlur: handleExpressionBlur,
+                        inputData: inputData,
+                        placeholder: property.placeholder || '/path/to/directory',
+                    }),
+                ],
+                property.instructions && React.createElement('div', {
+                    key: 'instructions',
+                    className: 'property-instructions',
+                }, property.instructions),
+            ]);
+        }
+
+        // File Path Property Editor
+        // For selecting files (shows both directories and files)
+        function FilePathPropertyEditor({ property, onChange, inputData, workflowSettings }) {
+            const [mode, setMode] = useState('browse');
+            const [localValue, setLocalValue] = useState(property.value || '');
+            const [showHidden, setShowHidden] = useState(false);
+            const [pathExists, setPathExists] = useState(null);
+
+            // Determine root path from workflow settings
+            const rootPath = workflowSettings?.dataDirectory || null;
+
+            // Check if path exists (only in browse mode)
+            useEffect(() => {
+                if (mode !== 'browse' || !localValue) {
+                    setPathExists(null);
+                    return;
+                }
+
+                const checkPath = async () => {
+                    try {
+                        const response = await fetch(`/api/filesystem/exists?path=${encodeURIComponent(localValue)}`);
+                        const data = await response.json();
+                        setPathExists(data.exists);
+                    } catch {
+                        setPathExists(false);
+                    }
+                };
+
+                checkPath();
+            }, [localValue, mode]);
+
+            const handleSelect = (path) => {
+                setLocalValue(path);
+                onChange(property.id, path);
+            };
+
+            const handleExpressionChange = (newValue) => {
+                setLocalValue(newValue);
+            };
+
+            const handleExpressionBlur = () => {
+                if (localValue !== property.value) {
+                    onChange(property.id, localValue);
+                }
+            };
+
+            return React.createElement('div', { className: 'property-group' }, [
+                React.createElement('label', { key: 'label' }, property.label),
+                React.createElement(PathModeToggle, {
+                    key: 'toggle',
+                    mode: mode,
+                    onChange: setMode,
+                }),
+                mode === 'browse' ? [
+                    // Current path display
+                    localValue && React.createElement('div', {
+                        key: 'path',
+                        className: `current-path-display${pathExists === false ? ' invalid' : ''}`,
+                    }, localValue),
+                    // Directory tree browser (with files)
+                    React.createElement(DirectoryTreeBrowser, {
+                        key: 'tree',
+                        rootPath: rootPath,
+                        showFiles: true,
+                        showHidden: showHidden,
+                        onSelect: handleSelect,
+                        selectedPath: localValue,
+                    }),
+                    // Hidden files toggle
+                    React.createElement('label', {
+                        key: 'hidden',
+                        className: 'hidden-files-toggle',
+                    }, [
+                        React.createElement('input', {
+                            key: 'checkbox',
+                            type: 'checkbox',
+                            checked: showHidden,
+                            onChange: (e) => setShowHidden(e.target.checked),
+                        }),
+                        'Show hidden files',
+                    ]),
+                    // Validation indicator
+                    localValue && pathExists !== null && React.createElement('div', {
+                        key: 'validation',
+                        className: `path-validation ${pathExists ? 'valid' : 'invalid'}`,
+                    }, pathExists ? '✓ Path exists' : '✗ Path not found'),
+                ] : [
+                    // Expression mode - use ExpressionInput
+                    React.createElement(ExpressionInput, {
+                        key: 'expr',
+                        value: localValue,
+                        onChange: handleExpressionChange,
+                        onBlur: handleExpressionBlur,
+                        inputData: inputData,
+                        placeholder: property.placeholder || '/path/to/file',
+                    }),
+                ],
+                property.instructions && React.createElement('div', {
+                    key: 'instructions',
+                    className: 'property-instructions',
+                }, property.instructions),
+            ]);
+        }
+
+        function PropertyEditor({ property, onChange, inputData, nodeTypeId, credentialName, nodeData, workflowSettings }) {
             switch (property.type) {
                 case 'text':
                     return React.createElement(TextPropertyEditor, { property, onChange, inputData });
@@ -4512,6 +5126,14 @@
                     });
                 case 'fieldlist':
                     return React.createElement(FieldListPropertyEditor, { property, onChange, inputData });
+                case 'directory_path':
+                    return React.createElement(DirectoryPathPropertyEditor, {
+                        property, onChange, inputData, workflowSettings
+                    });
+                case 'file_path':
+                    return React.createElement(FilePathPropertyEditor, {
+                        property, onChange, inputData, workflowSettings
+                    });
                 default:
                     return null;
             }
@@ -4626,6 +5248,7 @@
             const tags = useWorkflowStore((state) => state.tags);
             const loadAgents = useWorkflowStore((state) => state.loadAgents);
             const loadTags = useWorkflowStore((state) => state.loadTags);
+            const workflowSettings = useWorkflowStore((state) => state.workflowSettings);
 
             const [localName, setLocalName] = useState(node?.name || '');
 
@@ -5075,6 +5698,7 @@
                                         nodeTypeId: node.typeId,
                                         credentialName: node.data.credentialName,
                                         nodeData: node.data,
+                                        workflowSettings: workflowSettings,
                                     })
                                 ),
                             ]),
@@ -5762,6 +6386,101 @@
                     ])
                 ))
             );
+        }
+
+        // Workflow Settings Tab Component
+        function WorkflowSettingsTab() {
+            const workflowSettings = useWorkflowStore((state) => state.workflowSettings);
+            const updateWorkflowSettings = useWorkflowStore((state) => state.updateWorkflowSettings);
+            const [showHidden, setShowHidden] = useState(false);
+            const [pathExists, setPathExists] = useState(null);
+
+            const dataDirectory = workflowSettings.dataDirectory || '';
+
+            // Check if data directory exists
+            useEffect(() => {
+                if (!dataDirectory) {
+                    setPathExists(null);
+                    return;
+                }
+
+                const checkPath = async () => {
+                    try {
+                        const response = await fetch(`/api/filesystem/exists?path=${encodeURIComponent(dataDirectory)}`);
+                        const data = await response.json();
+                        setPathExists(data.exists && data.isDirectory);
+                    } catch {
+                        setPathExists(false);
+                    }
+                };
+
+                checkPath();
+            }, [dataDirectory]);
+
+            const handleDirectorySelect = (path) => {
+                updateWorkflowSettings({ dataDirectory: path });
+            };
+
+            const handleDirectoryClear = () => {
+                updateWorkflowSettings({ dataDirectory: '' });
+            };
+
+            return React.createElement('div', {
+                className: 'settings-tab-container',
+                'data-testid': 'workflow-settings-tab',
+            }, [
+                React.createElement('div', { key: 'section', className: 'settings-section' }, [
+                    React.createElement('h3', { key: 'title', className: 'settings-section-title' }, 'Data Directory'),
+                    React.createElement('p', { key: 'desc', className: 'settings-section-description' },
+                        'Set a root directory for file and directory paths in this workflow. ' +
+                        'When set, the file browser will be restricted to this directory. ' +
+                        'Leave empty to browse from home directory.'
+                    ),
+                    // Current value display
+                    dataDirectory && React.createElement('div', {
+                        key: 'current',
+                        className: `current-path-display${pathExists === false ? ' invalid' : ''}`,
+                        style: { marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' },
+                    }, [
+                        React.createElement('span', { key: 'path', style: { flex: 1 } }, dataDirectory),
+                        React.createElement('button', {
+                            key: 'clear',
+                            className: 'toolbar-btn',
+                            onClick: handleDirectoryClear,
+                            title: 'Clear data directory',
+                            style: { padding: '4px 8px', fontSize: '12px' },
+                        }, 'Clear'),
+                    ]),
+                    // Validation indicator
+                    dataDirectory && pathExists !== null && React.createElement('div', {
+                        key: 'validation',
+                        className: `path-validation ${pathExists ? 'valid' : 'invalid'}`,
+                        style: { marginBottom: '12px' },
+                    }, pathExists ? '✓ Directory exists' : '✗ Directory not found'),
+                    // Directory tree browser
+                    React.createElement(DirectoryTreeBrowser, {
+                        key: 'tree',
+                        rootPath: null, // Can browse from home
+                        showFiles: false,
+                        showHidden: showHidden,
+                        onSelect: handleDirectorySelect,
+                        selectedPath: dataDirectory,
+                    }),
+                    // Hidden files toggle
+                    React.createElement('label', {
+                        key: 'hidden',
+                        className: 'hidden-files-toggle',
+                    }, [
+                        React.createElement('input', {
+                            key: 'checkbox',
+                            type: 'checkbox',
+                            checked: showHidden,
+                            onChange: (e) => setShowHidden(e.target.checked),
+                        }),
+                        'Show hidden files',
+                    ]),
+                ]),
+            ]);
         }
 
         // Credential Editor Modal Component
@@ -7124,6 +7843,12 @@
                         onClick: () => setEditorTab('history'),
                         'data-testid': 'editor-tab-history',
                     }, 'History'),
+                    React.createElement('button', {
+                        key: 'settings',
+                        className: `editor-tab ${editorTab === 'settings' ? 'active' : ''}`,
+                        onClick: () => setEditorTab('settings'),
+                        'data-testid': 'editor-tab-settings',
+                    }, 'Settings'),
                 ]),
             ]);
         }
@@ -7245,12 +7970,13 @@
                                 }, 'Restore This Version'),
                             ]),
                         ]),
-                        // Main content: Editor, Workflow Executions, or History based on tab
+                        // Main content: Editor, Workflow Executions, History, or Settings based on tab
                         (editorTab === 'editor' || isReadOnly) ? React.createElement('div', { key: 'main', className: 'editor', 'data-testid': 'editor' }, [
                             React.createElement(Sidebar, { key: 'sidebar', onAddNode: handleAddNode }),
                             React.createElement(Canvas, { key: 'canvas', onAddNode: handleAddNode }),
                         ]) : editorTab === 'executions' ? React.createElement(WorkflowExecutionsTab, { key: 'workflow-executions' })
-                           : React.createElement(WorkflowHistoryTab, { key: 'workflow-history' }),
+                           : editorTab === 'history' ? React.createElement(WorkflowHistoryTab, { key: 'workflow-history' })
+                           : React.createElement(WorkflowSettingsTab, { key: 'workflow-settings' }),
                         // Node editor dialog
                         openEditorNodeId && React.createElement(NodeEditorDialog, {
                             key: 'node-editor',

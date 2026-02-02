@@ -101,9 +101,9 @@ export const nodeTypes = [
             {
                 id: 'workingDirectory',
                 label: 'Working Directory',
-                type: 'text',
+                type: 'directory_path',
                 value: data.workingDirectory ?? '',
-                placeholder: 'Leave empty for current directory',
+                placeholder: '/path/to/directory',
             },
             {
                 id: 'timeout',

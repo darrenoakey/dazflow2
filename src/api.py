@@ -38,6 +38,7 @@ from .module_loader import (
     load_all_modules,
 )
 from .tags import create_tag, delete_tag, list_tags
+from .filesystem import check_path, list_directory
 from .git import (
     ensure_gitignore,
     git_add,
@@ -1253,6 +1254,71 @@ async def log_client_error(request: ClientErrorRequest):
         f"  Stack: {request.stack or 'N/A'}"
     )
     return {"logged": True}
+
+
+# ##################################################################
+# filesystem browsing endpoints
+# allow clients to browse the local filesystem for file/directory selection
+
+
+@api_router.get("/filesystem/list")
+async def filesystem_list(
+    path: str = "~",
+    show_hidden: bool = False,
+    directories_only: bool = False,
+    root_path: str | None = None,
+):
+    """List contents of a directory.
+
+    Args:
+        path: Directory path to list (~ is expanded to home)
+        show_hidden: Include hidden files (dotfiles)
+        directories_only: Only return directories, not files
+        root_path: If specified, path must be within this root
+    """
+    result = list_directory(
+        path=path,
+        show_hidden=show_hidden,
+        directories_only=directories_only,
+        root_path=root_path,
+    )
+
+    if result.error:
+        return {
+            "path": result.path,
+            "error": result.error,
+            "directories": [],
+            "files": [],
+        }
+
+    return {
+        "path": result.path,
+        "error": None,
+        "directories": [
+            {"name": d.name, "path": d.path}
+            for d in result.directories
+        ],
+        "files": [
+            {"name": f.name, "path": f.path, "size": f.size}
+            for f in result.files
+        ],
+    }
+
+
+@api_router.get("/filesystem/exists")
+async def filesystem_exists(path: str):
+    """Check if a path exists.
+
+    Args:
+        path: Path to check (~ is expanded to home)
+    """
+    result = check_path(path)
+
+    return {
+        "path": result.path,
+        "exists": result.exists,
+        "isDirectory": result.is_directory,
+    }
 
 
 # ##################################################################
