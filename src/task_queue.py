@@ -127,7 +127,13 @@ class TaskQueue:
             if callback:
                 callback(result)
 
-    def fail_task(self, task_id: str, error: str) -> None:
+    def fail_task(
+        self,
+        task_id: str,
+        error: str,
+        error_details: str | None = None,
+        execution: dict | None = None,
+    ) -> None:
         """Mark a task as failed."""
         task = self._in_progress.pop(task_id, None)
         if task:
@@ -146,9 +152,14 @@ class TaskQueue:
                 registry.update_agent(agent_name, current_task=None)
 
             # Call completion callback with error (include agent name for debugging)
+            result: dict = {"error": error, "agent": agent_name, "node_id": task.node_id}
+            if error_details:
+                result["error_details"] = error_details
+            if execution:
+                result["execution"] = execution
             callback = self._callbacks.pop(task_id, None)
             if callback:
-                callback({"error": error, "agent": agent_name, "node_id": task.node_id})
+                callback(result)
 
     def requeue_agent_tasks(self, agent_name: str) -> None:
         """Requeue all tasks claimed by an agent (on disconnect)."""

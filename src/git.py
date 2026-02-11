@@ -37,9 +37,17 @@ def _run_git(args: list[str], cwd: str | None = None) -> subprocess.CompletedPro
 
 
 def is_git_repo(path: str | None = None) -> bool:
-    """Check if the directory is a git repository."""
-    result = _run_git(["rev-parse", "--is-inside-work-tree"], cwd=path)
-    return result.returncode == 0
+    """Check if the directory is the root of its own git repository.
+
+    Returns False if the directory is merely inside a parent git repo
+    (e.g. a data dir nested inside a source repo).
+    """
+    if path is None:
+        path = get_config().data_dir
+    result = _run_git(["rev-parse", "--show-toplevel"], cwd=path)
+    if result.returncode != 0:
+        return False
+    return Path(result.stdout.strip()).resolve() == Path(path).resolve()
 
 
 def git_init(path: str | None = None) -> bool:

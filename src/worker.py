@@ -509,9 +509,19 @@ async def execute_one_step(item: dict) -> dict:
     queue = get_queue()
     queue.enqueue(task, on_complete=on_complete)
 
+    # Use node's configured timeout if available, otherwise default to 5 minutes
+    node = get_node_by_id(workflow, ready_node_id)
+    node_data = node.get("data", {}) if node else {}
+    try:
+        worker_timeout = int(node_data.get("timeout", 300))
+    except (ValueError, TypeError):
+        worker_timeout = 300
+    # Add a small buffer so the node's own timeout fires first with a clean error
+    worker_timeout = max(worker_timeout + 30, 300)
+
     # Wait for task completion (with timeout)
     try:
-        await asyncio.wait_for(completion_event.wait(), timeout=300)  # 5 min timeout
+        await asyncio.wait_for(completion_event.wait(), timeout=worker_timeout)
 
         # Task completed - update execution with result
         if task_result.get("success"):
@@ -533,7 +543,11 @@ async def execute_one_step(item: dict) -> dict:
             item["error"] = error_msg
             item["error_node_id"] = ready_node_id
             item["error_agent"] = agent_name
+            item["error_details"] = task_result.get("error_details")
             item["completed_at"] = time.time()
+            # Preserve execution state so node error info is visible
+            if task_result.get("execution"):
+                item["execution"] = task_result["execution"]
 
     except asyncio.TimeoutError:
         item["status"] = "error"

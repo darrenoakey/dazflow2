@@ -359,6 +359,7 @@ class DazflowAgent:
 
     async def _execute_task(self, task_id: str, task_details: dict) -> None:
         """Execute a claimed task."""
+        execution = {}
         try:
             print(f"[{self._timestamp()}] Executing task {task_id}...")
 
@@ -401,15 +402,18 @@ class DazflowAgent:
 
         except Exception as e:
             error_msg = f"{type(e).__name__}: {e}"
+            tb = traceback.format_exc()
             print(f"[{self._timestamp()}] Task {task_id} failed: {error_msg}")
-            print(traceback.format_exc())
+            print(tb)
 
-            # Report failure
+            # Report failure — include execution state so error details are preserved
             await self.send(
                 {
                     "type": "task_failed",
                     "task_id": task_id,
                     "error": error_msg,
+                    "error_details": tb,
+                    "execution": execution,
                 }
             )
 

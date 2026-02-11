@@ -133,8 +133,10 @@ async def handle_agent_message(name: str, message: dict, websocket: WebSocket):
         # Agent failed a task
         task_id = message.get("task_id")
         error = message.get("error", "Unknown error")
+        error_details = message.get("error_details")
+        execution = message.get("execution")
         queue = get_queue()
-        queue.fail_task(task_id, error)
+        queue.fail_task(task_id, error, error_details=error_details, execution=execution)
 
     elif msg_type == "credentials_report":
         # Agent reports what credentials it has

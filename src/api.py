@@ -159,15 +159,15 @@ def init_work_directories():
     if SAMPLE_WORKFLOW.exists() and not any(workflows_dir.iterdir()):
         shutil.copy(SAMPLE_WORKFLOW, workflows_dir / "sample.json")
 
-    # Initialize git repository in data directory if not already initialized
-    data_dir = get_config().data_dir
-    if not is_git_repo(data_dir):
-        git_init(data_dir)
-        ensure_gitignore(data_dir)
+    # Initialize git repository in work directory if not already initialized
+    work_dir_str = str(work_dir)
+    if not is_git_repo(work_dir_str):
+        git_init(work_dir_str)
+        ensure_gitignore(work_dir_str)
         # Stage initial files
-        git_add("workflows/", data_dir)
-        git_add(".gitignore", data_dir)
-        git_commit("Initial commit: dazflow2 data directory", data_dir)
+        git_add("workflows/", work_dir_str)
+        git_add(".gitignore", work_dir_str)
+        git_commit("Initial commit: dazflow2 data directory", work_dir_str)
 
     # Initialize worker system
     init_worker_system(queue_dir, stats_dir)
@@ -179,8 +179,12 @@ def init_work_directories():
     load_all_modules()
 
 
-def _load_executions_from_disk(limit: int = 100) -> dict:
-    """Load executions from disk. Used by cache refresh."""
+def _load_executions_from_disk() -> dict:
+    """Load all executions from disk. Used by cache refresh.
+
+    No limit is applied here — the cache holds everything so that
+    per-workflow filtering in list_executions() doesn't miss entries.
+    """
     executions = []
     indexes_dir = _get_indexes_dir()
 
@@ -197,11 +201,7 @@ def _load_executions_from_disk(limit: int = 100) -> dict:
     # Sort by completed_at descending (newest first)
     executions.sort(key=lambda x: x.get("completed_at", 0), reverse=True)
 
-    # Apply limit
-    has_more = len(executions) > limit
-    executions = executions[:limit]
-
-    return {"items": executions, "has_more": has_more, "last_updated": time.time()}
+    return {"items": executions, "last_updated": time.time()}
 
 
 async def _executions_cache_refresh_loop():
@@ -816,6 +816,67 @@ async def set_workflow_enabled_endpoint(path: str, request: SetEnabledRequest):
 
 
 # ##################################################################
+# workflow history endpoint
+# returns git commit history for a workflow file
+# NOTE: must be registered before the catch-all GET /workflow/{path:path}
+@api_router.get("/workflow/{path:path}/history")
+async def get_workflow_history(path: str, limit: int = 50):
+    """Get git commit history for a workflow file."""
+    work_dir = str(_get_work_dir())
+    commits = git_log(f"workflows/{path}", limit=limit, cwd=work_dir)
+    return {"commits": [asdict(c) for c in commits]}
+
+
+# ##################################################################
+# workflow version endpoint
+# returns workflow content at a specific commit
+@api_router.get("/workflow/{path:path}/version/{commit_hash}")
+async def get_workflow_version(path: str, commit_hash: str):
+    """Get workflow content at a specific commit."""
+    work_dir = str(_get_work_dir())
+    content = git_show(commit_hash, f"workflows/{path}", cwd=work_dir)
+    if content is None:
+        raise HTTPException(status_code=404, detail="Version not found")
+
+    try:
+        workflow = json.loads(content)
+        return workflow
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Invalid workflow at this version")
+
+
+# ##################################################################
+# workflow restore endpoint
+# restores workflow to a previous version (creates new commit)
+@api_router.post("/workflow/{path:path}/restore/{commit_hash}")
+async def restore_workflow_version(path: str, commit_hash: str):
+    """Restore workflow to a previous version (creates new commit)."""
+    work_dir = str(_get_work_dir())
+    workflows_dir = _get_workflows_dir()
+    workflow_path = workflows_dir / path
+
+    # Get content at the specified commit
+    content = git_show(commit_hash, f"workflows/{path}", cwd=work_dir)
+    if content is None:
+        raise HTTPException(status_code=404, detail="Version not found")
+
+    # Validate it's valid JSON
+    try:
+        workflow = json.loads(content)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Invalid workflow at this version")
+
+    # Write the restored content
+    workflow_path.write_text(json.dumps(workflow, indent=2))
+
+    # Stage and commit
+    git_add(f"workflows/{path}", work_dir)
+    git_commit(f"Restore {path} to version {commit_hash[:7]}", work_dir)
+
+    return {"restored": True, "commit_hash": commit_hash, "workflow": workflow}
+
+
+# ##################################################################
 # get workflow endpoint
 # returns workflow json
 @api_router.get("/workflow/{path:path}")
@@ -834,15 +895,15 @@ class SaveWorkflowRequest(BaseModel):
     workflow: dict
 
 
-async def _commit_workflow_change(path: str, data_dir: str):
+async def _commit_workflow_change(path: str, work_dir: str):
     """Background task to commit workflow change with AI-generated message."""
     try:
         # Check if there are staged changes
-        if not git_has_changes(f"workflows/{path}", data_dir):
+        if not git_has_changes(f"workflows/{path}", work_dir):
             return
 
         # Get the diff
-        diff = git_diff(f"workflows/{path}", staged=True, cwd=data_dir)
+        diff = git_diff(f"workflows/{path}", staged=True, cwd=work_dir)
         if not diff:
             return
 
@@ -850,7 +911,7 @@ async def _commit_workflow_change(path: str, data_dir: str):
         message = await generate_commit_message(diff, path)
 
         # Commit (sync operation, but fast)
-        git_commit(message, data_dir)
+        git_commit(message, work_dir)
     except Exception as e:
         # Log but don't fail - git is enhancement, not critical
         print(f"Git commit failed: {e}")
@@ -864,73 +925,13 @@ async def save_workflow(path: str, request: SaveWorkflowRequest):
     workflow_path.write_text(json.dumps(request.workflow, indent=2))
 
     # Stage the file immediately (sync, fast)
-    data_dir = get_config().data_dir
-    git_add(f"workflows/{path}", data_dir)
+    work_dir = str(_get_work_dir())
+    git_add(f"workflows/{path}", work_dir)
 
     # Start async commit task (non-blocking)
-    asyncio.create_task(_commit_workflow_change(path, data_dir))
+    asyncio.create_task(_commit_workflow_change(path, work_dir))
 
     return {"saved": True, "path": path}
-
-
-# ##################################################################
-# workflow history endpoint
-# returns git commit history for a workflow file
-@api_router.get("/workflow/{path:path}/history")
-async def get_workflow_history(path: str, limit: int = 50):
-    """Get git commit history for a workflow file."""
-    data_dir = get_config().data_dir
-    commits = git_log(f"workflows/{path}", limit=limit, cwd=data_dir)
-    return {"commits": [asdict(c) for c in commits]}
-
-
-# ##################################################################
-# workflow version endpoint
-# returns workflow content at a specific commit
-@api_router.get("/workflow/{path:path}/version/{commit_hash}")
-async def get_workflow_version(path: str, commit_hash: str):
-    """Get workflow content at a specific commit."""
-    data_dir = get_config().data_dir
-    content = git_show(commit_hash, f"workflows/{path}", cwd=data_dir)
-    if content is None:
-        raise HTTPException(status_code=404, detail="Version not found")
-
-    try:
-        workflow = json.loads(content)
-        return workflow
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="Invalid workflow at this version")
-
-
-# ##################################################################
-# workflow restore endpoint
-# restores workflow to a previous version (creates new commit)
-@api_router.post("/workflow/{path:path}/restore/{commit_hash}")
-async def restore_workflow_version(path: str, commit_hash: str):
-    """Restore workflow to a previous version (creates new commit)."""
-    data_dir = get_config().data_dir
-    workflows_dir = _get_workflows_dir()
-    workflow_path = workflows_dir / path
-
-    # Get content at the specified commit
-    content = git_show(commit_hash, f"workflows/{path}", cwd=data_dir)
-    if content is None:
-        raise HTTPException(status_code=404, detail="Version not found")
-
-    # Validate it's valid JSON
-    try:
-        workflow = json.loads(content)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="Invalid workflow at this version")
-
-    # Write the restored content
-    workflow_path.write_text(json.dumps(workflow, indent=2))
-
-    # Stage and commit
-    git_add(f"workflows/{path}", data_dir)
-    git_commit(f"Restore {path} to version {commit_hash[:7]}", data_dir)
-
-    return {"restored": True, "commit_hash": commit_hash, "workflow": workflow}
 
 
 # ##################################################################
@@ -1347,6 +1348,7 @@ async def heartbeat():
 # ##################################################################
 # serve index
 # serves the main frontend shell html page with no-cache headers
+@app.head("/")
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
     index_path = STATIC_DIR / "index.html"

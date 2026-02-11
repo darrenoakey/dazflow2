@@ -171,6 +171,14 @@
         .custom-node.pipeline .node-icon {
             color: #14b8a6;
         }
+        .custom-node.has-error {
+            border-color: #dc2626;
+            box-shadow: 0 0 8px rgba(220, 38, 38, 0.4);
+        }
+        .custom-node.has-error.selected {
+            border-color: #ef4444;
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.5);
+        }
         .custom-node .node-pin-indicator {
             position: absolute;
             top: -6px;
@@ -3083,13 +3091,30 @@
                     if (response.ok) {
                         const data = await response.json();
                         history.pushState(null, '', `/execution/${id}`);
+                        // If the execution errored and the failing node has no error
+                        // in its execution entry, inject the top-level error info
+                        const execution = data.execution || {};
+                        if (data.status === 'error' && data.error_node_id) {
+                            const nodeExec = execution[data.error_node_id];
+                            if (!nodeExec || !nodeExec.error) {
+                                execution[data.error_node_id] = {
+                                    ...(nodeExec || {}),
+                                    input: nodeExec?.input || null,
+                                    nodeOutput: nodeExec?.nodeOutput || null,
+                                    output: nodeExec?.output || null,
+                                    executedAt: nodeExec?.executedAt || (data.completed_at ? new Date(data.completed_at * 1000).toISOString() : null),
+                                    error: data.error,
+                                    errorDetails: data.error_details || null,
+                                };
+                            }
+                        }
                         set({
                             currentView: 'editor',
                             nodes: data.workflow.nodes || [],
                             connections: data.workflow.connections || [],
                             nameCounts: {},
                             viewport: { x: 0, y: 0, zoom: 1 },
-                            ambientExecution: data.execution || {},
+                            ambientExecution: execution,
                             executionViewerId: id,
                             executionViewerData: data,
                             isReadOnly: true,
@@ -3800,6 +3825,10 @@
             // Check if node is pinned
             const isPinned = workflowNode.data?.pinned || false;
 
+            // Check if node has an error in execution
+            const nodeExec = useWorkflowStore((state) => state.ambientExecution[workflowNode.id]);
+            const hasError = !!nodeExec?.error;
+
             const inputCount = connectors.inputs.length;
             const outputCount = connectors.outputs.length;
             const shapeClasses = [
@@ -3852,7 +3881,7 @@
                 // The actual node box (double-click handled by global position-based detection)
                 React.createElement('div', {
                     key: 'node',
-                    className: `custom-node ${selected ? 'selected' : ''} ${nodeType.category === 'Pipeline' ? 'pipeline' : ''} ${shapeClasses}`,
+                    className: `custom-node ${selected ? 'selected' : ''} ${nodeType.category === 'Pipeline' ? 'pipeline' : ''} ${hasError ? 'has-error' : ''} ${shapeClasses}`,
                 }, [
                     // Input handles
                     ...connectors.inputs.map((input, idx) => {
@@ -5285,6 +5314,8 @@
             const nodeExecution = ambientExecution[nodeId];
             const nodeOutput = nodeExecution?.nodeOutput || null; // What THIS node produced
             const fullOutput = nodeExecution?.output || null; // Combined output (input + nodeOutput under node name)
+            const nodeError = nodeExecution?.error || null; // Error message if node failed
+            const nodeErrorDetails = nodeExecution?.errorDetails || null; // Full traceback
             const executionTime = nodeExecution?.executedAt
                 ? new Date(nodeExecution.executedAt).toLocaleTimeString()
                 : null;
@@ -5771,6 +5802,50 @@
                                             'data-testid': 'execution-output',
                                         }, React.createElement(JsonViewer, { data: pinnedOutput, expandAll: true })),
                                     ])
+                                    : nodeError
+                                        ? React.createElement('div', { key: 'error-content', style: { padding: '12px' } }, [
+                                            executionTime && React.createElement('div', {
+                                                key: 'time',
+                                                className: 'execution-time',
+                                            }, `Failed at ${executionTime}`),
+                                            React.createElement('div', {
+                                                key: 'error-msg',
+                                                style: {
+                                                    background: '#2d1b1b',
+                                                    border: '1px solid #dc2626',
+                                                    borderRadius: '6px',
+                                                    padding: '12px',
+                                                    marginTop: '8px',
+                                                    color: '#fca5a5',
+                                                    fontFamily: 'monospace',
+                                                    fontSize: '13px',
+                                                    whiteSpace: 'pre-wrap',
+                                                    wordBreak: 'break-word',
+                                                },
+                                            }, nodeError),
+                                            nodeErrorDetails && React.createElement('details', {
+                                                key: 'error-details',
+                                                style: { marginTop: '8px' },
+                                            }, [
+                                                React.createElement('summary', {
+                                                    key: 'summary',
+                                                    style: { cursor: 'pointer', color: '#9ca3af', fontSize: '12px' },
+                                                }, 'Stack trace'),
+                                                React.createElement('pre', {
+                                                    key: 'trace',
+                                                    style: {
+                                                        background: '#1a1a2e',
+                                                        padding: '8px',
+                                                        borderRadius: '4px',
+                                                        marginTop: '4px',
+                                                        fontSize: '11px',
+                                                        color: '#9ca3af',
+                                                        overflow: 'auto',
+                                                        maxHeight: '300px',
+                                                    },
+                                                }, nodeErrorDetails),
+                                            ]),
+                                        ])
                                     : fullOutput
                                         ? React.createElement('div', { key: 'output-content' }, [
                                             executionTime && React.createElement('div', {

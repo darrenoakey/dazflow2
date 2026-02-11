@@ -5,6 +5,7 @@ Handles expression evaluation using Duktape and node execution.
 
 import json
 import re
+import traceback
 from datetime import datetime, timezone
 from typing import Any
 
@@ -208,20 +209,33 @@ def execute_node(
         if cred_name:
             credential_data = get_credential_for_execution(cred_name)
 
-    if node_type.get("kind") == "map":
-        # Map node: execute per-item with expression evaluation per-item
-        node_output = []
-        for item in input_data:
-            # Evaluate expressions in node_data for this item
-            evaluated_data = evaluate_data_expressions(node_data, item)
-            result = execute_fn(evaluated_data, item, credential_data)
-            node_output.append(result)
-    else:
-        # Array node: execute once with full input
-        # Use first item for expression evaluation context
-        context = input_data[0] if input_data else {}
-        evaluated_data = evaluate_data_expressions(node_data, context)
-        node_output = execute_fn(evaluated_data, input_data, credential_data)
+    try:
+        if node_type.get("kind") == "map":
+            # Map node: execute per-item with expression evaluation per-item
+            node_output = []
+            for item in input_data:
+                # Evaluate expressions in node_data for this item
+                evaluated_data = evaluate_data_expressions(node_data, item)
+                result = execute_fn(evaluated_data, item, credential_data)
+                node_output.append(result)
+        else:
+            # Array node: execute once with full input
+            # Use first item for expression evaluation context
+            context = input_data[0] if input_data else {}
+            evaluated_data = evaluate_data_expressions(node_data, context)
+            node_output = execute_fn(evaluated_data, input_data, credential_data)
+    except Exception as e:
+        # Record the error in execution state so it's visible in the UI
+        execution = dict(execution)
+        execution[node_id] = {
+            "input": input_data,
+            "nodeOutput": None,
+            "output": None,
+            "executedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "error": f"{type(e).__name__}: {e}",
+            "errorDetails": traceback.format_exc(),
+        }
+        raise
 
     # Ensure output is a list
     if not isinstance(node_output, list):
