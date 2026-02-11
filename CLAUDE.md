@@ -98,9 +98,20 @@ new_execution = await asyncio.to_thread(execute_node, node_id, workflow, executi
 
 Without this, long-running nodes (e.g., `run_command` with 24-hour timeout) block the entire event loop, making the server unresponsive. This caused the server to appear "crashed" when executing workflows with shell commands.
 
+### Data Directory vs Work Directory
+
+**CRITICAL:** `config.data_dir` (project root) is NOT the same as the work directory (`local/work/`).
+
+- `data_dir` = project root (from `DAZFLOW_DATA_DIR` env var or auto-detected)
+- Work dir = `data_dir / "local" / "work"` — where workflows, executions, indexes live
+- Git operations target the **work dir**, not `data_dir` (work dir has its own git repo)
+- `is_git_repo()` checks for the directory's **own** repo, not a parent repo
+
+All `_get_*_dir()` functions in `src/api.py` return paths under the work dir.
+
 ### Git-Based Workflow Versioning
 
-The data directory is automatically initialized as a git repo on startup:
+The **work directory** (`local/work/`) is automatically initialized as a git repo on startup:
 - **src/git.py** - Git operations (init, add, commit, log, show, diff)
 - **src/git_ai.py** - AI commit message generation using Claude Agent SDK
 - **.gitignore** excludes runtime files: `local/`, `agents.json`, `tags.json`, etc.
@@ -303,3 +314,29 @@ Workflows share state through patterns:
 - Workflow A writes to `articles/{slug}.md`
 - Workflow B's `state_trigger` watches `articles/{slug}.md`
 - When A produces, B finds new work automatically
+
+## Worker Timeout Behavior
+
+The worker reads the node's `timeout` property from its data and uses that (+30s buffer) as the worker-level timeout. This ensures the node's own timeout logic fires first with a clean error message. Default is 300s (5 minutes) if no timeout is configured.
+
+Nodes like `run_command` with long timeouts (e.g., 86400s for auto-blog) will be given their full configured time.
+
+## API Route Ordering
+
+**CRITICAL:** Routes with `{path:path}` catch-all parameters are greedy. More specific routes (like `/workflow/{path}/history`) MUST be registered BEFORE the catch-all `GET /workflow/{path:path}`. Otherwise FastAPI matches the catch-all first.
+
+Current correct order in `src/api.py`:
+1. `/workflow/{path}/history` (GET)
+2. `/workflow/{path}/version/{hash}` (GET)
+3. `/workflow/{path}/restore/{hash}` (POST)
+4. `/workflow/{path}` (GET) — catch-all, must be LAST
+
+## Execution Error Visibility
+
+When a node fails during execution:
+- **executor.py** catches exceptions and records `error` + `errorDetails` (traceback) in the execution dict
+- **agent** sends execution state back to server on failure
+- **worker** preserves execution state and error_details in the archived execution
+- **Frontend** shows red error panel with expandable stack trace in node editor
+- **Canvas** shows red border/glow on error nodes (`has-error` CSS class)
+- For legacy executions without per-node errors, the frontend injects the top-level error into the error node's execution data
