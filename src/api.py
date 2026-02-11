@@ -179,11 +179,12 @@ def init_work_directories():
     load_all_modules()
 
 
-def _load_executions_from_disk() -> dict:
-    """Load all executions from disk. Used by cache refresh.
+def _load_executions_from_disk(limit: int = 100) -> dict:
+    """Load recent executions from disk. Used by cache refresh.
 
-    No limit is applied here — the cache holds everything so that
-    per-workflow filtering in list_executions() doesn't miss entries.
+    This is the global "all workflows" cache for the dashboard view.
+    A limit is applied to avoid loading everything into memory.
+    Per-workflow queries use _load_workflow_executions() instead.
     """
     executions = []
     indexes_dir = _get_indexes_dir()
@@ -201,7 +202,35 @@ def _load_executions_from_disk() -> dict:
     # Sort by completed_at descending (newest first)
     executions.sort(key=lambda x: x.get("completed_at", 0), reverse=True)
 
-    return {"items": executions, "last_updated": time.time()}
+    has_more = len(executions) > limit
+    return {"items": executions[:limit], "has_more": has_more, "last_updated": time.time()}
+
+
+def _load_workflow_executions(workflow_path: str) -> list[dict]:
+    """Load executions for a specific workflow from its index file.
+
+    Each workflow has its own JSONL index file, so we read only that
+    file instead of scanning all indexes.
+    """
+    indexes_dir = _get_indexes_dir()
+    index_name = workflow_path.replace("/", "-").replace(".json", "") + ".jsonl"
+    index_file = indexes_dir / index_name
+
+    if not index_file.exists():
+        return []
+
+    executions = []
+    try:
+        for line in index_file.read_text().strip().split("\n"):
+            if line:
+                entry = json.loads(line)
+                executions.append(entry)
+    except (json.JSONDecodeError, OSError):
+        pass
+
+    # Sort by completed_at descending (newest first)
+    executions.sort(key=lambda x: x.get("completed_at", 0), reverse=True)
+    return executions
 
 
 async def _executions_cache_refresh_loop():
@@ -1128,20 +1157,21 @@ async def list_executions(
 ):
     """List executions, newest first, with pagination.
 
-    Returns cached data that refreshes every 10 seconds server-side.
-    Multiple clients hitting this endpoint share the same cached result.
+    When workflow_path is specified, reads that workflow's index file directly
+    (efficient, no global cache needed). Otherwise uses the global cache
+    which holds the most recent 100 executions across all workflows.
 
     Args:
         limit: Maximum number of executions to return
         before: Only return executions with completed_at < this value (for pagination)
         workflow_path: Filter to only executions of this workflow
     """
-    # Use cached data
-    executions = list(_executions_cache.get("items", []))
-
-    # Filter by workflow path if provided
     if workflow_path is not None:
-        executions = [e for e in executions if e.get("workflow_path") == workflow_path]
+        # Read directly from this workflow's index file
+        executions = _load_workflow_executions(workflow_path)
+    else:
+        # Use global cache for the "all workflows" dashboard view
+        executions = list(_executions_cache.get("items", []))
 
     # Filter by before cursor if provided (for pagination)
     if before is not None:

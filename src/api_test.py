@@ -1681,29 +1681,48 @@ async def test_execute_multi_node_workflow_step_by_step(tmp_path):
 # ##################################################################
 # test list_executions with workflow_path filter
 # verifies that workflow_path parameter filters executions correctly
-def test_list_executions_workflow_filter():
+def test_list_executions_workflow_filter(tmp_path):
     import src.api as api_module
 
-    # Set up mock cache data
+    set_config(ServerConfig(data_dir=str(tmp_path)))
+
+    # Create per-workflow index files (used when workflow_path is specified)
+    indexes_dir = tmp_path / "local" / "work" / "indexes"
+    indexes_dir.mkdir(parents=True)
+
+    entries_a = [
+        {"id": "exec1", "workflow_path": "workflow-a.json", "completed_at": 1000},
+        {"id": "exec3", "workflow_path": "workflow-a.json", "completed_at": 3000},
+    ]
+    entries_b = [
+        {"id": "exec2", "workflow_path": "workflow-b.json", "completed_at": 2000},
+    ]
+    entries_c = [
+        {"id": "exec4", "workflow_path": "workflow-c.json", "completed_at": 4000},
+    ]
+
+    for name, entries in [("workflow-a.jsonl", entries_a), ("workflow-b.jsonl", entries_b), ("workflow-c.jsonl", entries_c)]:
+        with open(indexes_dir / name, "w") as f:
+            for entry in entries:
+                f.write(json.dumps(entry) + "\n")
+
+    # Set up global cache (used when no workflow_path filter)
     original_cache = api_module._executions_cache.copy()
     try:
-        api_module._executions_cache["items"] = [
-            {"id": "exec1", "workflow_path": "workflow-a.json", "completed_at": 1000},
-            {"id": "exec2", "workflow_path": "workflow-b.json", "completed_at": 2000},
-            {"id": "exec3", "workflow_path": "workflow-a.json", "completed_at": 3000},
-            {"id": "exec4", "workflow_path": "workflow-c.json", "completed_at": 4000},
-        ]
+        all_entries = entries_a + entries_b + entries_c
+        all_entries.sort(key=lambda x: x["completed_at"], reverse=True)
+        api_module._executions_cache["items"] = all_entries
         api_module._executions_cache["last_updated"] = 5000
 
         client = TestClient(app)
 
-        # Test without filter - should return all
+        # Test without filter - uses global cache
         response = client.get("/api/executions")
         assert response.status_code == 200
         data = response.json()
         assert len(data["items"]) == 4
 
-        # Test with workflow_path filter
+        # Test with workflow_path filter - reads per-workflow index file
         response = client.get("/api/executions?workflow_path=workflow-a.json")
         assert response.status_code == 200
         data = response.json()

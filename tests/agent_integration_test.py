@@ -255,18 +255,23 @@ def test_builtin_agent_connects_on_startup(test_server):
 
 def test_builtin_agent_persists_across_restarts(tmp_path_factory):
     """Test that built-in agent secret persists across server restarts."""
+    # Use a different port than the module-scoped test_server fixture
+    # to avoid port conflicts when both are alive simultaneously
+    restart_port = TEST_PORT + 1
+    restart_url = f"http://localhost:{restart_port}"
+
     data_dir = tmp_path_factory.mktemp("dazflow_test_restart")
     (data_dir / "workflows").mkdir()
     project_root = Path(__file__).parent.parent
 
     # Start server first time
     server_proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "src.api:app", "--host", "127.0.0.1", "--port", str(TEST_PORT)],
+        [sys.executable, "-m", "uvicorn", "src.api:app", "--host", "127.0.0.1", "--port", str(restart_port)],
         cwd=str(project_root),
         env={
             **dict(os.environ),
             "DAZFLOW_DATA_DIR": str(data_dir),
-            "DAZFLOW_PORT": str(TEST_PORT),
+            "DAZFLOW_PORT": str(restart_port),
         },
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -276,7 +281,7 @@ def test_builtin_agent_persists_across_restarts(tmp_path_factory):
         # Wait for server to be ready
         for _ in range(30):
             try:
-                response = requests.get(f"{TEST_SERVER_URL}/health", timeout=1)
+                response = requests.get(f"{restart_url}/health", timeout=1)
                 if response.status_code == 200:
                     break
             except requests.exceptions.ConnectionError:
@@ -287,7 +292,7 @@ def test_builtin_agent_persists_across_restarts(tmp_path_factory):
         time.sleep(2)
 
         # Verify built-in agent exists
-        response = requests.get(f"{TEST_SERVER_URL}/api/agents/built-in")
+        response = requests.get(f"{restart_url}/api/agents/built-in")
         assert response.status_code == 200
 
         # Verify secret file was created
@@ -301,12 +306,12 @@ def test_builtin_agent_persists_across_restarts(tmp_path_factory):
 
     # Start server second time with same data directory
     server_proc2 = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "src.api:app", "--host", "127.0.0.1", "--port", str(TEST_PORT)],
+        [sys.executable, "-m", "uvicorn", "src.api:app", "--host", "127.0.0.1", "--port", str(restart_port)],
         cwd=str(project_root),
         env={
             **dict(os.environ),
             "DAZFLOW_DATA_DIR": str(data_dir),
-            "DAZFLOW_PORT": str(TEST_PORT),
+            "DAZFLOW_PORT": str(restart_port),
         },
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -316,7 +321,7 @@ def test_builtin_agent_persists_across_restarts(tmp_path_factory):
         # Wait for server to be ready
         for _ in range(30):
             try:
-                response = requests.get(f"{TEST_SERVER_URL}/health", timeout=1)
+                response = requests.get(f"{restart_url}/health", timeout=1)
                 if response.status_code == 200:
                     break
             except requests.exceptions.ConnectionError:
@@ -327,7 +332,7 @@ def test_builtin_agent_persists_across_restarts(tmp_path_factory):
         time.sleep(2)
 
         # Verify built-in agent still exists and secret hasn't changed
-        response = requests.get(f"{TEST_SERVER_URL}/api/agents/built-in")
+        response = requests.get(f"{restart_url}/api/agents/built-in")
         assert response.status_code == 200
 
         # Verify secret is the same
