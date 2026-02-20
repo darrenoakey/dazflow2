@@ -1701,7 +1701,11 @@ def test_list_executions_workflow_filter(tmp_path):
         {"id": "exec4", "workflow_path": "workflow-c.json", "completed_at": 4000},
     ]
 
-    for name, entries in [("workflow-a.jsonl", entries_a), ("workflow-b.jsonl", entries_b), ("workflow-c.jsonl", entries_c)]:
+    for name, entries in [
+        ("workflow-a.jsonl", entries_a),
+        ("workflow-b.jsonl", entries_b),
+        ("workflow-c.jsonl", entries_c),
+    ]:
         with open(indexes_dir / name, "w") as f:
             for entry in entries:
                 f.write(json.dumps(entry) + "\n")

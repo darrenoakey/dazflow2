@@ -5,6 +5,7 @@ conversation persistence across executions.
 """
 
 import asyncio
+import os
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -43,6 +44,11 @@ def _run_agent_query(prompt: str, session_id: str | None, options: dict) -> dict
     async def run_query():
         # Build options
         sdk_options = ClaudeAgentOptions()
+
+        # Strip CLAUDECODE so claude can be launched from within Claude Code
+        env = os.environ.copy()
+        env.pop("CLAUDECODE", None)
+        sdk_options.env = env
 
         if session_id:
             sdk_options.resume = session_id
@@ -126,7 +132,7 @@ def execute_claude_agent(node_data: dict, input_data, credential_data=None) -> l
     Returns:
         List with single result dict containing response and metadata
     """
-    prompt = node_data.get("prompt", "")
+    prompt = (node_data.get("prompt") or "").strip()
     conversation_id = node_data.get("conversation_id", "")
     model = node_data.get("model", "")
     allowed_tools = node_data.get("allowed_tools", "")

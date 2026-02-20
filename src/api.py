@@ -1325,14 +1325,8 @@ async def filesystem_list(
     return {
         "path": result.path,
         "error": None,
-        "directories": [
-            {"name": d.name, "path": d.path}
-            for d in result.directories
-        ],
-        "files": [
-            {"name": f.name, "path": f.path, "size": f.size}
-            for f in result.files
-        ],
+        "directories": [{"name": d.name, "path": d.path} for d in result.directories],
+        "files": [{"name": f.name, "path": f.path, "size": f.size} for f in result.files],
     }
 
 

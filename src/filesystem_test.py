@@ -4,11 +4,8 @@ import os
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from .filesystem import (
     DirectoryEntry,
-    DirectoryListing,
     PathInfo,
     check_path,
     expand_path,
