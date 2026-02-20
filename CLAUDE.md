@@ -340,3 +340,26 @@ When a node fails during execution:
 - **Frontend** shows red error panel with expandable stack trace in node editor
 - **Canvas** shows red border/glow on error nodes (`has-error` CSS class)
 - For legacy executions without per-node errors, the frontend injects the top-level error into the error node's execution data
+
+## Agent-Link Integration
+
+The `modules/agent_link/` module connects dazflow2 to the local agent-link service:
+
+- **Service URL:** `https://localhost:8900` (mTLS required)
+- **Certs:** `~/.agent-link/certs/ca.crt`, `~/.agent-link/certs/client/client.crt`, `~/.agent-link/certs/client/client.key`
+- **17 nodes:** `email_trigger` (push/SSE), 7 mail actions, 3 calendar actions, `contacts_list`, 3 task actions, `agent_link_call` (generic)
+
+### Response Format
+
+agent-link returns `{"Data": {...}, "Error": "", "Source": "source-name"}` per source, NOT `{"results": [...]}`. The `_call()` helper in `nodes.py` normalizes this automatically — callers receive a list of unwrapped `Data` dicts.
+
+### Email Trigger
+
+`email_trigger` is a **push** trigger that subscribes to SSE at `/api/v1/events/subscribe?type=mail.received`. It uses `httpx.AsyncClient.stream()` for non-blocking async SSE. Optional `from_filter`, `subject_filter`, and `source` properties for filtering.
+
+### Enabling seek-emails Workflow
+
+`local/work/workflows/seek-emails.json` logs emails from `noreply@s.seek.com.au` to `local/seek-emails.jsonl`. Enable with:
+```bash
+curl -X PUT http://localhost:31415/api/workflow/seek-emails.json/enabled -H "Content-Type: application/json" -d '{"enabled": true}'
+```
