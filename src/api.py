@@ -1,10 +1,13 @@
 import asyncio
 import json
+import logging
 import os
 import shutil
 import sys
 import time
 from contextlib import asynccontextmanager
+
+logging.basicConfig(level=logging.INFO)
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any

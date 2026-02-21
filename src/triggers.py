@@ -5,10 +5,13 @@ Manages automatic workflow execution via trigger nodes.
 
 import asyncio
 import json
+import logging
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Callable
+
+logger = logging.getLogger(__name__)
 
 from .nodes import get_node_type
 from .worker import queue_workflow, wake_workers
@@ -209,22 +212,32 @@ async def _start_push_listener(
         max_restarts = 10
         backoff = 1
 
+        logger.info("Push listener starting: %s", trigger_id)
         while not _shutdown and restart_count < max_restarts:
             try:
                 # Call the listener function (blocks until callback called or error)
                 await listener_fn(node_data, callback)
                 # If it returns normally, we're done
+                logger.info("Push listener exited normally: %s", trigger_id)
                 break
             except asyncio.CancelledError:
+                logger.info("Push listener cancelled: %s", trigger_id)
                 break
-            except Exception:
+            except Exception as e:
                 restart_count += 1
+                logger.warning(
+                    "Push listener error (%s, attempt %d/%d): %s",
+                    trigger_id, restart_count, max_restarts, e
+                )
                 # Exponential backoff using Event pattern
                 try:
                     await asyncio.wait_for(asyncio.Event().wait(), timeout=min(backoff, 60))
                 except asyncio.TimeoutError:
                     pass
                 backoff *= 2
+
+        if restart_count >= max_restarts:
+            logger.error("Push listener gave up after %d restarts: %s", max_restarts, trigger_id)
 
     task = asyncio.create_task(listener_wrapper())
     _push_listeners[trigger_id] = task
