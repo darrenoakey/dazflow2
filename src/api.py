@@ -351,6 +351,10 @@ api_router = APIRouter(prefix="/api")
 # Mount static files for nodes directory (must be before routes)
 app.mount("/nodes", StaticFiles(directory=STATIC_DIR / "nodes"), name="nodes")
 
+# Mount vendor directory for self-hosted JS bundles (xyflow, etc.)
+if (STATIC_DIR / "vendor").exists():
+    app.mount("/static/vendor", StaticFiles(directory=STATIC_DIR / "vendor"), name="vendor")
+
 # Mount modules directory for JS files
 MODULES_DIR = PROJECT_ROOT / "modules"
 if MODULES_DIR.exists():
