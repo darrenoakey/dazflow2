@@ -98,6 +98,8 @@ new_execution = await asyncio.to_thread(execute_node, node_id, workflow, executi
 
 Without this, long-running nodes (e.g., `run_command` with 24-hour timeout) block the entire event loop, making the server unresponsive. This caused the server to appear "crashed" when executing workflows with shell commands.
 
+**CRITICAL:** `_execute_task()` MUST clear `self._current_task = None` in a `finally` block. Without this, any task failure (exception, timeout, import error) leaves the agent permanently "busy" — it refuses all new work and every subsequent execution times out at 330s.
+
 ### Data Directory vs Work Directory
 
 **CRITICAL:** `config.data_dir` (project root) is NOT the same as the work directory (`local/work/`).
