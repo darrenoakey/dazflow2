@@ -335,6 +335,28 @@ Invokes Claude AI as an agent with tool access.
 **Credential**: None required (uses claude-agent-sdk)
 **Output**: `{"response": "Claude's response text", "conversation_id": "..."}`
 
+### `claude_json`
+Calls Claude API directly and returns structured JSON. Supports fan-out: a JSON array response produces multiple output items.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `prompt` | string | Prompt for Claude (should request JSON output) |
+| `model` | string | Model ID (default: `claude-haiku-4-5-20251001`) |
+| `max_tokens` | number | Max response tokens (default: 4096) |
+
+**Kind**: array
+**Credential**: None required (uses `ANTHROPIC_API_KEY` env var)
+**Output**: Parsed JSON from Claude's response. Array → multiple items; object → single-item list.
+
+**Example**:
+```json
+{
+  "prompt": "Extract job listings from this HTML as a JSON array: {{$.email_get.body}}",
+  "model": "claude-haiku-4-5-20251001",
+  "max_tokens": 4096
+}
+```
+
 ---
 
 ## Discord Module (`discord_nodes`)

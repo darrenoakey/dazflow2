@@ -357,9 +357,16 @@ agent-link returns `{"Data": {...}, "Error": "", "Source": "source-name"}` per s
 
 `email_trigger` is a **push** trigger that subscribes to SSE at `/api/v1/events/subscribe?type=mail.received`. It uses `httpx.AsyncClient.stream()` for non-blocking async SSE. Optional `from_filter`, `subject_filter`, and `source` properties for filtering.
 
+### Claude JSON Node
+
+`claude_json` calls the Anthropic API directly (not claude_agent_sdk) and parses the response as structured JSON. Returns `kind: "array"` — a JSON array response fans out into multiple output items (e.g., 1 email → N job listings). Uses `ANTHROPIC_API_KEY` env var. Default model: `claude-haiku-4-5-20251001`.
+
 ### Enabling seek-emails Workflow
 
-`local/work/workflows/seek-emails.json` logs emails from `noreply@s.seek.com.au` to `local/seek-emails.jsonl`. Enable with:
+`local/work/workflows/seek-emails.json` processes Seek job alert emails:
+`email_trigger` → `email_get` (full body) → `claude_json` (extract jobs) → `discord_send` (#jobs channel).
+
+Enable with:
 ```bash
 curl -X PUT http://localhost:31415/api/workflow/seek-emails.json/enabled -H "Content-Type: application/json" -d '{"enabled": true}'
 ```
