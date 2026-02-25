@@ -6,8 +6,6 @@ import shutil
 import sys
 import time
 from contextlib import asynccontextmanager
-
-logging.basicConfig(level=logging.INFO)
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -72,6 +70,8 @@ from .worker import (
     stop_workers,
     wake_workers,
 )
+
+logging.basicConfig(level=logging.INFO)
 
 # Add agent directory to path for importing DazflowAgent
 sys.path.insert(0, str(Path(__file__).parent.parent / "agent"))

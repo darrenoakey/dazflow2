@@ -418,6 +418,7 @@ class DazflowAgent:
             )
 
         finally:
+            # Always clear current task so agent can accept new work
             self._current_task = None
 
     async def _handle_credential_push(self, message: dict) -> None:

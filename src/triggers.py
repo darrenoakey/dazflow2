@@ -11,10 +11,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-logger = logging.getLogger(__name__)
-
 from .nodes import get_node_type
 from .worker import queue_workflow, wake_workers
+
+logger = logging.getLogger(__name__)
 
 # Directory paths (set by init_trigger_system)
 WORK_DIR: Path | None = None
