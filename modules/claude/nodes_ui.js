@@ -46,9 +46,9 @@ export const nodeTypes = [
                 value: data.model ?? '',
                 options: [
                     { value: '', label: 'Default' },
-                    { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
-                    { value: 'claude-opus-4', label: 'Claude Opus 4' },
-                    { value: 'claude-haiku-3-5', label: 'Claude Haiku 3.5' },
+                    { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+                    { value: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
+                    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
                 ],
             },
             {
@@ -86,6 +86,54 @@ export const nodeTypes = [
                 value: data.cwd ?? '',
                 placeholder: '/path/to/project',
                 instructions: 'Optional. The working directory for the agent.',
+            },
+        ],
+    },
+    {
+        id: 'claude_json',
+        name: 'Claude JSON',
+        category: 'AI',
+        kind: 'array',
+        icon: `<svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h-2v-2h2v2zm0-4h-2V7h2v6zm4 4h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+        </svg>`,
+        defaultData: {
+            prompt: '',
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 4096,
+        },
+        getConnectors: () => ({
+            inputs: [{ id: 'trigger', name: 'trigger' }],
+            outputs: [{ id: 'result', name: 'result' }],
+        }),
+        getProperties: (data) => [
+            {
+                id: 'prompt',
+                label: 'Prompt',
+                type: 'textarea',
+                value: data.prompt ?? '',
+                placeholder: 'Extract structured data as JSON...',
+                instructions: 'Prompt for Claude. Use {{$.field}} for input data. Response must be valid JSON.',
+            },
+            {
+                id: 'model',
+                label: 'Model',
+                type: 'select',
+                value: data.model ?? 'claude-haiku-4-5-20251001',
+                options: [
+                    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (fast, cheap)' },
+                    { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+                    { value: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
+                ],
+            },
+            {
+                id: 'max_tokens',
+                label: 'Max Tokens',
+                type: 'number',
+                value: data.max_tokens ?? 4096,
+                min: 1,
+                max: 65536,
+                instructions: 'Maximum tokens in Claude response.',
             },
         ],
     },

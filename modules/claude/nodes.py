@@ -1,11 +1,14 @@
-"""Claude agent node for running Claude Code as an agent.
+"""Claude module nodes.
 
-Provides a node that executes Claude agent queries with optional
-conversation persistence across executions.
+Provides:
+- claude_agent: Runs Claude Code as an agent with tool access
+- claude_json: Calls Claude API directly and returns structured JSON
 """
 
 import asyncio
+import json
 import os
+import re
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -167,6 +170,65 @@ def execute_claude_agent(node_data: dict, input_data, credential_data=None) -> l
     return [result]
 
 
+def execute_claude_json(node_data: dict, input_data, credential_data=None) -> list[dict]:
+    """Call Claude API and return structured JSON.
+
+    Uses the Anthropic SDK directly (not claude_agent_sdk) to send a prompt
+    and parse the response as JSON. Returns a list of dicts, enabling fan-out
+    when Claude returns a JSON array (e.g., 1 email → N job listings).
+
+    Args:
+        node_data: Node configuration with prompt, model, max_tokens
+        input_data: Input data from previous nodes (available as $ in expressions)
+        credential_data: Not used - uses ANTHROPIC_API_KEY env var
+
+    Returns:
+        List of dicts parsed from Claude's JSON response
+    """
+    prompt = (node_data.get("prompt") or "").strip()
+    model = node_data.get("model", "") or "claude-haiku-4-5-20251001"
+    max_tokens = int(node_data.get("max_tokens", 4096) or 4096)
+
+    if not prompt:
+        return [{"error": "Prompt is required"}]
+
+    try:
+        import anthropic
+    except ImportError:
+        return [{"error": "anthropic package not installed. Run: pip install anthropic"}]
+
+    client = anthropic.Anthropic()
+
+    message = client.messages.create(
+        model=model,
+        max_tokens=max_tokens,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    # Extract text from response
+    text = ""
+    for block in message.content:
+        if block.type == "text":
+            text += block.text
+
+    # Strip markdown code fences if present
+    text = text.strip()
+    text = re.sub(r"^```(?:json)?\s*\n?", "", text)
+    text = re.sub(r"\n?```\s*$", "", text)
+    text = text.strip()
+
+    # Parse as JSON
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as e:
+        return [{"error": f"Failed to parse JSON: {e}", "raw_response": text}]
+
+    # Array → multiple items for fan-out; object → single-item list
+    if isinstance(parsed, list):
+        return parsed if parsed else [{}]
+    return [parsed]
+
+
 # ##################################################################
 # Node type definitions
 
@@ -174,5 +236,9 @@ NODE_TYPES = {
     "claude_agent": {
         "execute": execute_claude_agent,
         "kind": "map",
+    },
+    "claude_json": {
+        "execute": execute_claude_json,
+        "kind": "array",
     },
 }

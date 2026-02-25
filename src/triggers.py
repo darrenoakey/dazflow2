@@ -226,8 +226,7 @@ async def _start_push_listener(
             except Exception as e:
                 restart_count += 1
                 logger.warning(
-                    "Push listener error (%s, attempt %d/%d): %s",
-                    trigger_id, restart_count, max_restarts, e
+                    "Push listener error (%s, attempt %d/%d): %s", trigger_id, restart_count, max_restarts, e
                 )
                 # Exponential backoff using Event pattern
                 try:
