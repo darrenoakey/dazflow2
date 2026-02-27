@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, TextBlock, query
+from agent_sdk import Tier, agent
 
 from src.config import get_config
 from src.validation import validate_workflow
@@ -230,17 +230,8 @@ Summary:"""
 
     summary = ""
     try:
-        async for message in query(
-            prompt=summary_prompt,
-            options=ClaudeAgentOptions(
-                allowed_tools=[],
-                permission_mode="bypassPermissions",
-            ),
-        ):
-            if isinstance(message, AssistantMessage):
-                for block in message.content:
-                    if isinstance(block, TextBlock):
-                        summary += block.text
+        response = await agent.ask(summary_prompt, tier=Tier.LOW)
+        summary = response.text
     except Exception:
         summary = "Previous conversation about workflow management."
 
@@ -304,19 +295,14 @@ async def chat(
     # Query Claude
     response_text = ""
     try:
-        async for message in query(
-            prompt=full_prompt,
-            options=ClaudeAgentOptions(
-                allowed_tools=["Read", "Write", "Edit", "Glob", "Grep", "Bash"],
-                permission_mode="bypassPermissions",
-                system_prompt=system_prompt,
-                cwd=get_config().data_dir,
-            ),
-        ):
-            if isinstance(message, AssistantMessage):
-                for block in message.content:
-                    if isinstance(block, TextBlock):
-                        response_text += block.text
+        response = await agent.ask(
+            full_prompt,
+            tier=Tier.HIGH,
+            tools=["Read", "Write", "Edit", "Glob", "Grep", "Bash"],
+            system_prompt=system_prompt,
+            cwd=get_config().data_dir,
+        )
+        response_text = response.text
     except Exception as e:
         response_text = f"Error communicating with AI: {e}"
 

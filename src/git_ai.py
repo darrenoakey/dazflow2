@@ -1,9 +1,9 @@
-"""AI-powered commit message generation using Claude Agent SDK.
+"""AI-powered commit message generation using agent-sdk.
 
-Uses Claude (haiku model) to generate meaningful commit messages from diffs.
+Uses Claude (haiku/LOW tier) to generate meaningful commit messages from diffs.
 """
 
-from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, TextBlock, query
+from agent_sdk import Tier, agent
 
 
 async def generate_commit_message(diff: str, workflow_name: str) -> str:
@@ -35,25 +35,16 @@ Return ONLY the commit message text, nothing else - no quotes, no explanation.
 Diff:
 {truncated_diff}"""
 
-    response = ""
+    response_text = ""
     try:
-        async for message in query(
-            prompt=prompt,
-            options=ClaudeAgentOptions(
-                allowed_tools=[],
-                permission_mode="bypassPermissions",
-            ),
-        ):
-            if isinstance(message, AssistantMessage):
-                for block in message.content:
-                    if isinstance(block, TextBlock):
-                        response += block.text
+        response = await agent.ask(prompt, tier=Tier.LOW)
+        response_text = response.text
     except Exception:
         # If AI fails, return a generic message
         return f"Update {workflow_name}"
 
     # Clean up the response
-    message = response.strip()
+    message = response_text.strip()
     if not message:
         message = f"Update {workflow_name}"
 

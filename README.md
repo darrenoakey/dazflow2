@@ -2,137 +2,178 @@
 
 # dazflow2
 
-A visual workflow automation platform that lets you create, manage, and execute automated workflows through a web-based interface.
+A visual workflow automation platform where you design automated tasks by connecting nodes in a web-based editor — like building with blocks, but for automating your digital life.
 
-## Purpose
+## What is dazflow2?
 
-dazflow2 provides a workflow automation system where you can:
+dazflow2 lets you create automated workflows without writing code. Want to run a task every 5 minutes? Process incoming emails? Send notifications to Discord? Just drag nodes onto a canvas, connect them together, and let dazflow2 handle the rest.
 
-- Design workflows visually using a node-based editor
-- Schedule automated tasks with various triggers
-- Distribute workflow execution across multiple agents
-- Monitor workflow executions and their status
+Think of it as your personal automation hub — workflows run in the background, triggered by schedules, events, or other workflows, so you can focus on more interesting things.
 
-## Installation
+## Getting Started
 
 ### Prerequisites
 
-- Python 3.10+
-- Node.js 18+ (for running Playwright tests)
+- **Python 3.10+**
+- **Node.js 18+** (for running tests)
 
-### Setup
+### Installation
 
-1. Clone the repository and install Python dependencies:
+1. Clone the repository and install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Install Playwright browsers (for testing):
+2. If you plan to run tests, install Playwright:
 
 ```bash
 npm install
 npx playwright install
 ```
 
-## Usage
-
 ### Starting the Server
 
-The server is managed through the `auto` service manager:
+dazflow2 uses the `auto` service manager to keep things running smoothly:
 
 ```bash
-# Start the server
-auto start dazflow
-
-# Stop the server
-auto stop dazflow
-
-# Restart the server
-auto restart dazflow
+auto start dazflow    # Start the server
+auto stop dazflow     # Stop the server
+auto restart dazflow  # Restart after changes
 ```
 
-The web interface will be available at `http://localhost:31415`.
+Once started, open your browser and visit **http://localhost:31415** — that's your workflow dashboard.
 
-### Creating Workflows
+## Features
 
-1. Open the web interface in your browser
-2. Use the visual editor to add nodes (triggers, actions)
-3. Connect nodes to define the workflow logic
-4. Save and enable the workflow
+### Visual Workflow Editor
 
-### Workflow Example
+The heart of dazflow2 is its node-based editor. You build workflows by:
 
-A simple workflow that appends timestamps to a file every 5 minutes:
+1. **Adding nodes** from the sidebar — triggers, transforms, actions, and more
+2. **Connecting them** by dragging wires between nodes
+3. **Configuring each node** with its own settings
+4. **Saving** — changes autosave after 1 second of inactivity
 
-```json
-{
-  "nodes": [
-    {
-      "id": "node-1",
-      "typeId": "scheduled",
-      "name": "scheduled1",
-      "position": { "x": 100, "y": 150 },
-      "data": {
-        "interval": 5,
-        "unit": "minutes"
-      }
-    },
-    {
-      "id": "node-2",
-      "typeId": "append_to_file",
-      "name": "append1",
-      "position": { "x": 400, "y": 150 },
-      "data": {
-        "filepath": "local/work/output/timestamps.txt",
-        "content": "{{$.scheduled1.time}}"
-      }
-    }
-  ],
-  "connections": [
-    {
-      "id": "conn-1",
-      "sourceNodeId": "node-1",
-      "sourceConnectorId": "trigger",
-      "targetNodeId": "node-2",
-      "targetConnectorId": "data"
-    }
-  ]
-}
-```
+The sidebar organizes nodes into collapsible categories: Input, Transform, Logic, Action, Pipeline, Output, AI, Discord, System, and Database.
 
-### Running Tests
+### Node Types
+
+Here's a taste of what you can do:
+
+| Category | Examples |
+|----------|---------|
+| **Input** | Scheduled triggers, email triggers, webhooks |
+| **Transform** | Set values, transform data, extract fields |
+| **Logic** | Conditionals, branching, filtering |
+| **Action** | Run shell commands, append to files, call APIs |
+| **Pipeline** | State-based data processing with automatic change detection |
+| **AI** | Claude-powered nodes for text analysis and generation |
+| **Discord** | Send messages to Discord channels |
+| **Database** | Read and write data |
+
+### Scheduled Workflows
+
+Set up tasks to run on a schedule — every few minutes, hourly, daily, or with custom cron expressions. Great for:
+
+- Periodic data collection
+- Regular file cleanup
+- Scheduled notifications
+- Recurring reports
+
+### Pipeline Workflows
+
+For more advanced use cases, pipeline nodes let you build state-aware data processing chains. They automatically detect when something has changed and only reprocess what's needed — perfect for things like content feeds, data syncing, or multi-step processing pipelines.
+
+### Workflow Version History
+
+Every time you save a workflow, dazflow2 keeps a version in its history. You can:
+
+- **Browse past versions** in the History tab
+- **Compare changes** between versions
+- **Restore any previous version** with one click
+
+Never worry about losing your work or breaking something — you can always go back.
+
+### AI Assistant
+
+dazflow2 includes a built-in AI assistant that understands your workflows. Use it to:
+
+- Create new workflows from natural language descriptions
+- Modify existing workflows through conversation
+- Manage folders, tags, and organization
+- Get help with workflow design
+
+Access it through the chat panel in the dashboard or editor, or from the command line:
 
 ```bash
-# Run the full test suite and quality gates
-./run check
-
-# Run a specific test
-./run test tests/e2e/
-
-# Run linter
-./run lint
-
-# Run Playwright tests with UI
-npm run test:e2e:ui
+./run ai list                              # List all workflows
+./run ai enable my-workflow                # Enable a workflow
+./run ai create a workflow that does x y z # Describe what you want
 ```
 
-### CLI Commands
+### Distributed Agents
 
-The `./run` script provides several commands:
+Need more power? dazflow2 supports multiple execution agents:
 
-| Command | Description |
+- **Built-in agent** — runs on the same machine as the server
+- **Remote agents** — run on other machines and connect back to the server
+
+This lets you spread work across multiple machines or dedicate specific agents to specific tasks.
+
+### Workflow Settings
+
+Each workflow can have its own settings:
+
+- **Data Directory** — restrict file operations to a specific folder for safety
+- **Tags** — organize workflows with labels
+- **Concurrency Groups** — prevent workflows from stepping on each other
+
+### File and Directory Browsing
+
+Nodes that work with files (like "append to file" or "run command") include a built-in file browser. Toggle between browsing mode and typing a path directly, with real-time validation to catch typos.
+
+## Tips and Tricks
+
+- **Autosave is your friend** — changes save automatically after 1 second, and the status indicator in the header shows you the current state (Saved, Modified, Saving)
+
+- **Use the keyboard** — the editor supports standard shortcuts for common operations
+
+- **Check the Executions tab** — every time a workflow runs, the results appear in the Executions tab so you can see exactly what happened
+
+- **Pipeline nodes stand out** — they're colored teal instead of purple, making them easy to spot in complex workflows
+
+- **Collapse sidebar categories** — click category headers to hide node types you don't need right now
+
+- **Test your workflows** — create test workflows (name them `*_test.json` or `test_*.json`) and run them with:
+  ```bash
+  ./run workflow-test
+  ```
+
+- **Cross-workflow communication** — pipeline workflows can trigger each other through shared state patterns. Workflow A writes data, Workflow B automatically picks it up
+
+- **AI commit messages** — when you save a workflow, the system automatically generates a descriptive commit message for the version history
+
+## Running Tests
+
+```bash
+./run check              # Full test suite and quality gates
+./run test tests/e2e/    # Run end-to-end tests
+./run lint               # Check code style
+./run workflow-test      # Run workflow-based tests
+```
+
+## CLI Reference
+
+| Command | What it does |
 |---------|-------------|
-| `./run check` | Run full test suite and quality gates |
-| `./run test <target>` | Run a specific test target |
+| `./run start` | Start the development server |
+| `./run check` | Run all tests and quality checks |
+| `./run test <target>` | Run a specific test |
 | `./run lint` | Run the linter |
-| `./run start` | Start the development server (use `auto` for production) |
+| `./run ai <command>` | Talk to the AI assistant |
+| `./run workflow-test` | Run workflow tests |
 
-### Agents
+## License
 
-dazflow2 supports distributed execution through agents. Agents can be:
-
-- **Built-in**: Runs on the same machine as the server
-- **Remote**: Runs on separate machines and connects to the server
-
-Configure agents through the web interface under the Agents section.
+Private project.
